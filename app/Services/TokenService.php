@@ -37,6 +37,30 @@ final class TokenService
         }
     }
 
+    public function issueTokenForUser(int $userId): array
+    {
+        $pdo = Database::connection();
+        $check = $pdo->prepare('SELECT id FROM users WHERE id=:id LIMIT 1');
+        $check->execute(['id' => $userId]);
+        if (!$check->fetchColumn()) {
+            throw new HttpException(404, 'USER_NOT_FOUND', 'Учётная запись не найдена.');
+        }
+        $plainToken = bin2hex(random_bytes(32));
+        $expiresAt = (new \\DateTimeImmutable('+365 days'))->format('Y-m-d H:i:s');
+        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id,token_hash,expires_at) VALUES (:user_id,:hash,:expires)');
+        $stmt->execute([
+            'user_id' => $userId,
+            'hash' => hash('sha256', $plainToken),
+            'expires' => $expiresAt,
+        ]);
+        return [
+            'token' => $plainToken,
+            'token_type' => 'Bearer',
+            'expires_at' => $expiresAt,
+            'user_id' => $userId,
+        ];
+    }
+
     public function authenticate(string $plainToken): array
     {
         if ($plainToken === '' || strlen($plainToken) > 200) {
