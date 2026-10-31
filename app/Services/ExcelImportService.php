@@ -141,7 +141,7 @@ final class ExcelImportService
         $pdo->beginTransaction();
         try {
             $find = $pdo->prepare(
-                'SELECT id,status,started_at,rows_total,rows_created,rows_updated,rows_unchanged,rows_errors
+                'SELECT id,status,started_at,(started_at IS NULL OR started_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE)) AS is_stale,rows_total,rows_created,rows_updated,rows_unchanged,rows_errors
                  FROM import_log WHERE branch_id=:branch_id AND file_sha256=:hash
                  LIMIT 1 FOR UPDATE'
             );
@@ -162,8 +162,7 @@ final class ExcelImportService
                     ];
                 }
                 if ($existing['status'] === 'processing') {
-                    $startedAt = $existing['started_at'] === null ? false : strtotime((string)$existing['started_at']);
-                    if ($startedAt !== false && $startedAt > time() - 1800) {
+                    if (!(bool)$existing['is_stale']) {
                         throw new HttpException(409, 'IMPORT_ALREADY_PROCESSING', 'Этот файл уже обрабатывается.');
                     }
                 }
@@ -361,13 +360,14 @@ final class ExcelImportService
         $restocked = false;
 
         if (!$existingStock) {
-            $availableSince = (float)$newQuantity > 0 ? date('Y-m-d H:i:s') : null;
+            $availableSince = (float)$newQuantity > 0 ? 'NOW()' : null;
             $pdo->prepare(
-                'INSERT INTO stock (branch_id,product_id,price,quantity,available_since,last_import_id)
-                 VALUES (:branch_id,:product_id,:price,:quantity,:available_since,:import_id)'
+                "INSERT INTO stock (branch_id,product_id,price,quantity,available_since,last_import_id)
+                 VALUES (:branch_id,:product_id,:price,:quantity,IF(:is_available=1,NOW(),NULL),:import_id)"
             )->execute([
                 'branch_id' => $branchId, 'product_id' => $productId, 'price' => $newPrice,
-                'quantity' => $newQuantity, 'available_since' => $availableSince, 'import_id' => $importId,
+                'quantity' => $newQuantity, 'is_available' => (float)$newQuantity > 0 ? 1 : 0,
+                'import_id' => $importId,
             ]);
             $priceChanged = true;
             $restocked = (float)$newQuantity > 0;
@@ -379,7 +379,7 @@ final class ExcelImportService
             $quantityChanged = $oldQuantity !== $newQuantity;
             $restocked = (float)$oldQuantity <= 0 && (float)$newQuantity > 0;
             $stockChanged = $priceChanged || $quantityChanged;
-            $availableSince = $restocked ? date('Y-m-d H:i:s') : ((float)$newQuantity <= 0 ? null : $existingStock['available_since']);
+            $availableSince = $restocked ? 'NOW()' : ((float)$newQuantity <= 0 ? null : $existingStock['available_since']);
             if ($stockChanged || $existingStock['available_since'] !== $availableSince) {
                 $pdo->prepare(
                     'UPDATE stock SET price=:price,quantity=:quantity,available_since=:available_since,last_import_id=:import_id
