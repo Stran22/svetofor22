@@ -68,6 +68,16 @@ final class TokenService
         ];
     }
 
+    public function revokeToken(string $plainToken, int $userId): void
+    {
+        Database::connection()->prepare(
+            'DELETE FROM api_tokens WHERE user_id=:user_id AND token_hash=:hash'
+        )->execute([
+            'user_id' => $userId,
+            'hash' => hash('sha256', $plainToken),
+        ]);
+    }
+
     public function authenticate(string $plainToken): array
     {
         if ($plainToken === '' || strlen($plainToken) > 200) {
