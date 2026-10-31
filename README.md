@@ -18,7 +18,7 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, cURL. Android-кли�
 2. В корне проекта выполнить `composer install --no-dev --optimize-autoloader`.
 3. Скопировать `.env.example` в `.env`, задать доступы к MySQL и OAuth credentials.
 4. Создать БД MySQL с кодировкой utf8mb4.
-5. Применить миграции по порядку: `001_initial_schema.sql`, `002_admin_oauth_security.sql`, `003_oauth_attempt_context.sql`.
+5. Применить миграции по порядку: `001_initial_schema.sql`, `002_admin_oauth_security.sql`, `003_oauth_attempt_context.sql`, затем `004_push_delivery_state.sql`.
 6. Проверить `/api/v1/health`.
 7. В кабинетах VK ID и Яндекс ID зарегистрировать точный Redirect URI: `https://baza.altaj-otdyh.ru/api/v1/auth/oauth/callback`. Этот же адрес должен совпадать с `APP_URL` в `.env`.
 
@@ -60,3 +60,17 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, cURL. Android-кли�
 Администраторские сессии используют HttpOnly cookie, SameSite=Lax, строгий режим PHP-сессий и регенерацию ID после входа. Production должен работать по HTTPS. После 10 неудачных попыток входа для сочетания логина и IP за 15 минут применяется временное ограничение. Роли: `owner`, `manager`, `moderator`; для закрытых операций используется `AdminGuard::requireRole()`.
 
 Гостевой и социальный API-токены генерируются криптографически стойким генератором; в БД сохраняется только SHA-256-хеш. OAuth state, PKCE verifier и handoff-коды также не сохраняются в открытом виде, кроме PKCE verifier, который временно необходим для завершения обмена и удаляется по сроку хранения записей. В production APP_DEBUG=false. Все SQL-параметры передаются через prepared statements.
+
+
+### Push-уведомления о появлении товара
+Серверная отправка выполняется через OneSignal REST API:
+- API-ключ REST хранится только в `.env` на сервере.
+- Получатель адресуется по OneSignal External ID, равному строковому `users.id`.
+- Android-клиент после получения API-токена должен вызвать OneSignal SDK `login(userId)`, используя тот же ID из ответа API. Это связывает устройства пользователя с записью `users`.
+- Для push используется `include_aliases.external_id` совместно с `target_channel=push`; старые player/device IDs не используются.
+- Сервис `PushNotificationService::notifyRestock(productId, branchId, eventKey)` вызывается только после фиксации в БД перехода остатка с 0 на положительное значение.
+- `eventKey` должен быть стабильным для одного события импорта, например `restock:import:42:branch:2:product:900`. Повторный вызов с тем же событием не создаёт повторную отправку.
+- Для каждой подписки хранится отдельная запись в `push_delivery_log`; блокировка, попытки, результат и ответ OneSignal записываются в журнал. При успехе подписка переходит в состояние `triggered`, при неудаче остаётся активной.
+- На стороне OneSignal используется детерминированный `idempotency_key`, поэтому повтор после сетевой ошибки не должен создать дублирующее уведомление в пределах срока идемпотентности OneSignal.
+
+Нужно настроить OneSignal App ID и REST API Key в серверном `.env`. Android OneSignal SDK и вызов `login(userId)` будут подключены на Android-этапе. До этого момента серверная часть не сможет адресовать push устройству, которое ещё не зарегистрировано в OneSignal.
