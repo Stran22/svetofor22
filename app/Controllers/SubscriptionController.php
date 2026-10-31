@@ -36,23 +36,40 @@ final class SubscriptionController
             throw new HttpException(422, 'VALIDATION_ERROR', 'Укажите корректные product_id и branch_id.');
         }
         $pdo = Database::connection();
-        $valid = $pdo->prepare(
-            'SELECT p.id FROM products p CROSS JOIN branches b
-             WHERE p.id=:product_id AND p.is_active=1 AND b.id=:branch_id AND b.is_active=1 LIMIT 1'
-        );
-        $valid->execute(['product_id' => $productId, 'branch_id' => $branchId]);
-        if (!$valid->fetchColumn()) throw new HttpException(404, 'SUBSCRIPTION_TARGET_NOT_FOUND', 'Товар или магазин не найден.');
-        $pdo->prepare(
-            "INSERT INTO subscriptions (user_id,product_id,branch_id,status,notified_at)
-             VALUES (:user_id,:product_id,:branch_id,'active',NULL)
-             ON DUPLICATE KEY UPDATE status='active',notified_at=NULL,updated_at=NOW()"
-        )->execute(['user_id' => $user['id'], 'product_id' => $productId, 'branch_id' => $branchId]);
-        $stmt = $pdo->prepare(
-            'SELECT id,product_id,branch_id,status,created_at FROM subscriptions
-             WHERE user_id=:user_id AND product_id=:product_id AND branch_id=:branch_id'
-        );
-        $stmt->execute(['user_id' => $user['id'], 'product_id' => $productId, 'branch_id' => $branchId]);
-        Response::json(['success' => true, 'data' => ['subscription' => $stmt->fetch()]]);
+        $pdo->beginTransaction();
+        try {
+            $valid = $pdo->prepare(
+                'SELECT p.id,COALESCE(s.quantity,0) AS quantity
+                 FROM products p
+                 JOIN branches b ON b.id=:branch_id AND b.is_active=1
+                 LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=b.id
+                 WHERE p.id=:product_id AND p.is_active=1
+                 LIMIT 1 FOR UPDATE'
+            );
+            $valid->execute(['product_id' => $productId, 'branch_id' => $branchId]);
+            $target = $valid->fetch();
+            if (!$target) throw new HttpException(404, 'SUBSCRIPTION_TARGET_NOT_FOUND', 'Товар или магазин не найден.');
+            if ((float)$target['quantity'] > 0) {
+                throw new HttpException(409, 'PRODUCT_ALREADY_AVAILABLE', 'Товар уже есть в выбранном магазине. Подписка нужна только для отсутствующего товара.');
+            }
+
+            $pdo->prepare(
+                "INSERT INTO subscriptions (user_id,product_id,branch_id,status,notified_at)
+                 VALUES (:user_id,:product_id,:branch_id,'active',NULL)
+                 ON DUPLICATE KEY UPDATE status='active',notified_at=NULL,updated_at=NOW()"
+            )->execute(['user_id' => $user['id'], 'product_id' => $productId, 'branch_id' => $branchId]);
+            $stmt = $pdo->prepare(
+                'SELECT id,product_id,branch_id,status,created_at FROM subscriptions
+                 WHERE user_id=:user_id AND product_id=:product_id AND branch_id=:branch_id'
+            );
+            $stmt->execute(['user_id' => $user['id'], 'product_id' => $productId, 'branch_id' => $branchId]);
+            $subscription = $stmt->fetch();
+            $pdo->commit();
+        } catch (\\Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+        Response::json(['success' => true, 'data' => ['subscription' => $subscription]]);
     }
 
     public function cancel(Request $request): void
