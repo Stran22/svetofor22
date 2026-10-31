@@ -41,7 +41,6 @@ final class Config
                 ],
                 'yandex' => [
                     'client_id' => getenv('YANDEX_CLIENT_ID') ?: '',
-                    'client_secret' => getenv('YANDEX_CLIENT_SECRET') ?: '',
                     'scope' => getenv('YANDEX_SCOPE') ?: 'login:info login:email login:avatar',
                 ],
             ],
