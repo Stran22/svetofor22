@@ -234,12 +234,17 @@ final class OAuthService
             $displayName = trim($firstName . ' ' . $lastName);
             $email = isset($user['email']) && is_string($user['email']) ? $user['email'] : null;
         }
-        if ($providerUserId === '') {
-            throw new HttpException(502, 'OAUTH_PROFILE_INVALID', 'Провайдер не вернул постоянный идентификатор пользователя.');
+        if ($providerUserId === '' || strlen($providerUserId) > 190) {
+            throw new HttpException(502, 'OAUTH_PROFILE_INVALID', 'Провайдер не вернул корректный постоянный идентификатор пользователя.');
         }
+        $displayName = trim((string)$displayName);
+        $displayName = $displayName === '' ? null : mb_substr($displayName, 0, 150);
+        $email = is_string($email) && strlen($email) <= 190 && filter_var($email, FILTER_VALIDATE_EMAIL)
+            ? $email
+            : null;
         return [
             'provider_user_id' => $providerUserId,
-            'display_name' => $displayName !== '' ? $displayName : null,
+            'display_name' => $displayName,
             'email' => $email,
         ];
     }
