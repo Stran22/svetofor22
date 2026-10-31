@@ -234,7 +234,7 @@ final class ExcelImportService
                     $counts['rows_errors']++;
                     $errorCode = $rowError instanceof \PDOException ? 'ROW_DATABASE_ERROR' : 'ROW_DATA_INVALID';
                     $pdo->prepare(
-                        'INSERT INTO import_errors (import_id,row_number,error_code,message,row_data)
+                        'INSERT INTO import_errors (import_id,`row_number`,error_code,message,row_data)
                          VALUES (:import_id,:row_number,:error_code,:message,:row_data)'
                     )->execute([
                         'import_id' => $importId,
