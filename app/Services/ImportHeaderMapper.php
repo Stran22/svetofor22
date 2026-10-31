@@ -29,9 +29,13 @@ final class ImportHeaderMapper
             $normalized = self::normalizeHeader((string)$header);
             if ($normalized === '') continue;
             foreach (self::ALIASES as $field => $aliases) {
-                if (!isset($map[$field]) && in_array($normalized, $aliases, true)) {
-                    $map[$field] = (int)$index;
+                if (!in_array($normalized, $aliases, true)) continue;
+                if (isset($map[$field])) {
+                    // Two columns mapped to one logical field are ambiguous;
+                    // silently choosing one could import the wrong price or stock.
+                    return null;
                 }
+                $map[$field] = (int)$index;
             }
         }
         if (!isset($map['name'], $map['price'], $map['quantity'])) return null;
