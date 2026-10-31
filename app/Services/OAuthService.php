@@ -90,7 +90,7 @@ final class OAuthService
                 'code_challenge_method' => 'S256',
                 'scope' => (string)Config::get('oauth.vk_id.scope', 'vkid.personal_info email'),
             ];
-            if ($provider === 'ok') $params['provider'] = 'ok_ru';
+            $params['provider'] = $provider === 'ok' ? 'ok_ru' : 'vkid';
             $authorizationUrl = self::VK_AUTHORIZE_URL . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
         }
 
