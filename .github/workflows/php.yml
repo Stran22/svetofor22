@@ -19,6 +19,6 @@ jobs:
       - name: Install dependencies
         run: composer install --prefer-dist --no-interaction
       - name: PHP syntax checks
-        run: find app public_html tests -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find app public_html bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Unit tests
         run: composer test
