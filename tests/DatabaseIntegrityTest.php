@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Tests;
 
+use App\Controllers\AdminAuthController;
 use App\Controllers\AdminCatalogController;
 use App\Controllers\AdminImportController;
 use App\Controllers\AdminReviewController;
@@ -289,6 +290,48 @@ final class DatabaseIntegrityTest extends TestCase
         } catch (HttpException $e) {
             self::assertSame(401, $e->status);
         }
+    }
+
+
+    public function testAdminLoginMeAndLogoutUseCurrentDatabaseAccount(): void
+    {
+        $suffix = bin2hex(random_bytes(8));
+        $login = 'login-' . $suffix;
+        $password = 'Strong-test-password-2026';
+        $this->pdo->prepare(
+            'INSERT INTO admins (login,password_hash,role,is_active) VALUES (:login,:hash,\'owner\',1)'
+        )->execute(['login' => $login, 'hash' => password_hash($password, PASSWORD_DEFAULT)]);
+        $adminId = (int)$this->pdo->lastInsertId();
+
+        AdminGuard::startSession();
+        $_SESSION = ['csrf_token' => 'prelogin-' . $suffix];
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'prelogin-' . $suffix;
+        $oldSessionId = session_id();
+
+        $auth = new AdminAuthController();
+        $loggedIn = $this->capture(fn() => $auth->login(
+            new Request('POST', '/api/v1/admin/login', [], [], [
+                'login' => $login, 'password' => $password,
+            ])
+        ));
+        self::assertSame($adminId, (int)$loggedIn['data']['admin']['id']);
+        self::assertNotSame($oldSessionId, session_id());
+        self::assertNotSame('', $loggedIn['data']['csrf_token']);
+
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = $loggedIn['data']['csrf_token'];
+        $me = $this->capture(fn() => $auth->me(
+            new Request('GET', '/api/v1/admin/me', [], [], [])
+        ));
+        self::assertSame($login, $me['data']['admin']['login']);
+
+        $this->capture(fn() => $auth->logout(
+            new Request('POST', '/api/v1/admin/logout', [], [], [])
+        ));
+        self::assertSame(PHP_SESSION_NONE, session_status());
+
+        $check = $this->pdo->prepare('SELECT last_login_at FROM admins WHERE id=:id');
+        $check->execute(['id' => $adminId]);
+        self::assertNotFalse($check->fetchColumn());
     }
 
     private function seedCatalog(): array
