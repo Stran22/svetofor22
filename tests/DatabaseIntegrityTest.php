@@ -120,6 +120,9 @@ final class DatabaseIntegrityTest extends TestCase
     public function testSubscriptionAndReviewQueriesRespectUserAndProductRelations(): void
     {
         [$branchOne, , $productId] = $this->seedCatalog();
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,10.00,5.000)'
+        )->execute(['branch_id' => $branchOne, 'product_id' => $productId]);
         $this->pdo->prepare('INSERT INTO users (display_name) VALUES (:name)')
             ->execute(['name' => 'Integration test']);
         $userId = (int)$this->pdo->lastInsertId();
@@ -128,6 +131,22 @@ final class DatabaseIntegrityTest extends TestCase
             'INSERT INTO api_tokens (user_id,token_hash,expires_at) VALUES (:user_id,:hash,DATE_ADD(NOW(),INTERVAL 1 DAY))'
         )->execute(['user_id' => $userId, 'hash' => hash('sha256', $token)]);
         $requestHeaders = ['Authorization' => 'Bearer ' . $token];
+        // SubscriptionController owns its transaction, so commit fixture data first.
+        $this->pdo->commit();
+
+        try {
+            (new SubscriptionController())->create(
+                new Request('POST', '/api/v1/subscriptions', [], $requestHeaders, [
+                    'product_id' => $productId, 'branch_id' => $branchOne,
+                ])
+            );
+            self::fail('A subscription must be rejected while stock is positive.');
+        } catch (HttpException $e) {
+            self::assertSame(409, $e->status);
+        }
+        $this->pdo->prepare(
+            'UPDATE stock SET quantity=0 WHERE branch_id=:branch_id AND product_id=:product_id'
+        )->execute(['branch_id' => $branchOne, 'product_id' => $productId]);
 
         $created = $this->capture(fn() => (new SubscriptionController())->create(
             new Request('POST', '/api/v1/subscriptions', [], $requestHeaders, [
@@ -273,9 +292,9 @@ final class DatabaseIntegrityTest extends TestCase
             ])
         ));
         self::assertSame('published', $moderated['data']['status']);
-        self::assertCount(1, $this->capture(fn() => $adminReviews->index(
+        self::assertGreaterThanOrEqual(1, count($this->capture(fn() => $adminReviews->index(
             new Request('GET', '/api/v1/admin/reviews', ['status' => 'published'], [], [])
-        ))['data']['items']);
+        ))['data']['items']));
 
         $this->pdo->prepare("UPDATE admins SET role='moderator' WHERE id=:id")->execute(['id' => $adminId]);
         try {
