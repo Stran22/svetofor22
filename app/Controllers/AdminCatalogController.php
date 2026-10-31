@@ -366,11 +366,17 @@ final class AdminCatalogController
         $pdo->beginTransaction();
         try {
             $target = $pdo->prepare(
-                'SELECT b.id AS branch_id,p.id AS product_id FROM branches b CROSS JOIN products p
+                'SELECT b.id AS branch_id,b.is_active AS branch_active,
+                        p.id AS product_id,p.is_active AS product_active
+                 FROM branches b CROSS JOIN products p
                  WHERE b.id=:branch_id AND p.id=:product_id LIMIT 1 FOR UPDATE'
             );
             $target->execute(['branch_id' => $branchId, 'product_id' => $productId]);
-            if (!$target->fetch()) throw new HttpException(404, 'STOCK_TARGET_NOT_FOUND', 'Магазин или товар не найден.');
+            $targetRow = $target->fetch();
+            if (!$targetRow) throw new HttpException(404, 'STOCK_TARGET_NOT_FOUND', 'Магазин или товар не найден.');
+            if (!(bool)$targetRow['branch_active'] || !(bool)$targetRow['product_active']) {
+                throw new HttpException(409, 'STOCK_TARGET_INACTIVE', 'Нельзя изменять остаток отключённого магазина или товара.');
+            }
 
             $find = $pdo->prepare(
                 'SELECT id,price,quantity FROM stock WHERE branch_id=:branch_id AND product_id=:product_id LIMIT 1 FOR UPDATE'
