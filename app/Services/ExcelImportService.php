@@ -35,6 +35,7 @@ final class ExcelImportService
         }
 
         try {
+            $this->validateXlsxPackage($tmpPath);
             if (IOFactory::identify($tmpPath) !== 'Xlsx') {
                 throw new HttpException(422, 'FILE_FORMAT_INVALID', 'Содержимое файла не является корректной книгой Excel .xlsx.');
             }
@@ -51,6 +52,9 @@ final class ExcelImportService
             $sheet = $spreadsheet->getSheet(0);
             $highestRow = $sheet->getHighestRow();
             $highestColumn = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+            if ($highestRow > 100000 || $highestColumn > 100) {
+                throw new HttpException(422, 'XLSX_DIMENSIONS_INVALID', 'В файле слишком много строк или столбцов для безопасного импорта.');
+            }
             $header = $this->detectHeader($sheet, $highestRow, $highestColumn);
             if ($header === null) {
                 throw new HttpException(
@@ -72,6 +76,41 @@ final class ExcelImportService
             return $this->processRows($sheet, $header['row'], $header['map'], $highestRow, $highestColumn, $branchId, $importId);
         } finally {
             $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    private function validateXlsxPackage(string $path): void
+    {
+        if (!class_exists(\\ZipArchive::class)) {
+            throw new HttpException(503, 'ZIP_EXTENSION_UNAVAILABLE', 'На сервере не включено расширение PHP ZIP.');
+        }
+        $zip = new \\ZipArchive();
+        if ($zip->open($path) !== true) {
+            throw new HttpException(422, 'XLSX_PACKAGE_INVALID', 'Файл Excel повреждён или имеет неверный формат.');
+        }
+        try {
+            if ($zip->numFiles > 2000) {
+                throw new HttpException(422, 'XLSX_PACKAGE_TOO_LARGE', 'В Excel-файле слишком много внутренних элементов.');
+            }
+            $totalUncompressed = 0;
+            $hasWorkbook = false;
+            $hasContentTypes = false;
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $stat = $zip->statIndex($i);
+                if (!is_array($stat)) continue;
+                $totalUncompressed += (int)($stat['size'] ?? 0);
+                if ($totalUncompressed > 50 * 1024 * 1024) {
+                    throw new HttpException(422, 'XLSX_UNCOMPRESSED_TOO_LARGE', 'Распакованный объём Excel-файла превышает допустимые 50 МБ.');
+                }
+                $name = (string)($stat['name'] ?? '');
+                if ($name === 'xl/workbook.xml') $hasWorkbook = true;
+                if ($name === '[Content_Types].xml') $hasContentTypes = true;
+            }
+            if (!$hasWorkbook || !$hasContentTypes) {
+                throw new HttpException(422, 'XLSX_PACKAGE_INVALID', 'Файл не содержит обязательную структуру книги Excel.');
+            }
+        } finally {
+            $zip->close();
         }
     }
 
