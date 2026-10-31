@@ -13,6 +13,7 @@ use App\Controllers\SubscriptionController;
 use App\Core\Database;
 use App\Security\AdminGuard;
 use App\Services\OAuthService;
+use App\Services\PushNotificationService;
 use App\Core\HttpException;
 use App\Core\Request;
 use PDO;
@@ -478,6 +479,68 @@ final class DatabaseIntegrityTest extends TestCase
         $conflictingRecord['sku'] = 'OTHER-' . $suffix;
         $this->expectException(\RuntimeException::class);
         $method->invoke($service, $this->pdo, $conflictingRecord, $branchId, $importId);
+    }
+
+
+    public function testPushDeliveryClaimsAreIdempotentAndRetryQueriesMatchSchema(): void
+    {
+        [$branchId, , $productId] = $this->seedCatalog();
+        $this->pdo->prepare('INSERT INTO users (display_name) VALUES (\'Push user one\')')->execute();
+        $userOne = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare('INSERT INTO users (display_name) VALUES (\'Push user two\')')->execute();
+        $userTwo = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            "INSERT INTO subscriptions (user_id,product_id,branch_id,status)
+             VALUES (:user_id,:product_id,:branch_id,'active')"
+        )->execute(['user_id' => $userOne, 'product_id' => $productId, 'branch_id' => $branchId]);
+        $successSubscriptionId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            "INSERT INTO subscriptions (user_id,product_id,branch_id,status)
+             VALUES (:user_id,:product_id,:branch_id,'active')"
+        )->execute(['user_id' => $userTwo, 'product_id' => $productId, 'branch_id' => $branchId]);
+        $retrySubscriptionId = (int)$this->pdo->lastInsertId();
+        $this->pdo->commit();
+
+        $service = new PushNotificationService();
+        $claim = new \ReflectionMethod($service, 'claimDelivery');
+        $claim->setAccessible(true);
+        $finish = new \ReflectionMethod($service, 'finishDelivery');
+        $finish->setAccessible(true);
+
+        $deliveryId = $claim->invoke($service, $this->pdo, $successSubscriptionId, 'restock-success-' . bin2hex(random_bytes(4)));
+        self::assertGreaterThan(0, $deliveryId);
+        self::assertNull($claim->invoke($service, $this->pdo, $successSubscriptionId, 'restock-success-' . 'different-event'));
+
+        $finish->invoke($service, $this->pdo, $deliveryId, true, 'onesignal-test-id', ['id' => 'onesignal-test-id'], null);
+        $status = $this->pdo->prepare('SELECT status FROM subscriptions WHERE id=:id');
+        $status->execute(['id' => $successSubscriptionId]);
+        self::assertSame('triggered', $status->fetchColumn());
+
+        $result = $service->notifyRestock($productId, $branchId, 'restock-retry-' . bin2hex(random_bytes(4)));
+        self::assertSame(1, $result['matched']);
+        self::assertSame(1, $result['failed']);
+
+        $delivery = $this->pdo->prepare(
+            'SELECT id,status,attempt_count,last_error FROM push_delivery_log WHERE subscription_id=:id'
+        );
+        $delivery->execute(['id' => $retrySubscriptionId]);
+        $failed = $delivery->fetch();
+        self::assertSame('failed', $failed['status']);
+        self::assertSame(1, (int)$failed['attempt_count']);
+
+        $this->pdo->prepare(
+            'UPDATE push_delivery_log SET attempted_at=DATE_SUB(NOW(),INTERVAL 20 MINUTE) WHERE id=:id'
+        )->execute(['id' => $failed['id']]);
+        $retry = $service->retryFailedDeliveries(10);
+        self::assertSame(1, $retry['matched']);
+        self::assertSame(1, $retry['failed']);
+
+        $this->pdo->prepare(
+            "UPDATE push_delivery_log SET last_error='NO_SUBSCRIBED_DEVICES',
+             attempted_at=DATE_SUB(NOW(),INTERVAL 20 MINUTE) WHERE id=:id"
+        )->execute(['id' => $failed['id']]);
+        $noDeviceRetry = $service->retryFailedDeliveries(10);
+        self::assertSame(0, $noDeviceRetry['matched']);
     }
 
     private function seedCatalog(): array
