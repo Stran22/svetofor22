@@ -61,7 +61,7 @@ final class ReviewsController
         $save = $pdo->prepare(
             "INSERT INTO reviews (user_id,product_id,rating,body,status)
              VALUES (:user_id,:product_id,:rating,:body,'pending')
-             ON DUPLICATE KEY UPDATE rating=VALUES(rating),body=VALUES(body),status='pending',moderated_at=NULL,updated_at=NOW()"
+             ON DUPLICATE KEY UPDATE rating=VALUES(rating),body=VALUES(body),status='pending',moderated_at=NULL,moderated_by=NULL,updated_at=NOW()"
         );
         $save->execute(['user_id' => $user['id'], 'product_id' => $productId, 'rating' => $rating, 'body' => $body]);
         $stmt = $pdo->prepare('SELECT id,product_id,rating,body,status,created_at,updated_at FROM reviews WHERE user_id=:user_id AND product_id=:product_id');
