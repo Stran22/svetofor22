@@ -14,6 +14,11 @@ jobs:
           php-version: "8.1"
           extensions: pdo_mysql, mbstring, fileinfo, zip, xml
           coverage: none
-      - run: composer validate --no-check-publish
-      - run: composer install --prefer-dist --no-interaction
-      - run: find app public_html -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Validate Composer
+        run: composer validate --no-check-publish
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction
+      - name: PHP syntax checks
+        run: find app public_html tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Unit tests
+        run: composer test
