@@ -228,7 +228,7 @@ final class ExcelImportService
                         $restocks[$outcome['product_id']] = true;
                     }
                     $pdo->exec('RELEASE SAVEPOINT import_row');
-                } catch (\\RuntimeException $rowError) {
+                } catch (\RuntimeException $rowError) {
                     $pdo->exec('ROLLBACK TO SAVEPOINT import_row');
                     $pdo->exec('RELEASE SAVEPOINT import_row');
                     $counts['rows_errors']++;
