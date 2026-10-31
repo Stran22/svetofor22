@@ -23,6 +23,9 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, PHP extensions cURL, 
 7. Открыть панель по адресу `/admin/` и проверить `/api/v1/health`.
 8. В кабинетах VK ID и Яндекс ID зарегистрировать точный Redirect URI: `https://baza.altaj-otdyh.ru/api/v1/auth/oauth/callback`. Этот же адрес должен совпадать с `APP_URL` в `.env`.
 
+## Административная панель
+После создания первого администратора панель доступна по адресу `/admin/`. Интерфейс сделан на обычных HTML/CSS/JavaScript без UI-фреймворка; запросы идут в тот же PHP API, сессионная cookie не доступна JavaScript, изменяющие запросы защищены CSRF. Роль `moderator` видит только раздел отзывов.
+
 ## API v1
 
 ### Каталог и гостевой пользователь
