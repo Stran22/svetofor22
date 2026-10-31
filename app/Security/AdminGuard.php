@@ -48,6 +48,9 @@ final class AdminGuard
                 break;
             }
         }
+        if ($provided === '') {
+            $provided = trim((string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['REDIRECT_HTTP_X_CSRF_TOKEN'] ?? ''));
+        }
         if ($provided === '') $provided = trim((string)($_POST['_csrf'] ?? ''));
         if (!self::matchesCsrfToken($_SESSION['csrf_token'] ?? null, $provided)) {
             throw new HttpException(419, 'CSRF_TOKEN_INVALID', 'Сессия формы устарела. Обновите страницу и повторите действие.');
