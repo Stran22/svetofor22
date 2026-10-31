@@ -7,15 +7,18 @@ use App\Core\Request;
 
 final class RequestUser
 {
+    public static function tokenFromBearer(Request $request): string
+    {
+        $authorization = self::authorizationHeader($request);
+        if (!preg_match('/^Bearer\s+([a-f0-9]{64})$/i', $authorization, $matches)) {
+            throw new HttpException(401, 'UNAUTHENTICATED', 'Требуется корректный Bearer-токен.');
+        }
+        return $matches[1];
+    }
+
     public static function optionalFromBearer(Request $request): ?array
     {
-        $authorization = '';
-        foreach ($request->headers as $name => $value) {
-            if (strtolower((string)$name) === 'authorization') {
-                $authorization = trim((string)$value);
-                break;
-            }
-        }
+        $authorization = self::authorizationHeader($request);
         if ($authorization === '') return null;
         if (!preg_match('/^Bearer\s+([a-f0-9]{64})$/i', $authorization, $matches)) {
             throw new HttpException(401, 'UNAUTHENTICATED', 'Передан некорректный Bearer-токен.');
@@ -30,5 +33,13 @@ final class RequestUser
             throw new HttpException(401, 'UNAUTHENTICATED', 'Требуется Bearer-токен.');
         }
         return $user;
+    }
+
+    private static function authorizationHeader(Request $request): string
+    {
+        foreach ($request->headers as $name => $value) {
+            if (strtolower((string)$name) === 'authorization') return trim((string)$value);
+        }
+        return '';
     }
 }
