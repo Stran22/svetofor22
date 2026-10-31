@@ -148,7 +148,7 @@ final class ExcelImportService
             $find->execute(['branch_id' => $branchId, 'hash' => $fileHash]);
             $existing = $find->fetch();
             if ($existing) {
-                if (in_array($existing['status'], ['completed', 'completed_with_errors'], true)) {
+                if ($existing['status'] === 'completed') {
                     $pdo->commit();
                     return [
                         'duplicate' => true,
