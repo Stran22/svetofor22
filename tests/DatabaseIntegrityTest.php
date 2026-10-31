@@ -2,11 +2,15 @@
 declare(strict_types=1);
 namespace Tests;
 
+use App\Controllers\AdminCatalogController;
+use App\Controllers\AdminImportController;
+use App\Controllers\AdminReviewController;
 use App\Controllers\CatalogController;
 use App\Controllers\PriceHistoryController;
 use App\Controllers\ReviewsController;
 use App\Controllers\SubscriptionController;
 use App\Core\Database;
+use App\Security\AdminGuard;
 use App\Core\HttpException;
 use App\Core\Request;
 use PDO;
@@ -27,6 +31,11 @@ final class DatabaseIntegrityTest extends TestCase
 
     protected function tearDown(): void
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION = [];
+            session_destroy();
+        }
+        unset($_SERVER['HTTP_X_CSRF_TOKEN']);
         if ($this->pdo && $this->pdo->inTransaction()) {
             $this->pdo->rollBack();
         }
@@ -154,6 +163,127 @@ final class DatabaseIntegrityTest extends TestCase
             ])
         ));
         self::assertSame('cancelled', $cancelled['data']['status']);
+    }
+
+
+    public function testAdminCatalogImportAndReviewQueriesUseLiveSchemaAndRoles(): void
+    {
+        $suffix = bin2hex(random_bytes(8));
+        $this->pdo->prepare(
+            'INSERT INTO admins (login,password_hash,role,is_active) VALUES (:login,:hash,\'owner\',1)'
+        )->execute(['login' => 'audit-' . $suffix, 'hash' => password_hash('test-password', PASSWORD_DEFAULT)]);
+        $adminId = (int)$this->pdo->lastInsertId();
+
+        AdminGuard::startSession();
+        $_SESSION = [
+            'admin' => ['id' => $adminId, 'login' => 'audit-' . $suffix, 'role' => 'owner'],
+            'csrf_token' => 'csrf-' . $suffix,
+            'admin_last_activity' => time(),
+        ];
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'csrf-' . $suffix;
+
+        $adminCatalog = new AdminCatalogController();
+        $category = $this->capture(fn() => $adminCatalog->saveCategory(
+            new Request('POST', '/api/v1/admin/categories/save', [], [], [
+                'name' => 'Audit category', 'slug' => 'audit-category-' . $suffix,
+                'parent_id' => '', 'image_url' => '', 'sort_order' => 0, 'is_active' => true,
+            ])
+        ));
+        $categoryId = (int)$category['data']['id'];
+
+        $branch = $this->capture(fn() => $adminCatalog->saveBranch(
+            new Request('POST', '/api/v1/admin/branches/save', [], [], [
+                'name' => 'Audit branch', 'slug' => 'audit-branch-' . $suffix,
+                'address' => 'Test address', 'phone' => '', 'sort_order' => 0, 'is_active' => true,
+            ])
+        ));
+        $branchId = (int)$branch['data']['id'];
+
+        $product = $this->capture(fn() => $adminCatalog->saveProduct(
+            new Request('POST', '/api/v1/admin/products/save', [], [], [
+                'name' => 'Audit product', 'slug' => 'audit-product-' . $suffix,
+                'sku' => 'AUD-' . $suffix, 'barcode' => '', 'unit' => 'шт.',
+                'description' => 'Integration test', 'image_url' => '',
+                'category_id' => $categoryId, 'is_active' => true,
+            ])
+        ));
+        $productId = (int)$product['data']['id'];
+
+        $this->capture(fn() => $adminCatalog->saveStock(
+            new Request('POST', '/api/v1/admin/stock/save', [], [], [
+                'branch_id' => $branchId, 'product_id' => $productId,
+                'price' => '19,90', 'quantity' => '0',
+            ])
+        ));
+
+        self::assertCount(1, $this->capture(fn() => $adminCatalog->categories(
+            new Request('GET', '/api/v1/admin/categories', [], [], [])
+        ))['data']['items']);
+        self::assertGreaterThanOrEqual(1, count($this->capture(fn() => $adminCatalog->branches(
+            new Request('GET', '/api/v1/admin/branches', [], [], [])
+        ))['data']['items']));
+        self::assertGreaterThanOrEqual(1, count($this->capture(fn() => $adminCatalog->products(
+            new Request('GET', '/api/v1/admin/products', [], [], [])
+        ))['data']['items']));
+        self::assertCount(1, $this->capture(fn() => $adminCatalog->stock(
+            new Request('GET', '/api/v1/admin/stock', ['branch_id' => (string)$branchId], [], [])
+        ))['data']['items']);
+
+        $fileHash = hash('sha256', 'audit-' . $suffix);
+        $this->pdo->prepare(
+            "INSERT INTO import_log (branch_id,original_filename,file_sha256,status,started_at,finished_at)
+             VALUES (:branch_id,'audit.xlsx',:hash,'completed',NOW(),NOW())"
+        )->execute(['branch_id' => $branchId, 'hash' => $fileHash]);
+        $importId = (int)$this->pdo->lastInsertId();
+        $rowNumberColumn = chr(96) . 'row_number' . chr(96);
+        $this->pdo->prepare(
+            'INSERT INTO import_errors (import_id,' . $rowNumberColumn . ',error_code,message,row_data)
+             VALUES (:import_id,12,\'ROW_DATA_INVALID\',\'Bad test row\',JSON_OBJECT(\'sku\',\'x\'))'
+        )->execute(['import_id' => $importId]);
+
+        $adminImports = new AdminImportController();
+        self::assertCount(1, $this->capture(fn() => $adminImports->index(
+            new Request('GET', '/api/v1/admin/imports', ['branch_id' => (string)$branchId], [], [])
+        ))['data']['items']);
+        $errors = $this->capture(fn() => $adminImports->errors(
+            new Request('GET', '/api/v1/admin/import-errors', ['import_id' => (string)$importId], [], [])
+        ));
+        self::assertSame(12, (int)$errors['data']['errors'][0]['row_number']);
+
+        $this->pdo->prepare('INSERT INTO users (display_name) VALUES (:name)')
+            ->execute(['name' => 'Audit reviewer']);
+        $userId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            "INSERT INTO reviews (user_id,product_id,rating,body,status)
+             VALUES (:user_id,:product_id,4,'Moderation test','pending')"
+        )->execute(['user_id' => $userId, 'product_id' => $productId]);
+        $reviewId = (int)$this->pdo->lastInsertId();
+
+        $adminReviews = new AdminReviewController();
+        $moderated = $this->capture(fn() => $adminReviews->moderate(
+            new Request('POST', '/api/v1/admin/reviews/moderate', [], [], [
+                'review_id' => $reviewId, 'status' => 'published',
+            ])
+        ));
+        self::assertSame('published', $moderated['data']['status']);
+        self::assertCount(1, $this->capture(fn() => $adminReviews->index(
+            new Request('GET', '/api/v1/admin/reviews', ['status' => 'published'], [], [])
+        ))['data']['items']);
+
+        $this->pdo->prepare("UPDATE admins SET role='moderator' WHERE id=:id")->execute(['id' => $adminId]);
+        try {
+            AdminGuard::requireRole(['owner']);
+            self::fail('A changed moderator role must not retain owner access.');
+        } catch (HttpException $e) {
+            self::assertSame(403, $e->status);
+        }
+        $this->pdo->prepare('UPDATE admins SET is_active=0 WHERE id=:id')->execute(['id' => $adminId]);
+        try {
+            AdminGuard::requireAdmin();
+            self::fail('A disabled administrator must lose access immediately.');
+        } catch (HttpException $e) {
+            self::assertSame(401, $e->status);
+        }
     }
 
     private function seedCatalog(): array
