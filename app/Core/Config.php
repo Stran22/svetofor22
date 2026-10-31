@@ -31,7 +31,8 @@ final class Config
                 'database' => getenv('DB_DATABASE') ?: '',
                 'username' => getenv('DB_USERNAME') ?: '',
                 'password' => getenv('DB_PASSWORD') ?: '',
-                'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',\n                'timezone' => getenv('DB_TIMEZONE') ?: '+07:00',
+                'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
+                'timezone' => getenv('DB_TIMEZONE') ?: '+07:00',
             ],
             'onesignal' => [
                 'app_id' => getenv('ONESIGNAL_APP_ID') ?: '',
