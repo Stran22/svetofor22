@@ -236,12 +236,13 @@ final class DatabaseIntegrityTest extends TestCase
         ));
         $productId = (int)$product['data']['id'];
 
-        $this->capture(fn() => $adminCatalog->saveStock(
+        $stockSaved = $this->capture(fn() => $adminCatalog->saveStock(
             new Request('POST', '/api/v1/admin/stock/save', [], [], [
                 'branch_id' => $branchId, 'product_id' => $productId,
-                'price' => '19,90', 'quantity' => '0',
+                'price' => '19,90', 'quantity' => '2',
             ])
         ));
+        self::assertTrue($stockSaved['data']['restocked']);
 
         self::assertCount(1, $this->capture(fn() => $adminCatalog->categories(
             new Request('GET', '/api/v1/admin/categories', [], [], [])
