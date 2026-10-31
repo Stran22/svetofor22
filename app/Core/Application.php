@@ -23,6 +23,7 @@ final class Application
         $catalog = new CatalogController();
         $auth = new AuthController();
         $adminAuth = new AdminAuthController();
+        $adminCatalog = new AdminCatalogController();
         $adminImport = new AdminImportController();
         $adminReview = new AdminReviewController();
         $oauth = new OAuthController();
@@ -57,6 +58,14 @@ final class Application
         $router->get('/api/v1/admin/import-errors', [$adminImport, 'errors']);
         $router->get('/api/v1/admin/reviews', [$adminReview, 'index']);
         $router->post('/api/v1/admin/reviews/moderate', [$adminReview, 'moderate']);
+        $router->get('/api/v1/admin/products', [$adminCatalog, 'products']);
+        $router->post('/api/v1/admin/products/save', [$adminCatalog, 'saveProduct']);
+        $router->get('/api/v1/admin/categories', [$adminCatalog, 'categories']);
+        $router->post('/api/v1/admin/categories/save', [$adminCatalog, 'saveCategory']);
+        $router->get('/api/v1/admin/branches', [$adminCatalog, 'branches']);
+        $router->post('/api/v1/admin/branches/save', [$adminCatalog, 'saveBranch']);
+        $router->get('/api/v1/admin/stock', [$adminCatalog, 'stock']);
+        $router->post('/api/v1/admin/stock/save', [$adminCatalog, 'saveStock']);
 
         try {
             $router->dispatch(Request::fromGlobals());
