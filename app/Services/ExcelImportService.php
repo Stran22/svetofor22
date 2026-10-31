@@ -379,15 +379,20 @@ final class ExcelImportService
             $quantityChanged = $oldQuantity !== $newQuantity;
             $restocked = (float)$oldQuantity <= 0 && (float)$newQuantity > 0;
             $stockChanged = $priceChanged || $quantityChanged;
-            $availableSince = $restocked ? 'NOW()' : ((float)$newQuantity <= 0 ? null : $existingStock['available_since']);
-            if ($stockChanged || $existingStock['available_since'] !== $availableSince) {
-                $pdo->prepare(
-                    'UPDATE stock SET price=:price,quantity=:quantity,available_since=:available_since,last_import_id=:import_id
-                     WHERE id=:id'
-                )->execute([
-                    'price' => $newPrice, 'quantity' => $newQuantity, 'available_since' => $availableSince,
-                    'import_id' => $importId, 'id' => $existingStock['id'],
-                ]);
+            if ($stockChanged || $restocked || ((float)$newQuantity <= 0 && $existingStock['available_since'] !== null)) {
+                if ($restocked) {
+                    $pdo->prepare(
+                        'UPDATE stock SET price=:price,quantity=:quantity,available_since=NOW(),last_import_id=:import_id WHERE id=:id'
+                    )->execute(['price' => $newPrice, 'quantity' => $newQuantity, 'import_id' => $importId, 'id' => $existingStock['id']]);
+                } elseif ((float)$newQuantity <= 0) {
+                    $pdo->prepare(
+                        'UPDATE stock SET price=:price,quantity=:quantity,available_since=NULL,last_import_id=:import_id WHERE id=:id'
+                    )->execute(['price' => $newPrice, 'quantity' => $newQuantity, 'import_id' => $importId, 'id' => $existingStock['id']]);
+                } else {
+                    $pdo->prepare(
+                        'UPDATE stock SET price=:price,quantity=:quantity,last_import_id=:import_id WHERE id=:id'
+                    )->execute(['price' => $newPrice, 'quantity' => $newQuantity, 'import_id' => $importId, 'id' => $existingStock['id']]);
+                }
             } else {
                 $pdo->prepare('UPDATE stock SET last_import_id=:import_id WHERE id=:id')
                     ->execute(['import_id' => $importId, 'id' => $existingStock['id']]);
