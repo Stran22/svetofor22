@@ -34,6 +34,10 @@
     loginView.hidden = true;
     appView.hidden = false;
     $('#adminLabel').textContent = currentAdmin ? currentAdmin.login + ' · ' + currentAdmin.role : '';
+    document.querySelectorAll('#navigation button[data-view]').forEach((button) => {
+      button.hidden = currentAdmin && currentAdmin.role === 'moderator' ? button.dataset.view !== 'reviews' : false;
+    });
+    if (currentAdmin && currentAdmin.role === 'moderator') activeView = 'reviews';
     showNotice('');
     renderView(activeView);
   }
