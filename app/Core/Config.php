@@ -33,7 +33,11 @@ final class Config
                 'password' => getenv('DB_PASSWORD') ?: '',
                 'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
             ],
-            'onesignal' => [\n                'app_id' => getenv('ONESIGNAL_APP_ID') ?: '',\n                'rest_api_key' => getenv('ONESIGNAL_REST_API_KEY') ?: '',\n            ],\n            'oauth' => [
+            'onesignal' => [
+                'app_id' => getenv('ONESIGNAL_APP_ID') ?: '',
+                'rest_api_key' => getenv('ONESIGNAL_REST_API_KEY') ?: '',
+            ],
+            'oauth' => [
                 'vk_id' => [
                     'client_id' => getenv('VK_ID_CLIENT_ID') ?: '',
                     'service_token' => getenv('VK_ID_SERVICE_TOKEN') ?: '',
