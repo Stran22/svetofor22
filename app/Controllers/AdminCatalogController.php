@@ -363,6 +363,7 @@ final class AdminCatalogController
         $restocked = false;
         $stockId = 0;
         $auditId = 0;
+        $eventKey = null;
         $pdo->beginTransaction();
         try {
             $target = $pdo->prepare(
@@ -424,14 +425,17 @@ final class AdminCatalogController
                 'old_quantity' => $oldQuantity, 'new_quantity' => $quantity,
             ]);
             $auditId = (int)$pdo->lastInsertId();
+            if ($restocked) {
+                $eventKey = 'restock:admin_audit:' . $auditId;
+                (new PushNotificationService())->enqueueRestock($pdo, $productId, $branchId, $eventKey);
+            }
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
 
-        if ($restocked) {
-            $eventKey = 'restock:admin_audit:' . $auditId;
+        if ($restocked && $eventKey !== null) {
             try {
                 (new PushNotificationService())->notifyRestock($productId, $branchId, $eventKey);
             } catch (Throwable $e) {
