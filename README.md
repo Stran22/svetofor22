@@ -36,6 +36,7 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, PHP extensions cURL, 
 - GET `/api/v1/products/detail?id=123` — карточка и наличие/цены по филиалам.
 - POST `/api/v1/auth/guest` с JSON `{"device_uuid":"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}` — регистрация гостевого устройства и выдача Bearer-токена.
 - GET `/api/v1/auth/me` с заголовком `Authorization: Bearer <token>` — текущий пользователь.
+- POST `/api/v1/auth/logout` с тем же заголовком — отозвать текущий токен на этом устройстве; учётная запись и социальная привязка остаются.
 
 ### Социальная авторизация
 1. Клиент отправляет POST `/api/v1/auth/oauth/start` с JSON `{"provider":"vk"}`, `{"provider":"ok"}` или `{"provider":"yandex"}`. Если нужно привязать социальную учётную запись к текущему гостю, передаёт его Bearer-токен в заголовке `Authorization`.
