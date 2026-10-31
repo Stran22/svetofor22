@@ -26,8 +26,10 @@ final class AdminCatalogController
         $where = [];
         $params = [];
         if ($query !== '') {
-            $where[] = '(p.name LIKE :q OR p.sku LIKE :q OR p.barcode LIKE :q)';
-            $params['q'] = '%' . $query . '%';
+            $where[] = '(p.name LIKE :q_name OR p.sku LIKE :q_sku OR p.barcode LIKE :q_barcode)';
+            $params['q_name'] = '%' . $query . '%';
+            $params['q_sku'] = '%' . $query . '%';
+            $params['q_barcode'] = '%' . $query . '%';
         }
         if ($categoryId !== null) {
             if (!$categoryId || $categoryId < 1) throw new HttpException(422, 'CATEGORY_ID_INVALID', 'Некорректный category_id.');
