@@ -46,6 +46,7 @@ final class Application
 
         $router->post('/api/v1/auth/guest', [$auth, 'guest']);
         $router->get('/api/v1/auth/me', [$auth, 'me']);
+        $router->post('/api/v1/auth/logout', [$auth, 'logout']);
         $router->post('/api/v1/auth/oauth/start', [$oauth, 'start']);
         $router->get('/api/v1/auth/oauth/callback', [$oauth, 'callback']);
         $router->post('/api/v1/auth/oauth/exchange', [$oauth, 'exchange']);
