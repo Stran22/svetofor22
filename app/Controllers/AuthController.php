@@ -2,9 +2,11 @@
 declare(strict_types=1);
 namespace App\Controllers;
 
+use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\RequestUser;
 use App\Services\TokenService;
 
 final class AuthController
@@ -21,14 +23,13 @@ final class AuthController
 
     public function me(Request $request): void
     {
-        $authorization = '';
-        foreach ($request->headers as $name => $value) {
-            if (strtolower((string)$name) === 'authorization') { $authorization = trim((string)$value); break; }
-        }
-        if (!preg_match('/^Bearer\s+([a-f0-9]{64})$/i', $authorization, $matches)) {
-            throw new HttpException(401, 'UNAUTHENTICATED', 'Требуется Bearer-токен.');
-        }
-        $user = (new TokenService())->authenticate($matches[1]);
-        Response::json(['success' => true, 'data' => ['user' => $user, 'account_type' => 'guest']]);
+        $user = RequestUser::fromBearer($request);
+        $stmt = Database::connection()->prepare('SELECT 1 FROM social_accounts WHERE user_id=:user_id LIMIT 1');
+        $stmt->execute(['user_id' => $user['id']]);
+        $accountType = $stmt->fetchColumn() ? 'social' : 'guest';
+        Response::json(['success' => true, 'data' => [
+            'user' => $user,
+            'account_type' => $accountType,
+        ]]);
     }
 }
