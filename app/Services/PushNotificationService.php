@@ -66,7 +66,7 @@ final class PushNotificationService
                 );
                 $messageId = trim((string)($response['id'] ?? ''));
                 if ($messageId === '') {
-                    $this->finishDelivery($pdo, $claim, false, null, $response, 'OneSignal не нашёл активную push-подписку пользователя.');
+                    $this->finishDelivery($pdo, $claim, false, null, $response, 'NO_SUBSCRIBED_DEVICES');
                     $result['failed']++;
                     continue;
                 }
@@ -76,6 +76,59 @@ final class PushNotificationService
                 $this->finishDelivery($pdo, $claim, false, null, ['error' => 'ONESIGNAL_REQUEST_FAILED'], $e->getMessage());
                 $result['failed']++;
                 error_log('OneSignal delivery failed for subscription ' . (int)$subscription['subscription_id'] . ': ' . $e->getMessage());
+            }
+        }
+        return $result;
+    }
+
+    public function retryFailedDeliveries(int $limit = 100): array
+    {
+        $limit = min(500, max(1, $limit));
+        $pdo = Database::connection();
+        $stmt = $pdo->query(
+            "SELECT d.subscription_id,d.event_key,s.user_id,s.product_id,s.branch_id,
+                    p.name AS product_name,b.name AS branch_name
+             FROM push_delivery_log d
+             JOIN subscriptions s ON s.id=d.subscription_id
+             JOIN products p ON p.id=s.product_id
+             JOIN branches b ON b.id=s.branch_id
+             WHERE s.status='active' AND d.attempt_count<10
+               AND COALESCE(d.last_error,'')<>'NO_SUBSCRIBED_DEVICES'
+               AND (
+                    (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))
+                    OR (d.status='processing' AND d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+               )
+             ORDER BY d.id ASC LIMIT " . $limit
+        );
+        $items = $stmt->fetchAll();
+        $result = ['matched' => count($items), 'sent' => 0, 'failed' => 0, 'skipped' => 0];
+        foreach ($items as $item) {
+            $deliveryId = $this->claimDelivery($pdo, (int)$item['subscription_id'], (string)$item['event_key']);
+            if ($deliveryId === null) {
+                $result['skipped']++;
+                continue;
+            }
+            try {
+                $response = $this->send(
+                    (int)$item['user_id'],
+                    (string)$item['product_name'],
+                    (string)$item['branch_name'],
+                    (int)$item['product_id'],
+                    (int)$item['branch_id'],
+                    self::idempotencyKey((int)$item['subscription_id'], (string)$item['event_key'])
+                );
+                $messageId = trim((string)($response['id'] ?? ''));
+                if ($messageId === '') {
+                    $this->finishDelivery($pdo, $deliveryId, false, null, $response, 'NO_SUBSCRIBED_DEVICES');
+                    $result['failed']++;
+                    continue;
+                }
+                $this->finishDelivery($pdo, $deliveryId, true, $messageId, $response, null);
+                $result['sent']++;
+            } catch (Throwable $e) {
+                $this->finishDelivery($pdo, $deliveryId, false, null, ['error' => 'ONESIGNAL_REQUEST_FAILED'], $e->getMessage());
+                $result['failed']++;
+                error_log('OneSignal retry failed for subscription ' . (int)$item['subscription_id'] . ': ' . $e->getMessage());
             }
         }
         return $result;
@@ -116,7 +169,7 @@ final class PushNotificationService
             }
             $pdo->prepare(
                 "UPDATE push_delivery_log
-                 SET status='processing',locked_at=NOW(),attempt_count=attempt_count+1,last_error=NULL
+                 SET status='processing',locked_at=NOW(),attempted_at=NOW(),attempt_count=attempt_count+1,last_error=NULL
                  WHERE id=:id"
             )->execute(['id' => $delivery['id']]);
             $pdo->commit();
