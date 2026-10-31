@@ -268,6 +268,18 @@ final class ExcelImportService
                 'errors' => $counts['rows_errors'],
                 'id' => $importId,
             ]);
+            $push = new PushNotificationService();
+            $restockEvents = [];
+            foreach (array_keys($restocks) as $productId) {
+                $finalStock = $pdo->prepare(
+                    'SELECT quantity FROM stock WHERE product_id=:product_id AND branch_id=:branch_id LIMIT 1'
+                );
+                $finalStock->execute(['product_id' => $productId, 'branch_id' => $branchId]);
+                if ((float)$finalStock->fetchColumn() <= 0) continue;
+                $eventKey = 'restock:import:' . $importId . ':branch:' . $branchId . ':product:' . $productId;
+                $push->enqueueRestock($pdo, (int)$productId, $branchId, $eventKey);
+                $restockEvents[(int)$productId] = $eventKey;
+            }
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -276,12 +288,7 @@ final class ExcelImportService
             throw $e;
         }
 
-        $push = new PushNotificationService();
-        foreach (array_keys($restocks) as $productId) {
-            $finalStock = $pdo->prepare('SELECT quantity FROM stock WHERE product_id=:product_id AND branch_id=:branch_id LIMIT 1');
-            $finalStock->execute(['product_id' => $productId, 'branch_id' => $branchId]);
-            if ((float)$finalStock->fetchColumn() <= 0) continue;
-            $eventKey = 'restock:import:' . $importId . ':branch:' . $branchId . ':product:' . $productId;
+        foreach ($restockEvents as $productId => $eventKey) {
             try {
                 $push->notifyRestock((int)$productId, $branchId, $eventKey);
             } catch (Throwable $e) {
