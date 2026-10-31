@@ -7,12 +7,33 @@ on:
 jobs:
   php:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0.46
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: svetofor_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: svetofor_test
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_TIMEZONE: "+07:00"
+      RUN_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.1"
-          extensions: pdo_mysql, mbstring, fileinfo, zip, xml, curl, iconv
+          extensions: pdo_mysql, mbstring, fileinfo, zip, xml, xmlreader, xmlwriter, curl, iconv
           coverage: none
       - name: Validate Composer
         run: composer validate --no-check-publish
@@ -22,5 +43,7 @@ jobs:
         run: |
           find app public_html bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
           node --check public_html/admin/admin.js
-      - name: Unit tests
+      - name: Apply MySQL migrations
+        run: php bin/migrate.php
+      - name: Unit and database integration tests
         run: composer test
