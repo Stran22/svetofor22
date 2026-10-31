@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 use App\Core\Config;
 use App\Core\Database;
-use PDOException;
 
 if (PHP_SAPI !== 'cli') {
     fwrite(STDERR, "This command can only run from CLI.\n");
