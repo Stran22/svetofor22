@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace App\Core;
 
+use App\Controllers\AuthController;
 use App\Controllers\CatalogController;
 use App\Controllers\SystemController;
 use Throwable;
@@ -13,11 +14,14 @@ final class Application
         $router = new Router();
         $system = new SystemController();
         $catalog = new CatalogController();
+        $auth = new AuthController();
         $router->get('/api/v1/health', [$system, 'health']);
         $router->get('/api/v1/branches', [$catalog, 'branches']);
         $router->get('/api/v1/categories', [$catalog, 'categories']);
         $router->get('/api/v1/products', [$catalog, 'products']);
         $router->get('/api/v1/products/detail', [$catalog, 'productDetail']);
+        $router->post('/api/v1/auth/guest', [$auth, 'guest']);
+        $router->get('/api/v1/auth/me', [$auth, 'me']);
 
         try {
             $router->dispatch(Request::fromGlobals());

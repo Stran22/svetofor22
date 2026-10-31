@@ -7,6 +7,7 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x. Android-клиент 
 ## Структура
 - `app/Core` — ядро HTTP/API, конфигурация и БД.
 - `app/Controllers` — API-контроллеры.
+- `app/Services` — бизнес-логика.
 - `database/migrations` — SQL-схема.
 - `public_html` — единственная публичная директория.
 - `storage` — непубличные файлы импорта и журналы.
@@ -25,5 +26,7 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x. Android-клиент 
 - GET `/api/v1/categories` — категории.
 - GET `/api/v1/products?page=1&per_page=24&branch_id=1&category_id=2&q=молоко` — каталог.
 - GET `/api/v1/products/detail?id=123` — карточка и наличие/цены по филиалам.
+- POST `/api/v1/auth/guest` с JSON `{"device_uuid":"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"}` — регистрация гостевого устройства и выдача Bearer-токена.
+- GET `/api/v1/auth/me` с заголовком `Authorization: Bearer <token>` — текущий пользователь.
 
-Секреты не коммитить. В production APP_DEBUG=false. Все SQL-параметры передаются через prepared statements.
+Гостевой токен генерируется криптографически стойким генератором; в БД сохраняется только SHA-256-хеш. Секреты не коммитить. В production APP_DEBUG=false. Все SQL-параметры передаются через prepared statements.
