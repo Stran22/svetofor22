@@ -67,8 +67,26 @@ final class AdminGuard
             session_destroy();
             throw new HttpException(401, 'ADMIN_SESSION_EXPIRED', 'Сессия администратора завершена из-за бездействия. Войдите снова.');
         }
+        $stmt = Database::connection()->prepare(
+            'SELECT id,login,role,is_active FROM admins WHERE id=:id LIMIT 1'
+        );
+        $stmt->execute(['id' => (int)$admin['id']]);
+        $current = $stmt->fetch();
+        if (!$current || !(bool)$current['is_active']) {
+            $_SESSION = [];
+            session_destroy();
+            throw new HttpException(401, 'ADMIN_ACCOUNT_DISABLED', 'Учётная запись администратора отключена. Войдите снова после проверки доступа.');
+        }
+
+        // Roles are read from MySQL on every protected request. A role change or
+        // account deactivation therefore takes effect without waiting for logout.
+        $_SESSION['admin'] = [
+            'id' => (int)$current['id'],
+            'login' => (string)$current['login'],
+            'role' => (string)$current['role'],
+        ];
         $_SESSION['admin_last_activity'] = time();
-        return $admin;
+        return $_SESSION['admin'];
     }
 
     public static function requireRole(array $allowedRoles): array
