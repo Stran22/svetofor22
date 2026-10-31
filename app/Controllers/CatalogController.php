@@ -29,6 +29,21 @@ final class CatalogController
         $branchId = $this->positiveInt($request->query['branch_id'] ?? null);
         $categoryId = $this->positiveInt($request->query['category_id'] ?? null);
         $search = trim((string)($request->query['q'] ?? ''));
+        $pdo = Database::connection();
+        if ($branchId !== null) {
+            $branchCheck = $pdo->prepare('SELECT id FROM branches WHERE id=:id AND is_active=1 LIMIT 1');
+            $branchCheck->execute(['id' => $branchId]);
+            if (!$branchCheck->fetchColumn()) {
+                throw new HttpException(404, 'BRANCH_NOT_FOUND', 'Магазин не найден или отключён.');
+            }
+        }
+        if ($categoryId !== null) {
+            $categoryCheck = $pdo->prepare('SELECT id FROM categories WHERE id=:id AND is_active=1 LIMIT 1');
+            $categoryCheck->execute(['id' => $categoryId]);
+            if (!$categoryCheck->fetchColumn()) {
+                throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена или отключена.');
+            }
+        }
         $where = ['p.is_active=1'];
         $params = [];
         if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = [$categoryId, PDO::PARAM_INT]; }
@@ -48,7 +63,7 @@ final class CatalogController
         $sql = 'SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
             ' FROM products p' . $join . ' WHERE ' . implode(' AND ', $where) .
             ' ORDER BY p.name LIMIT :limit OFFSET :offset';
-        $stmt = Database::connection()->prepare($sql);
+        $stmt = $pdo->prepare($sql);
         foreach ($params as $key => [$value, $type]) $stmt->bindValue(':' . $key, $value, $type);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
