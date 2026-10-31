@@ -85,6 +85,12 @@ final class PushNotificationService
     {
         $pdo->beginTransaction();
         try {
+            $active = $pdo->prepare("SELECT status FROM subscriptions WHERE id=:id LIMIT 1 FOR UPDATE");
+            $active->execute(['id' => $subscriptionId]);
+            if ($active->fetchColumn() !== 'active') {
+                $pdo->commit();
+                return null;
+            }
             $pdo->prepare(
                 "INSERT IGNORE INTO push_delivery_log (subscription_id,event_key,status)
                  VALUES (:subscription_id,:event_key,'pending')"
