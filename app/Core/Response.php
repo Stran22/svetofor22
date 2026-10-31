@@ -12,6 +12,14 @@ final class Response
         echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
+    public static function redirect(string $url, int $status = 302): void
+    {
+        if (!in_array($status, [302, 303], true)) $status = 302;
+        header('Cache-Control: no-store');
+        header('Location: ' . $url, true, $status);
+        exit;
+    }
+
     public static function notFound(): void
     {
         self::json(['success' => false, 'error' => ['code' => 'NOT_FOUND', 'message' => 'Маршрут не найден.']], 404);
