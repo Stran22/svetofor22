@@ -65,7 +65,7 @@ final class SubscriptionController
             $stmt->execute(['user_id' => $user['id'], 'product_id' => $productId, 'branch_id' => $branchId]);
             $subscription = $stmt->fetch();
             $pdo->commit();
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
