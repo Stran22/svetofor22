@@ -360,7 +360,6 @@ final class ExcelImportService
         $restocked = false;
 
         if (!$existingStock) {
-            $availableSince = (float)$newQuantity > 0 ? 'NOW()' : null;
             $pdo->prepare(
                 "INSERT INTO stock (branch_id,product_id,price,quantity,available_since,last_import_id)
                  VALUES (:branch_id,:product_id,:price,:quantity,IF(:is_available=1,NOW(),NULL),:import_id)"
