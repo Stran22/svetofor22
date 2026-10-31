@@ -170,10 +170,13 @@ final class AdminCatalogController
         }
         if ($imageUrl !== '' && !$this->isHttpsUrl($imageUrl)) throw new HttpException(422, 'IMAGE_URL_INVALID', 'Ссылка на изображение должна быть HTTPS.');
         $pdo = Database::connection();
+        $existingCategory = null;
         if ($id !== null) {
-            $exists = $pdo->prepare('SELECT id FROM categories WHERE id=:id LIMIT 1');
+            $exists = $pdo->prepare('SELECT id,slug,is_active FROM categories WHERE id=:id LIMIT 1');
             $exists->execute(['id' => $id]);
-            if (!$exists->fetchColumn()) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
+            $existingCategory = $exists->fetch();
+            if (!$existingCategory) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
+            if (!array_key_exists('is_active', $request->body)) $isActive = (bool)$existingCategory['is_active'];
         }
         if ($parentId !== null) {
             if ($id !== null && $parentId === $id) throw new HttpException(422, 'CATEGORY_PARENT_CYCLE', 'Категория не может быть родителем самой себе.');
@@ -194,7 +197,9 @@ final class AdminCatalogController
             }
         }
         $slugInput = trim((string)($request->body['slug'] ?? ''));
-        $slug = $this->makeSlug($slugInput !== '' ? $slugInput : $name, 'category');
+        $slug = $slugInput !== ''
+            ? $this->makeSlug($slugInput, 'category', 180)
+            : ($existingCategory === null ? $this->makeSlug($name, 'category', 180) : (string)$existingCategory['slug']);
         try {
             if ($id === null) {
                 $stmt = $pdo->prepare(
@@ -252,13 +257,16 @@ final class AdminCatalogController
         }
         $pdo = Database::connection();
         if ($id !== null) {
-            $find = $pdo->prepare('SELECT id,slug FROM branches WHERE id=:id LIMIT 1');
+            $find = $pdo->prepare('SELECT id,slug,is_active FROM branches WHERE id=:id LIMIT 1');
             $find->execute(['id' => $id]);
             $existing = $find->fetch();
             if (!$existing) throw new HttpException(404, 'BRANCH_NOT_FOUND', 'Магазин не найден.');
+            if (!array_key_exists('is_active', $request->body)) $isActive = (bool)$existing['is_active'];
         }
         $slugInput = trim((string)($request->body['slug'] ?? ''));
-        $slug = $slugInput !== '' ? $this->makeSlug($slugInput, 'branch') : ($id === null ? $this->makeSlug($name, 'branch') : $existing['slug']);
+        $slug = $slugInput !== ''
+            ? $this->makeSlug($slugInput, 'branch', 150)
+            : ($id === null ? $this->makeSlug($name, 'branch', 150) : $existing['slug']);
         try {
             if ($id === null) {
                 $pdo->prepare(
@@ -400,13 +408,13 @@ final class AdminCatalogController
         Response::json(['success' => true, 'data' => ['stock_id' => $stockId, 'restocked' => $restocked]]);
     }
 
-    private function makeSlug(string $value, string $fallback): string
+    private function makeSlug(string $value, string $fallback, int $maxLength = 250): string
     {
         $slug = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
         $slug = strtolower((string)$slug);
         $slug = trim(preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '', '-');
         if ($slug === '') $slug = $fallback;
-        return substr($slug, 0, 250);
+        return substr($slug, 0, max(1, $maxLength));
     }
 
     private function isHttpsUrl(string $url): bool
