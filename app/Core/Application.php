@@ -4,6 +4,7 @@ namespace App\Core;
 
 use App\Controllers\AdminAuthController;
 use App\Controllers\AdminImportController;
+use App\Controllers\AdminReviewController;
 use App\Controllers\AuthController;
 use App\Controllers\CatalogController;
 use App\Controllers\OAuthController;
@@ -23,6 +24,7 @@ final class Application
         $auth = new AuthController();
         $adminAuth = new AdminAuthController();
         $adminImport = new AdminImportController();
+        $adminReview = new AdminReviewController();
         $oauth = new OAuthController();
         $priceHistory = new PriceHistoryController();
         $reviews = new ReviewsController();
@@ -53,6 +55,8 @@ final class Application
         $router->get('/api/v1/admin/imports', [$adminImport, 'index']);
         $router->post('/api/v1/admin/imports', [$adminImport, 'upload']);
         $router->get('/api/v1/admin/import-errors', [$adminImport, 'errors']);
+        $router->get('/api/v1/admin/reviews', [$adminReview, 'index']);
+        $router->post('/api/v1/admin/reviews/moderate', [$adminReview, 'moderate']);
 
         try {
             $router->dispatch(Request::fromGlobals());
