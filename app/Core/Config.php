@@ -22,6 +22,8 @@ final class Config
                 'env' => getenv('APP_ENV') ?: 'production',
                 'debug' => filter_var(getenv('APP_DEBUG') ?: 'false', FILTER_VALIDATE_BOOL),
                 'timezone' => getenv('APP_TIMEZONE') ?: 'Asia/Barnaul',
+                'url' => getenv('APP_URL') ?: '',
+                'auth_return_uri' => getenv('APP_AUTH_RETURN_URI') ?: '',
             ],
             'db' => [
                 'host' => getenv('DB_HOST') ?: '127.0.0.1',
@@ -30,6 +32,18 @@ final class Config
                 'username' => getenv('DB_USERNAME') ?: '',
                 'password' => getenv('DB_PASSWORD') ?: '',
                 'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
+            ],
+            'oauth' => [
+                'vk_id' => [
+                    'client_id' => getenv('VK_ID_CLIENT_ID') ?: '',
+                    'service_token' => getenv('VK_ID_SERVICE_TOKEN') ?: '',
+                    'scope' => getenv('VK_ID_SCOPE') ?: 'vkid.personal_info email',
+                ],
+                'yandex' => [
+                    'client_id' => getenv('YANDEX_CLIENT_ID') ?: '',
+                    'client_secret' => getenv('YANDEX_CLIENT_SECRET') ?: '',
+                    'scope' => getenv('YANDEX_SCOPE') ?: 'login:info login:email login:avatar',
+                ],
             ],
         ];
         date_default_timezone_set(self::$values['app']['timezone']);
