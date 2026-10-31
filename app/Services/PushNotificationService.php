@@ -113,10 +113,12 @@ final class PushNotificationService
             "UPDATE push_delivery_log d
              JOIN subscriptions s ON s.id=d.subscription_id
              LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id
-             SET d.status='failed',d.locked_at=NULL,d.last_error='STOCK_NO_LONGER_AVAILABLE'
-             WHERE d.status IN ('pending','processing')
-               AND (d.status='pending' OR d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
-               AND (st.id IS NULL OR st.quantity<=0)"
+             SET d.status='failed',d.locked_at=NULL,
+                 d.last_error=CASE WHEN s.status<>'active' THEN 'SUBSCRIPTION_INACTIVE'
+                                   ELSE 'STOCK_NO_LONGER_AVAILABLE' END
+             WHERE d.status IN ('pending','failed','processing')
+               AND (d.status IN ('pending','failed') OR d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+               AND (s.status<>'active' OR st.id IS NULL OR st.quantity<=0)"
         );
         $stmt = $pdo->query(
             "SELECT d.subscription_id,d.event_key,s.user_id,s.product_id,s.branch_id,
@@ -127,7 +129,7 @@ final class PushNotificationService
              JOIN branches b ON b.id=s.branch_id
              JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.status='active' AND d.attempt_count<10
-               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE')
+               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE')
                AND (
                     d.status='pending'
                     OR (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))
