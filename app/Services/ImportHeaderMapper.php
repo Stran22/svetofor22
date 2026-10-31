@@ -76,4 +76,5 @@ final class ImportHeaderMapper
         }
         $fraction = str_pad($parts[2] ?? '', $scale, '0');
         return $integer . '.' . $fraction;
-    }}
+    }
+}
