@@ -20,7 +20,7 @@ final class Application
         $catalog = new CatalogController();
         $auth = new AuthController();
         $adminAuth = new AdminAuthController();
-        $priceHistory = new PriceHistoryController();
+        $priceHistory = new PriceHistoryController();\n        $oauth = new OAuthController();
         $reviews = new ReviewsController();
         $subscriptions = new SubscriptionController();
         $router->get('/api/v1/health', [$system, 'health']);
@@ -34,7 +34,7 @@ final class Application
         $router->get('/api/v1/subscriptions', [$subscriptions, 'index']);
         $router->post('/api/v1/subscriptions', [$subscriptions, 'create']);
         $router->post('/api/v1/subscriptions/cancel', [$subscriptions, 'cancel']);
-        $router->post('/api/v1/auth/guest', [$auth, 'guest']);
+        $router->post('/api/v1/auth/guest', [$auth, 'guest']);\n        $router->post('/api/v1/auth/oauth/start', [$oauth, 'start']);\n        $router->get('/api/v1/auth/oauth/callback', [$oauth, 'callback']);\n        $router->post('/api/v1/auth/oauth/exchange', [$oauth, 'exchange']);
         $router->get('/api/v1/auth/me', [$auth, 'me']);
         $router->get('/api/v1/admin/csrf', [$adminAuth, 'csrf']);
         $router->post('/api/v1/admin/login', [$adminAuth, 'login']);
