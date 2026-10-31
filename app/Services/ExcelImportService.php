@@ -81,10 +81,10 @@ final class ExcelImportService
 
     private function validateXlsxPackage(string $path): void
     {
-        if (!class_exists(\\ZipArchive::class)) {
+        if (!class_exists(\ZipArchive::class)) {
             throw new HttpException(503, 'ZIP_EXTENSION_UNAVAILABLE', 'На сервере не включено расширение PHP ZIP.');
         }
-        $zip = new \\ZipArchive();
+        $zip = new \ZipArchive();
         if ($zip->open($path) !== true) {
             throw new HttpException(422, 'XLSX_PACKAGE_INVALID', 'Файл Excel повреждён или имеет неверный формат.');
         }
@@ -216,7 +216,7 @@ final class ExcelImportService
                     if ($record['sku'] !== null) $identityKeys[] = 'sku:' . $record['sku'];
                     foreach ($identityKeys as $identityKey) {
                         if (isset($seenIdentifiers[$identityKey])) {
-                            throw new \\RuntimeException('Этот штрихкод или артикул повторяется в файле.');
+                            throw new \RuntimeException('Этот штрихкод или артикул повторяется в файле.');
                         }
                     }
                     foreach ($identityKeys as $identityKey) $seenIdentifiers[$identityKey] = true;
@@ -354,7 +354,7 @@ final class ExcelImportService
                 throw new \RuntimeException('Штрихкод не совпадает с уже сохранённым для этого артикула.');
             }
             if ($record['unit'] !== null && $product['unit'] !== $record['unit']) {
-                throw new \\RuntimeException('Единица измерения отличается от уже сохранённой для этого товара.');
+                throw new \RuntimeException('Единица измерения отличается от уже сохранённой для этого товара.');
             }
             $sku = $product['sku'] ?? $record['sku'];
             $barcode = $product['barcode'] ?? $record['barcode'];
