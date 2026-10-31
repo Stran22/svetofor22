@@ -1,0 +1,375 @@
+<?php
+declare(strict_types=1);
+namespace App\Services;
+
+use App\Core\Database;
+use App\Core\HttpException;
+use PDO;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Throwable;
+
+final class ExcelImportService
+{
+    private const MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+    public function importUploadedFile(int $branchId, array $file): array
+    {
+        if ($branchId < 1) throw new HttpException(422, 'BRANCH_ID_INVALID', 'Не выбран магазин.');
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new HttpException(422, 'UPLOAD_FAILED', 'Файл не был загружен. Проверьте размер и повторите попытку.');
+        }
+        $tmpPath = (string)($file['tmp_name'] ?? '');
+        if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+            throw new HttpException(422, 'UPLOAD_INVALID', 'Не удалось проверить загруженный файл.');
+        }
+        $size = filesize($tmpPath);
+        if ($size === false || $size < 1 || $size > self::MAX_FILE_BYTES) {
+            throw new HttpException(422, 'FILE_SIZE_INVALID', 'Размер Excel-файла должен быть от 1 байта до 5 МБ.');
+        }
+
+        $originalName = basename((string)($file['name'] ?? 'import.xlsx'));
+        $originalName = preg_replace('/[\x00-\x1F\x7F]/u', '', $originalName) ?: 'import.xlsx';
+        if (mb_strlen($originalName) > 255 || strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) !== 'xlsx') {
+            throw new HttpException(422, 'FILE_FORMAT_INVALID', 'Поддерживаются только файлы Excel формата .xlsx.');
+        }
+
+        try {
+            if (IOFactory::identify($tmpPath) !== 'Xlsx') {
+                throw new HttpException(422, 'FILE_FORMAT_INVALID', 'Содержимое файла не является корректной книгой Excel .xlsx.');
+            }
+            $reader = IOFactory::createReader('Xlsx');
+            $reader->setReadDataOnly(false);
+            $spreadsheet = $reader->load($tmpPath);
+        } catch (HttpException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw new HttpException(422, 'XLSX_READ_FAILED', 'Не удалось прочитать Excel-файл. Проверьте, что файл не повреждён.');
+        }
+
+        try {
+            $sheet = $spreadsheet->getSheet(0);
+            $highestRow = $sheet->getHighestRow();
+            $highestColumn = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+            $header = $this->detectHeader($sheet, $highestRow, $highestColumn);
+            if ($header === null) {
+                throw new HttpException(
+                    422,
+                    'XLSX_HEADERS_NOT_RECOGNIZED',
+                    'Не найдены обязательные столбцы: наименование, цена, количество и штрихкод либо артикул.'
+                );
+            }
+            $fileHash = hash_file('sha256', $tmpPath);
+            if (!is_string($fileHash)) throw new HttpException(500, 'FILE_HASH_FAILED', 'Не удалось вычислить контрольную сумму файла.');
+
+            $branch = Database::connection()->prepare('SELECT id FROM branches WHERE id=:id AND is_active=1 LIMIT 1');
+            $branch->execute(['id' => $branchId]);
+            if (!$branch->fetchColumn()) throw new HttpException(404, 'BRANCH_NOT_FOUND', 'Магазин не найден или отключён.');
+
+            $importId = $this->startImport($branchId, $originalName, $fileHash);
+            if (is_array($importId)) return $importId;
+
+            return $this->processRows($sheet, $header['row'], $header['map'], $highestRow, $highestColumn, $branchId, $importId);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    private function detectHeader(object $sheet, int $highestRow, int $highestColumn): ?array
+    {
+        $lastRow = min($highestRow, 10);
+        for ($row = 1; $row <= $lastRow; $row++) {
+            $values = $this->readRow($sheet, $row, $highestColumn);
+            $map = ImportHeaderMapper::map($values);
+            if ($map !== null) return ['row' => $row, 'map' => $map];
+        }
+        return null;
+    }
+
+    private function readRow(object $sheet, int $rowNumber, int $highestColumn): array
+    {
+        $values = [];
+        for ($column = 1; $column <= $highestColumn; $column++) {
+            $coordinate = Coordinate::stringFromColumnIndex($column) . $rowNumber;
+            $values[] = $sheet->getCell($coordinate)->getFormattedValue();
+        }
+        return $values;
+    }
+
+    private function startImport(int $branchId, string $filename, string $fileHash): int|array
+    {
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $find = $pdo->prepare(
+                'SELECT id,status,rows_total,rows_created,rows_updated,rows_unchanged,rows_errors
+                 FROM import_log WHERE branch_id=:branch_id AND file_sha256=:hash
+                 LIMIT 1 FOR UPDATE'
+            );
+            $find->execute(['branch_id' => $branchId, 'hash' => $fileHash]);
+            $existing = $find->fetch();
+            if ($existing) {
+                if (in_array($existing['status'], ['completed', 'completed_with_errors'], true)) {
+                    $pdo->commit();
+                    return [
+                        'duplicate' => true,
+                        'import_id' => (int)$existing['id'],
+                        'status' => $existing['status'],
+                        'rows_total' => (int)$existing['rows_total'],
+                        'rows_created' => (int)$existing['rows_created'],
+                        'rows_updated' => (int)$existing['rows_updated'],
+                        'rows_unchanged' => (int)$existing['rows_unchanged'],
+                        'rows_errors' => (int)$existing['rows_errors'],
+                    ];
+                }
+                if ($existing['status'] === 'processing') {
+                    throw new HttpException(409, 'IMPORT_ALREADY_PROCESSING', 'Этот файл уже обрабатывается.');
+                }
+                $importId = (int)$existing['id'];
+                $pdo->prepare('DELETE FROM import_errors WHERE import_id=:id')->execute(['id' => $importId]);
+                $pdo->prepare(
+                    "UPDATE import_log SET original_filename=:filename,status='processing',
+                     rows_total=0,rows_created=0,rows_updated=0,rows_unchanged=0,rows_errors=0,
+                     started_at=NOW(),finished_at=NULL WHERE id=:id"
+                )->execute(['filename' => $filename, 'id' => $importId]);
+            } else {
+                $pdo->prepare(
+                    "INSERT INTO import_log (branch_id,original_filename,file_sha256,status,started_at)
+                     VALUES (:branch_id,:filename,:hash,'processing',NOW())"
+                )->execute(['branch_id' => $branchId, 'filename' => $filename, 'hash' => $fileHash]);
+                $importId = (int)$pdo->lastInsertId();
+            }
+            $pdo->commit();
+            return $importId;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    private function processRows(
+        object $sheet,
+        int $headerRow,
+        array $map,
+        int $highestRow,
+        int $highestColumn,
+        int $branchId,
+        int $importId
+    ): array {
+        $pdo = Database::connection();
+        $counts = ['rows_total' => 0, 'rows_created' => 0, 'rows_updated' => 0, 'rows_unchanged' => 0, 'rows_errors' => 0];
+        $restocks = [];
+
+        $pdo->beginTransaction();
+        try {
+            for ($rowNumber = $headerRow + 1; $rowNumber <= $highestRow; $rowNumber++) {
+                $row = $this->readRow($sheet, $rowNumber, $highestColumn);
+                if ($this->isEmptyRow($row)) continue;
+                $counts['rows_total']++;
+                $pdo->exec('SAVEPOINT import_row');
+                try {
+                    $record = $this->parseRow($row, $map);
+                    $outcome = $this->upsertProductAndStock($pdo, $record, $branchId, $importId);
+                    if ($outcome['created']) $counts['rows_created']++;
+                    elseif ($outcome['changed']) $counts['rows_updated']++;
+                    else $counts['rows_unchanged']++;
+                    if ($outcome['restocked']) {
+                        $restocks[$outcome['product_id']] = true;
+                    }
+                    $pdo->exec('RELEASE SAVEPOINT import_row');
+                } catch (Throwable $rowError) {
+                    $pdo->exec('ROLLBACK TO SAVEPOINT import_row');
+                    $pdo->exec('RELEASE SAVEPOINT import_row');
+                    $counts['rows_errors']++;
+                    $errorCode = $rowError instanceof \PDOException ? 'ROW_DATABASE_ERROR' : 'ROW_DATA_INVALID';
+                    $pdo->prepare(
+                        'INSERT INTO import_errors (import_id,row_number,error_code,message,row_data)
+                         VALUES (:import_id,:row_number,:error_code,:message,:row_data)'
+                    )->execute([
+                        'import_id' => $importId,
+                        'row_number' => $rowNumber,
+                        'error_code' => $errorCode,
+                        'message' => mb_substr($rowError->getMessage(), 0, 500),
+                        'row_data' => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    ]);
+                }
+            }
+
+            $status = $counts['rows_errors'] > 0 ? 'completed_with_errors' : 'completed';
+            $pdo->prepare(
+                'UPDATE import_log SET status=:status,rows_total=:total,rows_created=:created,
+                 rows_updated=:updated,rows_unchanged=:unchanged,rows_errors=:errors,finished_at=NOW()
+                 WHERE id=:id'
+            )->execute([
+                'status' => $status,
+                'total' => $counts['rows_total'],
+                'created' => $counts['rows_created'],
+                'updated' => $counts['rows_updated'],
+                'unchanged' => $counts['rows_unchanged'],
+                'errors' => $counts['rows_errors'],
+                'id' => $importId,
+            ]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $pdo->prepare("UPDATE import_log SET status='failed',finished_at=NOW() WHERE id=:id")
+                ->execute(['id' => $importId]);
+            throw $e;
+        }
+
+        $push = new PushNotificationService();
+        foreach (array_keys($restocks) as $productId) {
+            $eventKey = 'restock:import:' . $importId . ':branch:' . $branchId . ':product:' . $productId;
+            try {
+                $push->notifyRestock((int)$productId, $branchId, $eventKey);
+            } catch (Throwable $e) {
+                error_log('Restock notification scheduling failed: ' . $e->getMessage());
+            }
+        }
+
+        return ['duplicate' => false, 'import_id' => $importId, 'status' => $status] + $counts;
+    }
+
+    private function parseRow(array $row, array $map): array
+    {
+        $value = static function (string $field) use ($row, $map): string {
+            return isset($map[$field]) ? trim((string)($row[$map[$field]] ?? '')) : '';
+        };
+        $name = $value('name');
+        $barcode = preg_replace('/\s+/u', '', $value('barcode')) ?? '';
+        $sku = $value('sku');
+        if ($name === '' || ($barcode === '' && $sku === '')) {
+            throw new \RuntimeException('Не заполнено наименование или отсутствуют штрихкод и артикул.');
+        }
+        if ($barcode !== '' && !preg_match('/^\d{1,64}$/', $barcode)) {
+            throw new \RuntimeException('Штрихкод должен содержать только цифры. В Excel задавайте штрихкод как текст, чтобы не терялись ведущие нули.');
+        }
+        if (mb_strlen($name) > 255 || strlen($barcode) > 64 || strlen($sku) > 100) {
+            throw new \RuntimeException('Наименование, штрихкод или артикул превышают допустимую длину.');
+        }
+        $price = ImportHeaderMapper::parseDecimal($value('price'), 2);
+        $quantity = ImportHeaderMapper::parseDecimal($value('quantity'), 3);
+        $unit = $value('unit');
+        if ($unit === '') $unit = 'шт.';
+        if (mb_strlen($unit) > 30) throw new \RuntimeException('Слишком длинное обозначение единицы измерения.');
+        return ['name' => $name, 'barcode' => $barcode !== '' ? $barcode : null, 'sku' => $sku !== '' ? $sku : null,
+            'price' => $price, 'quantity' => $quantity, 'unit' => $unit];
+    }
+
+    private function upsertProductAndStock(PDO $pdo, array $record, int $branchId, int $importId): array
+    {
+        $product = false;
+        if ($record['barcode'] !== null) {
+            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit FROM products WHERE barcode=:identifier LIMIT 1 FOR UPDATE');
+            $find->execute(['identifier' => $record['barcode']]);
+            $product = $find->fetch();
+        } elseif ($record['sku'] !== null) {
+            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit FROM products WHERE sku=:identifier LIMIT 1 FOR UPDATE');
+            $find->execute(['identifier' => $record['sku']]);
+            $product = $find->fetch();
+        }
+
+        $created = false;
+        $productChanged = false;
+        if (!$product) {
+            $identifier = $record['barcode'] ?? $record['sku'];
+            $slugBase = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $record['name']);
+            $slugBase = strtolower((string)$slugBase);
+            $slugBase = trim(preg_replace('/[^a-z0-9]+/', '-', $slugBase) ?? '', '-');
+            if ($slugBase === '') $slugBase = 'product';
+            $slug = substr($slugBase, 0, 220) . '-' . substr(hash('sha256', (string)$identifier), 0, 8);
+            $insert = $pdo->prepare(
+                'INSERT INTO products (name,slug,sku,barcode,unit)
+                 VALUES (:name,:slug,:sku,:barcode,:unit)'
+            );
+            $insert->execute([
+                'name' => $record['name'], 'slug' => $slug, 'sku' => $record['sku'],
+                'barcode' => $record['barcode'], 'unit' => $record['unit'],
+            ]);
+            $productId = (int)$pdo->lastInsertId();
+            $created = true;
+        } else {
+            $productId = (int)$product['id'];
+            if ($product['sku'] !== null && $record['sku'] !== null && $product['sku'] !== $record['sku']) {
+                throw new \RuntimeException('Артикул не совпадает с уже сохранённым для этого штрихкода.');
+            }
+            if ($product['barcode'] !== null && $record['barcode'] !== null && $product['barcode'] !== $record['barcode']) {
+                throw new \RuntimeException('Штрихкод не совпадает с уже сохранённым для этого артикула.');
+            }
+            $sku = $product['sku'] ?? $record['sku'];
+            $barcode = $product['barcode'] ?? $record['barcode'];
+            $productChanged = $product['name'] !== $record['name'] || $product['unit'] !== $record['unit']
+                || $product['sku'] !== $sku || $product['barcode'] !== $barcode;
+            if ($productChanged) {
+                $pdo->prepare('UPDATE products SET name=:name,sku=:sku,barcode=:barcode,unit=:unit WHERE id=:id')
+                    ->execute(['name' => $record['name'], 'sku' => $sku, 'barcode' => $barcode, 'unit' => $record['unit'], 'id' => $productId]);
+            }
+        }
+
+        $stock = $pdo->prepare(
+            'SELECT id,price,quantity,available_since FROM stock
+             WHERE branch_id=:branch_id AND product_id=:product_id LIMIT 1 FOR UPDATE'
+        );
+        $stock->execute(['branch_id' => $branchId, 'product_id' => $productId]);
+        $existingStock = $stock->fetch();
+        $newQuantity = $record['quantity'];
+        $newPrice = $record['price'];
+        $restocked = false;
+
+        if (!$existingStock) {
+            $availableSince = (float)$newQuantity > 0 ? date('Y-m-d H:i:s') : null;
+            $pdo->prepare(
+                'INSERT INTO stock (branch_id,product_id,price,quantity,available_since,last_import_id)
+                 VALUES (:branch_id,:product_id,:price,:quantity,:available_since,:import_id)'
+            )->execute([
+                'branch_id' => $branchId, 'product_id' => $productId, 'price' => $newPrice,
+                'quantity' => $newQuantity, 'available_since' => $availableSince, 'import_id' => $importId,
+            ]);
+            $priceChanged = true;
+            $restocked = (float)$newQuantity > 0;
+            $stockChanged = true;
+        } else {
+            $oldQuantity = (string)$existingStock['quantity'];
+            $oldPrice = $existingStock['price'] === null ? null : (string)$existingStock['price'];
+            $priceChanged = $oldPrice === null || $oldPrice !== $newPrice;
+            $quantityChanged = $oldQuantity !== $newQuantity;
+            $restocked = (float)$oldQuantity <= 0 && (float)$newQuantity > 0;
+            $stockChanged = $priceChanged || $quantityChanged;
+            $availableSince = $restocked ? date('Y-m-d H:i:s') : ((float)$newQuantity <= 0 ? null : $existingStock['available_since']);
+            if ($stockChanged || $existingStock['available_since'] !== $availableSince) {
+                $pdo->prepare(
+                    'UPDATE stock SET price=:price,quantity=:quantity,available_since=:available_since,last_import_id=:import_id
+                     WHERE id=:id'
+                )->execute([
+                    'price' => $newPrice, 'quantity' => $newQuantity, 'available_since' => $availableSince,
+                    'import_id' => $importId, 'id' => $existingStock['id'],
+                ]);
+            } else {
+                $pdo->prepare('UPDATE stock SET last_import_id=:import_id WHERE id=:id')
+                    ->execute(['import_id' => $importId, 'id' => $existingStock['id']]);
+            }
+        }
+
+        if ($priceChanged) {
+            $pdo->prepare(
+                "INSERT INTO price_history (branch_id,product_id,price,recorded_at,source)
+                 VALUES (:branch_id,:product_id,:price,NOW(),'import')"
+            )->execute(['branch_id' => $branchId, 'product_id' => $productId, 'price' => $newPrice]);
+        }
+
+        return [
+            'product_id' => $productId,
+            'created' => $created,
+            'changed' => $productChanged || $stockChanged,
+            'restocked' => $restocked,
+        ];
+    }
+
+    private function isEmptyRow(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (trim((string)$value) !== '') return false;
+        }
+        return true;
+    }
+}
