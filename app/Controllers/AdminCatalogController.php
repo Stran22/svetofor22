@@ -89,6 +89,7 @@ final class AdminCatalogController
             $category->execute(['id' => $categoryId]);
             if (!$category->fetchColumn()) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
         }
+        $pdo->beginTransaction();
         try {
             if ($id === null) {
                 $slug = $this->makeSlug(trim((string)($request->body['slug'] ?? '')) ?: $name, 'product', 270);
@@ -109,6 +110,7 @@ final class AdminCatalogController
                 ]);
                 $id = (int)$pdo->lastInsertId();
                 $this->audit($pdo, (int)$admin['id'], 'product.create', 'product', $id, ['name' => $name]);
+                $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
             }
 
@@ -137,9 +139,14 @@ final class AdminCatalogController
                 'id' => $id,
             ]);
             $this->audit($pdo, (int)$admin['id'], 'product.update', 'product', (int)$id, ['name' => $name]);
+            $pdo->commit();
             Response::json(['success' => true, 'data' => ['id' => (int)$id]]);
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             if ($e->getCode() === '23000') throw new HttpException(409, 'PRODUCT_IDENTIFIER_CONFLICT', 'Такой slug, артикул или штрихкод уже используется.');
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
     }
@@ -203,6 +210,7 @@ final class AdminCatalogController
         $slug = $slugInput !== ''
             ? $this->makeSlug($slugInput, 'category', 180)
             : ($existingCategory === null ? $this->makeSlug($name, 'category', 180) : (string)$existingCategory['slug']);
+        $pdo->beginTransaction();
         try {
             if ($id === null) {
                 $stmt = $pdo->prepare(
@@ -216,6 +224,7 @@ final class AdminCatalogController
                 ]);
                 $id = (int)$pdo->lastInsertId();
                 $this->audit($pdo, (int)$admin['id'], 'category.create', 'category', $id, ['name' => $name]);
+                $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
             }
             $pdo->prepare(
@@ -227,9 +236,14 @@ final class AdminCatalogController
                 'sort_order' => $sortOrder, 'is_active' => $isActive ? 1 : 0, 'id' => $id,
             ]);
             $this->audit($pdo, (int)$admin['id'], 'category.update', 'category', (int)$id, ['name' => $name]);
+            $pdo->commit();
             Response::json(['success' => true, 'data' => ['id' => (int)$id]]);
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             if ($e->getCode() === '23000') throw new HttpException(409, 'CATEGORY_SLUG_CONFLICT', 'Такая ссылка категории уже существует.');
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
     }
@@ -270,6 +284,7 @@ final class AdminCatalogController
         $slug = $slugInput !== ''
             ? $this->makeSlug($slugInput, 'branch', 150)
             : ($id === null ? $this->makeSlug($name, 'branch', 150) : $existing['slug']);
+        $pdo->beginTransaction();
         try {
             if ($id === null) {
                 $pdo->prepare(
@@ -281,6 +296,7 @@ final class AdminCatalogController
                 ]);
                 $id = (int)$pdo->lastInsertId();
                 $this->audit($pdo, (int)$admin['id'], 'branch.create', 'branch', $id, ['name' => $name]);
+                $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
             }
             $pdo->prepare(
@@ -291,9 +307,14 @@ final class AdminCatalogController
                 'phone' => $phone !== '' ? $phone : null, 'sort_order' => $sortOrder, 'is_active' => $isActive ? 1 : 0, 'id' => $id,
             ]);
             $this->audit($pdo, (int)$admin['id'], 'branch.update', 'branch', (int)$id, ['name' => $name]);
+            $pdo->commit();
             Response::json(['success' => true, 'data' => ['id' => (int)$id]]);
         } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             if ($e->getCode() === '23000') throw new HttpException(409, 'BRANCH_SLUG_CONFLICT', 'Такая ссылка магазина уже существует.');
+            throw $e;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
     }
