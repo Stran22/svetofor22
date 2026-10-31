@@ -20,7 +20,7 @@ final class Application
         $system = new SystemController();
         $catalog = new CatalogController();
         $auth = new AuthController();
-        $adminAuth = new AdminAuthController();
+        $adminAuth = new AdminAuthController();\n        $adminImport = new AdminImportController();
         $oauth = new OAuthController();
         $priceHistory = new PriceHistoryController();
         $reviews = new ReviewsController();
@@ -47,7 +47,7 @@ final class Application
         $router->get('/api/v1/admin/csrf', [$adminAuth, 'csrf']);
         $router->post('/api/v1/admin/login', [$adminAuth, 'login']);
         $router->get('/api/v1/admin/me', [$adminAuth, 'me']);
-        $router->post('/api/v1/admin/logout', [$adminAuth, 'logout']);
+        $router->post('/api/v1/admin/logout', [$adminAuth, 'logout']);\n        $router->get('/api/v1/admin/imports', [$adminImport, 'index']);\n        $router->post('/api/v1/admin/imports', [$adminImport, 'upload']);\n        $router->get('/api/v1/admin/import-errors', [$adminImport, 'errors']);
 
         try {
             $router->dispatch(Request::fromGlobals());
