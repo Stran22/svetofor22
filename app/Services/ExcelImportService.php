@@ -28,7 +28,7 @@ final class ExcelImportService
             throw new HttpException(422, 'FILE_SIZE_INVALID', 'Размер Excel-файла должен быть от 1 байта до 5 МБ.');
         }
 
-        $originalName = basename((string)($file['name'] ?? 'import.xlsx'));
+        $originalName = basename(str_replace('\\\\', '/', (string)($file['name'] ?? 'import.xlsx')));
         $originalName = preg_replace('/[\x00-\x1F\x7F]/u', '', $originalName) ?: 'import.xlsx';
         if (mb_strlen($originalName) > 255 || strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) !== 'xlsx') {
             throw new HttpException(422, 'FILE_FORMAT_INVALID', 'Поддерживаются только файлы Excel формата .xlsx.');
