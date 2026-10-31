@@ -246,6 +246,9 @@ final class ExcelImportService
                 }
             }
 
+            if ($counts['rows_total'] === 0) {
+                throw new HttpException(422, 'XLSX_NO_DATA_ROWS', 'В файле нет строк с товарами после заголовков.');
+            }
             $status = $counts['rows_errors'] > 0 ? 'completed_with_errors' : 'completed';
             $pdo->prepare(
                 'UPDATE import_log SET status=:status,rows_total=:total,rows_created=:created,
