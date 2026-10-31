@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace App\Security;
 
+use App\Core\Database;
 use App\Core\HttpException;
 
 final class AdminGuard
