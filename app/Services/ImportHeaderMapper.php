@@ -43,8 +43,11 @@ final class ImportHeaderMapper
     {
         if (!in_array($scale, [2, 3], true)) throw new RuntimeException('Неподдерживаемая точность числа.');
         if (is_int($value) || is_float($value)) {
-            if (!is_finite((float)$value) || (float)$value < 0) throw new RuntimeException('Число должно быть неотрицательным.');
-            $normalized = number_format((float)$value, $scale, '.', '');
+            if (!is_finite((float)$value) || (float)$value < 0) {
+                throw new RuntimeException('Число должно быть неотрицательным.');
+            }
+            $raw = rtrim(rtrim(sprintf('%.10F', (float)$value), '0'), '.');
+            if ($raw === '') $raw = '0';
         } else {
             $raw = trim((string)$value);
             $raw = str_replace(["\xc2\xa0", "\xe2\x80\xaf", ' '], '', $raw);
@@ -60,17 +63,17 @@ final class ImportHeaderMapper
             } else {
                 $raw = str_replace(',', '.', $raw);
             }
-            if (!preg_match('/^\d+(?:\.\d{1,' . $scale . '})?$/', $raw)) {
-                throw new RuntimeException('Цена или количество имеют неверный формат.');
-            }
-            $normalized = number_format((float)$raw, $scale, '.', '');
         }
 
+        if (!preg_match('/^(\d+)(?:\.(\d{1,' . $scale . '}))?$/', $raw, $parts)) {
+            throw new RuntimeException('Цена или количество имеют неверный формат или слишком много знаков после запятой.');
+        }
+        $integer = ltrim($parts[1], '0');
+        if ($integer === '') $integer = '0';
         $maxIntegerDigits = $scale === 2 ? 10 : 9;
-        $integerPart = strstr($normalized, '.', true);
-        if ($integerPart === false || strlen($integerPart) > $maxIntegerDigits) {
+        if (strlen($integer) > $maxIntegerDigits) {
             throw new RuntimeException('Число превышает допустимый размер поля.');
         }
-        return $normalized;
-    }
-}
+        $fraction = str_pad($parts[2] ?? '', $scale, '0');
+        return $integer . '.' . $fraction;
+    }}
