@@ -200,6 +200,7 @@ final class ExcelImportService
         $pdo = Database::connection();
         $counts = ['rows_total' => 0, 'rows_created' => 0, 'rows_updated' => 0, 'rows_unchanged' => 0, 'rows_errors' => 0];
         $restocks = [];
+        $seenIdentifiers = [];
 
         $pdo->beginTransaction();
         try {
@@ -210,6 +211,15 @@ final class ExcelImportService
                 $pdo->exec('SAVEPOINT import_row');
                 try {
                     $record = $this->parseRow($row, $map);
+                    $identityKeys = [];
+                    if ($record['barcode'] !== null) $identityKeys[] = 'barcode:' . $record['barcode'];
+                    if ($record['sku'] !== null) $identityKeys[] = 'sku:' . $record['sku'];
+                    foreach ($identityKeys as $identityKey) {
+                        if (isset($seenIdentifiers[$identityKey])) {
+                            throw new \\RuntimeException('Этот штрихкод или артикул повторяется в файле.');
+                        }
+                    }
+                    foreach ($identityKeys as $identityKey) $seenIdentifiers[$identityKey] = true;
                     $outcome = $this->upsertProductAndStock($pdo, $record, $branchId, $importId);
                     if ($outcome['created']) $counts['rows_created']++;
                     elseif ($outcome['changed']) $counts['rows_updated']++;
@@ -260,6 +270,9 @@ final class ExcelImportService
 
         $push = new PushNotificationService();
         foreach (array_keys($restocks) as $productId) {
+            $finalStock = $pdo->prepare('SELECT quantity FROM stock WHERE product_id=:product_id AND branch_id=:branch_id LIMIT 1');
+            $finalStock->execute(['product_id' => $productId, 'branch_id' => $branchId]);
+            if ((float)$finalStock->fetchColumn() <= 0) continue;
             $eventKey = 'restock:import:' . $importId . ':branch:' . $branchId . ':product:' . $productId;
             try {
                 $push->notifyRestock((int)$productId, $branchId, $eventKey);
