@@ -67,7 +67,7 @@ final class AdminCatalogController
         $categoryId = isset($request->body['category_id']) && $request->body['category_id'] !== ''
             ? filter_var($request->body['category_id'], FILTER_VALIDATE_INT)
             : null;
-        if ($name === '' || mb_strlen($name) > 255 || mb_strlen($unit) > 30 || strlen($sku) > 100 || strlen($barcode) > 64 || mb_strlen($description) > 20000) {
+        if ($name === '' || mb_strlen($name) > 255 || mb_strlen($unit) > 30 || strlen($sku) > 100 || strlen($barcode) > 64 || strlen($description) > 60000) {
             throw new HttpException(422, 'PRODUCT_VALIDATION_ERROR', 'Проверьте наименование, единицу измерения, артикул, штрихкод и описание.');
         }
         if ($barcode !== '' && !preg_match('/^\d{1,64}$/', $barcode)) {
@@ -88,10 +88,10 @@ final class AdminCatalogController
         }
         try {
             if ($id === null) {
-                $slug = $this->makeSlug(trim((string)($request->body['slug'] ?? '')) ?: $name, 'product');
+                $slug = $this->makeSlug(trim((string)($request->body['slug'] ?? '')) ?: $name, 'product', 270);
                 $stmt = $pdo->prepare(
-                    'INSERT INTO products (category_id,name,slug,sku,barcode,description,image_url,unit)
-                     VALUES (:category_id,:name,:slug,:sku,:barcode,:description,:image_url,:unit)'
+                    'INSERT INTO products (category_id,name,slug,sku,barcode,description,image_url,unit,is_active)
+                     VALUES (:category_id,:name,:slug,:sku,:barcode,:description,:image_url,:unit,:is_active)'
                 );
                 $stmt->execute([
                     'category_id' => $categoryId,
@@ -102,21 +102,25 @@ final class AdminCatalogController
                     'description' => $description !== '' ? $description : null,
                     'image_url' => $imageUrl !== '' ? $imageUrl : null,
                     'unit' => $unit !== '' ? $unit : 'шт.',
+                    'is_active' => filter_var($request->body['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0,
                 ]);
                 $id = (int)$pdo->lastInsertId();
                 $this->audit($pdo, (int)$admin['id'], 'product.create', 'product', $id, ['name' => $name]);
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
             }
 
-            $find = $pdo->prepare('SELECT id,slug FROM products WHERE id=:id LIMIT 1');
+            $find = $pdo->prepare('SELECT id,slug,is_active FROM products WHERE id=:id LIMIT 1');
             $find->execute(['id' => $id]);
             $existing = $find->fetch();
             if (!$existing) throw new HttpException(404, 'PRODUCT_NOT_FOUND', 'Товар не найден.');
             $slugInput = trim((string)($request->body['slug'] ?? ''));
-            $slug = $slugInput !== '' ? $this->makeSlug($slugInput, 'product') : (string)$existing['slug'];
+            $slug = $slugInput !== '' ? $this->makeSlug($slugInput, 'product', 270) : (string)$existing['slug'];
+            $isActive = array_key_exists('is_active', $request->body)
+                ? filter_var($request->body['is_active'], FILTER_VALIDATE_BOOLEAN)
+                : (bool)$existing['is_active'];
             $pdo->prepare(
                 'UPDATE products SET category_id=:category_id,name=:name,slug=:slug,sku=:sku,barcode=:barcode,
-                 description=:description,image_url=:image_url,unit=:unit WHERE id=:id'
+                 description=:description,image_url=:image_url,unit=:unit,is_active=:is_active WHERE id=:id'
             )->execute([
                 'category_id' => $categoryId,
                 'name' => $name,
@@ -126,6 +130,7 @@ final class AdminCatalogController
                 'description' => $description !== '' ? $description : null,
                 'image_url' => $imageUrl !== '' ? $imageUrl : null,
                 'unit' => $unit !== '' ? $unit : 'шт.',
+                'is_active' => $isActive ? 1 : 0,
                 'id' => $id,
             ]);
             $this->audit($pdo, (int)$admin['id'], 'product.update', 'product', (int)$id, ['name' => $name]);
