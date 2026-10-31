@@ -336,12 +336,12 @@ final class ExcelImportService
         }
 
         if ($barcodeMatch && $skuMatch && (int)$barcodeMatch['id'] !== (int)$skuMatch['id']) {
-            throw new \\RuntimeException('Штрихкод и артикул в этой строке относятся к разным товарам.');
+            throw new \RuntimeException('Штрихкод и артикул в этой строке относятся к разным товарам.');
         }
         $product = $barcodeMatch ?: $skuMatch;
         if ($product && $record['barcode'] !== null && $product['barcode'] !== null
             && (string)$product['barcode'] !== $record['barcode']) {
-            throw new \\RuntimeException('Штрихкод строки не совпадает со штрихкодом найденного по артикулу товара.');
+            throw new \RuntimeException('Штрихкод строки не совпадает со штрихкодом найденного по артикулу товара.');
         }
 
         $created = false;
