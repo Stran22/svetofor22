@@ -18,7 +18,7 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, cURL. Android-кли�
 2. В корне проекта выполнить `composer install --no-dev --optimize-autoloader`.
 3. Скопировать `.env.example` в `.env`, задать доступы к MySQL и OAuth credentials.
 4. Создать БД MySQL с кодировкой utf8mb4.
-5. Применить миграции по порядку: `001_initial_schema.sql`, `002_admin_oauth_security.sql`, `003_oauth_attempt_context.sql`, затем `004_push_delivery_state.sql`, затем `005_product_catalog_source.sql`.
+5. Применить миграции по порядку: `001_initial_schema.sql`, `002_admin_oauth_security.sql`, `003_oauth_attempt_context.sql`, затем `004_push_delivery_state.sql`, затем `005_product_catalog_source.sql`, затем `006_review_moderation.sql`.
 6. Проверить `/api/v1/health`.
 7. В кабинетах VK ID и Яндекс ID зарегистрировать точный Redirect URI: `https://baza.altaj-otdyh.ru/api/v1/auth/oauth/callback`. Этот же адрес должен совпадать с `APP_URL` в `.env`.
 
@@ -56,6 +56,11 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, cURL. Android-кли�
 - POST `/api/v1/admin/login` — вход по JSON с логином и паролем, заголовок `X-CSRF-Token`.
 - GET `/api/v1/admin/me` — текущая администраторская сессия и CSRF-токен.
 - POST `/api/v1/admin/logout` — завершить сессию; обязателен `X-CSRF-Token`.
+
+- GET `/api/v1/admin/reviews?status=pending` — очередь отзывов; можно указать `pending`, `published` или `rejected`.
+- POST `/api/v1/admin/reviews/moderate` с JSON `{"review_id":123,"status":"published"}` или `{"review_id":123,"status":"rejected"}`; требуется CSRF-заголовок.
+ 
+Роли `owner`, `manager` и `moderator` имеют доступ к очереди и модерации отзывов. Модерация записывает администратора и время решения в review, а также действие в журнал аудита. Если автор изменяет свой отзыв, он снова получает статус `pending` и должен пройти модерацию повторно.
 
 Администраторские сессии используют HttpOnly cookie, SameSite=Lax, строгий режим PHP-сессий и регенерацию ID после входа. Production должен работать по HTTPS. После 10 неудачных попыток входа для сочетания логина и IP за 15 минут применяется временное ограничение. Роли: `owner`, `manager`, `moderator`; для закрытых операций используется `AdminGuard::requireRole()`.
 
