@@ -22,6 +22,7 @@ final class AdminCatalogController
         $perPage = min(100, max(1, (int)($request->query['per_page'] ?? 30)));
         $offset = ($page - 1) * $perPage;
         $query = trim((string)($request->query['q'] ?? ''));
+        if (mb_strlen($query) > 100) throw new HttpException(422, 'SEARCH_QUERY_TOO_LONG', 'Поисковый запрос слишком длинный.');
         $categoryId = isset($request->query['category_id']) ? filter_var($request->query['category_id'], FILTER_VALIDATE_INT) : null;
         $where = [];
         $params = [];
