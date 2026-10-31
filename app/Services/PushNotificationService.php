@@ -134,13 +134,13 @@ final class PushNotificationService
             $pdo->prepare(
                 'UPDATE push_delivery_log
                  SET status=:status,provider_message_id=:message_id,response=:response,
-                     sent_at=:sent_at,locked_at=NULL,last_error=:last_error
+                     sent_at=IF(:is_sent=1,NOW(),NULL),locked_at=NULL,last_error=:last_error
                  WHERE id=:id'
             )->execute([
                 'status' => $success ? 'sent' : 'failed',
                 'message_id' => $messageId,
                 'response' => json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'sent_at' => $success ? date('Y-m-d H:i:s') : null,
+                'is_sent' => $success ? 1 : 0,
                 'last_error' => $error === null ? null : mb_substr($error, 0, 500),
                 'id' => $deliveryId,
             ]);
