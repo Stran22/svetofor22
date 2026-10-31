@@ -323,7 +323,7 @@ final class ExcelImportService
             );
             $insert->execute([
                 'name' => $record['name'], 'slug' => $slug, 'sku' => $record['sku'],
-                'barcode' => $record['barcode'], 'unit' => $record['unit'],
+                'barcode' => $record['barcode'], 'unit' => $record['unit'] ?? 'шт.',
             ]);
             $productId = (int)$pdo->lastInsertId();
             $created = true;
@@ -335,13 +335,15 @@ final class ExcelImportService
             if ($product['barcode'] !== null && $record['barcode'] !== null && $product['barcode'] !== $record['barcode']) {
                 throw new \RuntimeException('Штрихкод не совпадает с уже сохранённым для этого артикула.');
             }
+            if ($record['unit'] !== null && $product['unit'] !== $record['unit']) {
+                throw new \\RuntimeException('Единица измерения отличается от уже сохранённой для этого товара.');
+            }
             $sku = $product['sku'] ?? $record['sku'];
             $barcode = $product['barcode'] ?? $record['barcode'];
-            $productChanged = $product['name'] !== $record['name'] || $product['unit'] !== $record['unit']
-                || $product['sku'] !== $sku || $product['barcode'] !== $barcode;
+            $productChanged = $product['sku'] !== $sku || $product['barcode'] !== $barcode;
             if ($productChanged) {
-                $pdo->prepare('UPDATE products SET name=:name,sku=:sku,barcode=:barcode,unit=:unit WHERE id=:id')
-                    ->execute(['name' => $record['name'], 'sku' => $sku, 'barcode' => $barcode, 'unit' => $record['unit'], 'id' => $productId]);
+                $pdo->prepare('UPDATE products SET sku=:sku,barcode=:barcode WHERE id=:id')
+                    ->execute(['sku' => $sku, 'barcode' => $barcode, 'id' => $productId]);
             }
         }
 
