@@ -400,6 +400,67 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame($guestId, (int)$linkedIssued['user_id']);
     }
 
+
+    public function testExcelImportResolvesBarcodeAndSkuWithoutMergingDifferentProducts(): void
+    {
+        [$branchId] = $this->seedCatalog();
+        $suffix = bin2hex(random_bytes(8));
+        $this->pdo->prepare(
+            'INSERT INTO import_log (branch_id,original_filename,file_sha256,status,started_at)
+             VALUES (:branch_id,\'test.xlsx\',:hash,\'processing\',NOW())'
+        )->execute(['branch_id' => $branchId, 'hash' => hash('sha256', 'import-' . $suffix)]);
+        $importId = (int)$this->pdo->lastInsertId();
+
+        $this->pdo->prepare(
+            'INSERT INTO products (name,slug,sku,barcode,unit,catalog_source_branch_id)
+             VALUES (\'Old milk\',:slug,\'MILK-\' . :suffix,NULL,\'шт.\',:branch_id)'
+        )->execute(['slug' => 'milk-' . $suffix, 'suffix' => $suffix, 'branch_id' => $branchId]);
+        $productId = (int)$this->pdo->lastInsertId();
+
+        $service = new \App\Services\ExcelImportService();
+        $method = new \ReflectionMethod($service, 'upsertProductAndStock');
+        $method->setAccessible(true);
+        $record = [
+            'name' => 'Молоко 1 л',
+            'barcode' => '0001234567890',
+            'sku' => 'MILK-' . $suffix,
+            'price' => '89.90',
+            'quantity' => '4.000',
+            'unit' => 'шт.',
+        ];
+        $result = $method->invoke($service, $this->pdo, $record, $branchId, $importId);
+        self::assertSame($productId, (int)$result['product_id']);
+        self::assertFalse($result['created']);
+        self::assertTrue($result['changed']);
+        self::assertTrue($result['restocked']);
+
+        $check = $this->pdo->prepare('SELECT barcode,name FROM products WHERE id=:id');
+        $check->execute(['id' => $productId]);
+        $product = $check->fetch();
+        self::assertSame('0001234567890', $product['barcode']);
+        self::assertSame('Молоко 1 л', $product['name']);
+
+        $stock = $this->pdo->prepare('SELECT price,quantity,last_import_id FROM stock WHERE branch_id=:branch_id AND product_id=:product_id');
+        $stock->execute(['branch_id' => $branchId, 'product_id' => $productId]);
+        $stockRow = $stock->fetch();
+        self::assertSame('89.90', $stockRow['price']);
+        self::assertSame('4.000', $stockRow['quantity']);
+        self::assertSame($importId, (int)$stockRow['last_import_id']);
+
+        $history = $this->pdo->prepare('SELECT COUNT(*) FROM price_history WHERE branch_id=:branch_id AND product_id=:product_id');
+        $history->execute(['branch_id' => $branchId, 'product_id' => $productId]);
+        self::assertSame(1, (int)$history->fetchColumn());
+
+        $conflictProduct = $this->pdo->prepare(
+            'INSERT INTO products (name,slug,sku,barcode,unit) VALUES (\'Other product\',:slug,:sku,\'2222222222222\',\'шт.\')'
+        );
+        $conflictProduct->execute(['slug' => 'other-' . $suffix, 'sku' => 'OTHER-' . $suffix]);
+        $conflictingRecord = $record;
+        $conflictingRecord['sku'] = 'OTHER-' . $suffix;
+        $this->expectException(\RuntimeException::class);
+        $method->invoke($service, $this->pdo, $conflictingRecord, $branchId, $importId);
+    }
+
     private function seedCatalog(): array
     {
         $suffix = bin2hex(random_bytes(8));
