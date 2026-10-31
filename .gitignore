@@ -1,0 +1,10 @@
+/vendor/
+/.env
+/.phpunit.cache/
+/storage/logs/*
+/storage/uploads/*
+!/storage/logs/.gitkeep
+!/storage/uploads/.gitkeep
+.idea/
+.vscode/
+*.log

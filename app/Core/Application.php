@@ -1,0 +1,30 @@
+<?php
+declare(strict_types=1);
+namespace App\Core;
+
+use App\Controllers\CatalogController;
+use App\Controllers\SystemController;
+use Throwable;
+
+final class Application
+{
+    public function run(): void
+    {
+        $router = new Router();
+        $system = new SystemController();
+        $catalog = new CatalogController();
+        $router->get('/api/v1/health', [$system, 'health']);
+        $router->get('/api/v1/branches', [$catalog, 'branches']);
+        $router->get('/api/v1/categories', [$catalog, 'categories']);
+        $router->get('/api/v1/products', [$catalog, 'products']);
+        $router->get('/api/v1/products/detail', [$catalog, 'productDetail']);
+        try {
+            $router->dispatch(Request::fromGlobals());
+        } catch (Throwable $e) {
+            error_log((string) $e);
+            $error = ['code' => 'INTERNAL_ERROR', 'message' => 'Внутренняя ошибка сервера.'];
+            if (Config::get('app.debug', false)) $error['debug'] = $e->getMessage();
+            Response::json(['success' => false, 'error' => $error], 500);
+        }
+    }
+}

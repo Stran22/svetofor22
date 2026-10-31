@@ -1,0 +1,81 @@
+<?php
+declare(strict_types=1);
+namespace App\Controllers;
+
+use App\Core\Database;
+use App\Core\Request;
+use App\Core\Response;
+use PDO;
+use InvalidArgumentException;
+
+final class CatalogController
+{
+    public function branches(Request $request): void
+    {
+        $rows = Database::connection()->query('SELECT id,name,slug,address,is_active FROM branches WHERE is_active=1 ORDER BY sort_order,name')->fetchAll();
+        Response::json(['success' => true, 'data' => $rows]);
+    }
+
+    public function categories(Request $request): void
+    {
+        $rows = Database::connection()->query('SELECT id,parent_id,name,slug,image_url,sort_order FROM categories WHERE is_active=1 ORDER BY sort_order,name')->fetchAll();
+        Response::json(['success' => true, 'data' => $rows]);
+    }
+
+    public function products(Request $request): void
+    {
+        $page = max(1, (int)($request->query['page'] ?? 1));
+        $limit = min(100, max(1, (int)($request->query['per_page'] ?? 24)));
+        $branchId = $this->positiveInt($request->query['branch_id'] ?? null);
+        $categoryId = $this->positiveInt($request->query['category_id'] ?? null);
+        $search = trim((string)($request->query['q'] ?? ''));
+        $where = ['p.is_active=1']; $params = [];
+        if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = $categoryId; }
+        if ($search !== '') {
+            $where[] = '(p.name LIKE :q OR p.barcode=:barcode OR p.sku=:sku)';
+            $params['q'] = '%' . $search . '%'; $params['barcode'] = $search; $params['sku'] = $search;
+        }
+        $join = ''; $stock = 'NULL AS price,NULL AS quantity,NULL AS is_available';
+        if ($branchId !== null) {
+            $join = ' LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=:branch_id';
+            $stock = 's.price,s.quantity,(s.quantity>0) AS is_available'; $params['branch_id'] = $branchId;
+        }
+        $sql = 'SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
+            ' FROM products p' . $join . ' WHERE ' . implode(' AND ', $where) .
+            ' ORDER BY p.name LIMIT :limit OFFSET :offset';
+        $stmt = Database::connection()->prepare($sql);
+        foreach ($params as $key => $value) $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
+        if ($search !== '') $stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        Response::json(['success' => true, 'data' => $stmt->fetchAll(),
+            'meta' => ['page' => $page, 'per_page' => $limit, 'branch_id' => $branchId]]);
+    }
+
+    public function productDetail(Request $request): void
+    {
+        $id = $this->positiveInt($request->query['id'] ?? null);
+        if ($id === null) throw new InvalidArgumentException('Параметр id обязателен.');
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare('SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products WHERE id=:id AND is_active=1');
+        $stmt->execute(['id' => $id]); $product = $stmt->fetch();
+        if (!$product) {
+            Response::json(['success' => false, 'error' => ['code' => 'PRODUCT_NOT_FOUND', 'message' => 'Товар не найден.']], 404);
+            return;
+        }
+        $stock = $pdo->prepare('SELECT b.id AS branch_id,b.name AS branch_name,b.address,s.price,s.quantity,(s.quantity>0) AS is_available
+            FROM branches b LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=:product_id
+            WHERE b.is_active=1 ORDER BY b.sort_order,b.name');
+        $stock->execute(['product_id' => $id]); $product['branches'] = $stock->fetchAll();
+        Response::json(['success' => true, 'data' => $product]);
+    }
+
+    private function positiveInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') return null;
+        $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($id === false) throw new InvalidArgumentException('Некорректный числовой параметр.');
+        return $id;
+    }
+}
