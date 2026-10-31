@@ -112,6 +112,7 @@ final class AdminCatalogController
                 $this->audit($pdo, (int)$admin['id'], 'product.create', 'product', $id, ['name' => $name]);
                 $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
+                return;
             }
 
             $find = $pdo->prepare('SELECT id,slug,is_active FROM products WHERE id=:id LIMIT 1');
