@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace App\Core;
 
+use App\Controllers\AdminAuthController;
 use App\Controllers\AuthController;
 use App\Controllers\CatalogController;
 use App\Controllers\SystemController;
@@ -15,6 +16,7 @@ final class Application
         $system = new SystemController();
         $catalog = new CatalogController();
         $auth = new AuthController();
+        $adminAuth = new AdminAuthController();
         $router->get('/api/v1/health', [$system, 'health']);
         $router->get('/api/v1/branches', [$catalog, 'branches']);
         $router->get('/api/v1/categories', [$catalog, 'categories']);
@@ -22,7 +24,10 @@ final class Application
         $router->get('/api/v1/products/detail', [$catalog, 'productDetail']);
         $router->post('/api/v1/auth/guest', [$auth, 'guest']);
         $router->get('/api/v1/auth/me', [$auth, 'me']);
-
+        $router->get('/api/v1/admin/csrf', [$adminAuth, 'csrf']);
+        $router->post('/api/v1/admin/login', [$adminAuth, 'login']);
+        $router->get('/api/v1/admin/me', [$adminAuth, 'me']);
+        $router->post('/api/v1/admin/logout', [$adminAuth, 'logout']);
         try {
             $router->dispatch(Request::fromGlobals());
         } catch (HttpException $e) {
