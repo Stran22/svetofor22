@@ -3,10 +3,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use PDO;
-use InvalidArgumentException;
 
 final class CatalogController
 {
@@ -24,28 +24,32 @@ final class CatalogController
 
     public function products(Request $request): void
     {
-        $page = max(1, (int)($request->query['page'] ?? 1));
+        $page = max(1, min(100000, (int)($request->query['page'] ?? 1)));
         $limit = min(100, max(1, (int)($request->query['per_page'] ?? 24)));
         $branchId = $this->positiveInt($request->query['branch_id'] ?? null);
         $categoryId = $this->positiveInt($request->query['category_id'] ?? null);
         $search = trim((string)($request->query['q'] ?? ''));
-        $where = ['p.is_active=1']; $params = [];
-        if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = $categoryId; }
+        $where = ['p.is_active=1'];
+        $params = [];
+        if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = [$categoryId, PDO::PARAM_INT]; }
         if ($search !== '') {
             $where[] = '(p.name LIKE :q OR p.barcode=:barcode OR p.sku=:sku)';
-            $params['q'] = '%' . $search . '%'; $params['barcode'] = $search; $params['sku'] = $search;
+            $params['q'] = ['%' . $search . '%', PDO::PARAM_STR];
+            $params['barcode'] = [$search, PDO::PARAM_STR];
+            $params['sku'] = [$search, PDO::PARAM_STR];
         }
-        $join = ''; $stock = 'NULL AS price,NULL AS quantity,NULL AS is_available';
+        $join = '';
+        $stock = 'NULL AS price,NULL AS quantity,NULL AS is_available';
         if ($branchId !== null) {
             $join = ' LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=:branch_id';
-            $stock = 's.price,s.quantity,(s.quantity>0) AS is_available'; $params['branch_id'] = $branchId;
+            $stock = 's.price,s.quantity,(s.quantity>0) AS is_available';
+            $params['branch_id'] = [$branchId, PDO::PARAM_INT];
         }
         $sql = 'SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
             ' FROM products p' . $join . ' WHERE ' . implode(' AND ', $where) .
             ' ORDER BY p.name LIMIT :limit OFFSET :offset';
         $stmt = Database::connection()->prepare($sql);
-        foreach ($params as $key => $value) $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
-        if ($search !== '') $stmt->bindValue(':q', '%' . $search . '%', PDO::PARAM_STR);
+        foreach ($params as $key => [$value, $type]) $stmt->bindValue(':' . $key, $value, $type);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', ($page - 1) * $limit, PDO::PARAM_INT);
         $stmt->execute();
@@ -56,10 +60,11 @@ final class CatalogController
     public function productDetail(Request $request): void
     {
         $id = $this->positiveInt($request->query['id'] ?? null);
-        if ($id === null) throw new InvalidArgumentException('Параметр id обязателен.');
+        if ($id === null) throw new HttpException(400, 'VALIDATION_ERROR', 'Параметр id обязателен.');
         $pdo = Database::connection();
         $stmt = $pdo->prepare('SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products WHERE id=:id AND is_active=1');
-        $stmt->execute(['id' => $id]); $product = $stmt->fetch();
+        $stmt->execute(['id' => $id]);
+        $product = $stmt->fetch();
         if (!$product) {
             Response::json(['success' => false, 'error' => ['code' => 'PRODUCT_NOT_FOUND', 'message' => 'Товар не найден.']], 404);
             return;
@@ -67,7 +72,8 @@ final class CatalogController
         $stock = $pdo->prepare('SELECT b.id AS branch_id,b.name AS branch_name,b.address,s.price,s.quantity,(s.quantity>0) AS is_available
             FROM branches b LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=:product_id
             WHERE b.is_active=1 ORDER BY b.sort_order,b.name');
-        $stock->execute(['product_id' => $id]); $product['branches'] = $stock->fetchAll();
+        $stock->execute(['product_id' => $id]);
+        $product['branches'] = $stock->fetchAll();
         Response::json(['success' => true, 'data' => $product]);
     }
 
@@ -75,7 +81,7 @@ final class CatalogController
     {
         if ($value === null || $value === '') return null;
         $id = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if ($id === false) throw new InvalidArgumentException('Некорректный числовой параметр.');
+        if ($id === false) throw new HttpException(400, 'VALIDATION_ERROR', 'Некорректный числовой параметр.');
         return $id;
     }
 }

@@ -18,8 +18,13 @@ final class Application
         $router->get('/api/v1/categories', [$catalog, 'categories']);
         $router->get('/api/v1/products', [$catalog, 'products']);
         $router->get('/api/v1/products/detail', [$catalog, 'productDetail']);
+
         try {
             $router->dispatch(Request::fromGlobals());
+        } catch (HttpException $e) {
+            Response::json(['success' => false, 'error' => [
+                'code' => $e->errorCode, 'message' => $e->getMessage(),
+            ]], $e->status);
         } catch (Throwable $e) {
             error_log((string) $e);
             $error = ['code' => 'INTERNAL_ERROR', 'message' => 'Внутренняя ошибка сервера.'];
