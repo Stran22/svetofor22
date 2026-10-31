@@ -4,7 +4,8 @@ CREATE TABLE admin_login_attempts (
  login VARCHAR(100) NOT NULL,
  ip_address VARCHAR(45) NOT NULL,
  attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
- INDEX idx_admin_login_attempts_lookup(login,ip_address,attempted_at)
+ INDEX idx_admin_login_attempts_lookup(login,ip_address,attempted_at),
+ INDEX idx_admin_login_attempts_time(attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE oauth_attempts (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
