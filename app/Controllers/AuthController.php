@@ -36,4 +36,14 @@ final class AuthController
             'account_type' => $accountType,
         ]]);
     }
+
+    public function logout(Request $request): void
+    {
+        $plainToken = RequestUser::tokenFromBearer($request);
+        $service = new TokenService();
+        $user = $service->authenticate($plainToken);
+        RateLimiter::hit('logout_user', (string)$user['id'], 30, 3600);
+        $service->revokeToken($plainToken, (int)$user['id']);
+        Response::json(['success' => true, 'data' => ['message' => 'Текущий токен отозван.']]);
+    }
 }
