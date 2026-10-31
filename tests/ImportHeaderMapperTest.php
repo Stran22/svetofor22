@@ -39,6 +39,13 @@ final class ImportHeaderMapperTest extends TestCase
         );
     }
 
+    public function testRejectsAmbiguousDuplicateLogicalHeaders(): void
+    {
+        self::assertNull(
+            ImportHeaderMapper::map(['Штрихкод', 'Название', 'Цена', 'Розничная цена', 'Остаток'])
+        );
+    }
+
     public function testParsesRussianDecimalFormatting(): void
     {
         self::assertSame('1234.56', ImportHeaderMapper::parseDecimal('1 234,56 ₽', 2));
