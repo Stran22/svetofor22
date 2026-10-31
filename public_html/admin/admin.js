@@ -59,7 +59,7 @@
     try { payload = await response.json(); } catch (_) {}
     if (!response.ok || payload.success === false) {
       const message = payload.error && payload.error.message ? payload.error.message : 'Ошибка запроса (' + response.status + ')';
-      if (response.status === 401 && !loginView.hidden) showLogin(message);
+      if (response.status === 401 && loginView.hidden) showLogin(message);
       throw new Error(message);
     }
     return payload.data || {};
