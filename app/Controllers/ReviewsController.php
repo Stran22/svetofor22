@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\RateLimiter;
 use App\Services\RequestUser;
 
 final class ReviewsController
@@ -42,6 +43,7 @@ final class ReviewsController
     public function save(Request $request): void
     {
         $user = RequestUser::fromBearer($request);
+        RateLimiter::hit('review_user', (string)$user['id'], 5, 3600);
         $social = Database::connection()->prepare('SELECT id FROM social_accounts WHERE user_id=:id LIMIT 1');
         $social->execute(['id' => $user['id']]);
         if (!$social->fetchColumn()) {
