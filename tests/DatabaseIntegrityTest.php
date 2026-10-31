@@ -64,6 +64,14 @@ final class DatabaseIntegrityTest extends TestCase
                 self::assertContains($column, $actual, "Missing {$table}.{$column}");
             }
         }
+
+        $fk = $this->pdo->prepare(
+            "SELECT REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='stock' AND COLUMN_NAME='last_import_id'
+               AND REFERENCED_TABLE_NAME IS NOT NULL LIMIT 1"
+        );
+        $fk->execute();
+        self::assertSame('import_log', $fk->fetchColumn(), 'stock.last_import_id must reference import_log.id');
     }
 
     public function testCatalogAndPriceHistoryQueriesReturnBranchSpecificValues(): void
