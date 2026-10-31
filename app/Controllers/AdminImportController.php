@@ -76,7 +76,7 @@ final class AdminImportController
         if (!$check->fetchColumn()) throw new HttpException(404, 'IMPORT_NOT_FOUND', 'Импорт не найден.');
         $stmt = $pdo->prepare(
             'SELECT `row_number`,error_code,message,row_data,created_at
-             FROM import_errors WHERE import_id=:import_id ORDER BY row_number,id LIMIT 500'
+             FROM import_errors WHERE import_id=:import_id ORDER BY `row_number`,id LIMIT 500'
         );
         $stmt->execute(['import_id' => $importId]);
         Response::json(['success' => true, 'data' => ['import_id' => $importId, 'errors' => $stmt->fetchAll()]]);
