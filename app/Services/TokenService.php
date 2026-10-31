@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Core\Database;
 use App\Core\HttpException;
-use PDO;
 
 final class TokenService
 {
@@ -25,10 +24,14 @@ final class TokenService
             }
 
             $plainToken = bin2hex(random_bytes(32));
-            $hash = hash('sha256', $plainToken);
-            $expiresAt = (new \DateTimeImmutable('+365 days'))->format('Y-m-d H:i:s');
-            $token = $pdo->prepare('INSERT INTO api_tokens (user_id,token_hash,expires_at) VALUES (:user_id,:hash,:expires)');
-            $token->execute(['user_id' => $userId, 'hash' => $hash, 'expires' => $expiresAt]);
+            $token = $pdo->prepare(
+                'INSERT INTO api_tokens (user_id,token_hash,expires_at)
+                 VALUES (:user_id,:hash,DATE_ADD(NOW(), INTERVAL 365 DAY))'
+            );
+            $token->execute(['user_id' => $userId, 'hash' => hash('sha256', $plainToken)]);
+            $expiry = $pdo->prepare('SELECT expires_at FROM api_tokens WHERE id=:id');
+            $expiry->execute(['id' => $pdo->lastInsertId()]);
+            $expiresAt = (string)$expiry->fetchColumn();
             $pdo->commit();
             return ['token' => $plainToken, 'token_type' => 'Bearer', 'expires_at' => $expiresAt, 'user_id' => $userId];
         } catch (\Throwable $e) {
@@ -46,13 +49,17 @@ final class TokenService
             throw new HttpException(404, 'USER_NOT_FOUND', 'Учётная запись не найдена.');
         }
         $plainToken = bin2hex(random_bytes(32));
-        $expiresAt = (new \DateTimeImmutable('+365 days'))->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare('INSERT INTO api_tokens (user_id,token_hash,expires_at) VALUES (:user_id,:hash,:expires)');
+        $stmt = $pdo->prepare(
+            'INSERT INTO api_tokens (user_id,token_hash,expires_at)
+             VALUES (:user_id,:hash,DATE_ADD(NOW(), INTERVAL 365 DAY))'
+        );
         $stmt->execute([
             'user_id' => $userId,
             'hash' => hash('sha256', $plainToken),
-            'expires' => $expiresAt,
         ]);
+        $expiry = $pdo->prepare('SELECT expires_at FROM api_tokens WHERE id=:id');
+        $expiry->execute(['id' => $pdo->lastInsertId()]);
+        $expiresAt = (string)$expiry->fetchColumn();
         return [
             'token' => $plainToken,
             'token_type' => 'Bearer',
@@ -66,7 +73,8 @@ final class TokenService
         if ($plainToken === '' || strlen($plainToken) > 200) {
             throw new HttpException(401, 'UNAUTHENTICATED', 'Требуется авторизация.');
         }
-        $stmt = Database::connection()->prepare(
+        $pdo = Database::connection();
+        $stmt = $pdo->prepare(
             'SELECT u.id,u.device_uuid,u.display_name,u.email,t.id AS token_id
              FROM api_tokens t JOIN users u ON u.id=t.user_id
              WHERE t.token_hash=:hash AND (t.expires_at IS NULL OR t.expires_at>NOW()) LIMIT 1'
@@ -74,7 +82,7 @@ final class TokenService
         $stmt->execute(['hash' => hash('sha256', $plainToken)]);
         $user = $stmt->fetch();
         if (!$user) throw new HttpException(401, 'UNAUTHENTICATED', 'Токен недействителен или истёк.');
-        Database::connection()->prepare('UPDATE api_tokens SET last_used_at=NOW() WHERE id=:id')
+        $pdo->prepare('UPDATE api_tokens SET last_used_at=NOW() WHERE id=:id')
             ->execute(['id' => $user['token_id']]);
         unset($user['token_id']);
         return $user;
