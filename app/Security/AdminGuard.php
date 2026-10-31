@@ -61,6 +61,13 @@ final class AdminGuard
         if (!is_array($admin) || empty($admin['id']) || empty($admin['role'])) {
             throw new HttpException(401, 'ADMIN_UNAUTHENTICATED', 'Требуется вход администратора.');
         }
+        $lastActivity = (int)($_SESSION['admin_last_activity'] ?? 0);
+        if ($lastActivity > 0 && $lastActivity < time() - 1800) {
+            $_SESSION = [];
+            session_destroy();
+            throw new HttpException(401, 'ADMIN_SESSION_EXPIRED', 'Сессия администратора завершена из-за бездействия. Войдите снова.');
+        }
+        $_SESSION['admin_last_activity'] = time();
         return $admin;
     }
 
