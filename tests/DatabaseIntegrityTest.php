@@ -74,6 +74,8 @@ final class DatabaseIntegrityTest extends TestCase
             }
         }
 
+        self::assertSame(9, (int)$this->pdo->query('SELECT COUNT(*) FROM schema_migrations')->fetchColumn());
+
         $fk = $this->pdo->prepare(
             "SELECT REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE
              WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='stock' AND COLUMN_NAME='last_import_id'
