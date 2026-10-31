@@ -413,8 +413,8 @@ final class DatabaseIntegrityTest extends TestCase
 
         $this->pdo->prepare(
             'INSERT INTO products (name,slug,sku,barcode,unit,catalog_source_branch_id)
-             VALUES (\'Old milk\',:slug,\'MILK-\' . :suffix,NULL,\'шт.\',:branch_id)'
-        )->execute(['slug' => 'milk-' . $suffix, 'suffix' => $suffix, 'branch_id' => $branchId]);
+             VALUES (\'Old milk\',:slug,:sku,NULL,\'шт.\',:branch_id)'
+        )->execute(['slug' => 'milk-' . $suffix, 'sku' => 'MILK-' . $suffix, 'branch_id' => $branchId]);
         $productId = (int)$this->pdo->lastInsertId();
 
         $service = new \App\Services\ExcelImportService();
