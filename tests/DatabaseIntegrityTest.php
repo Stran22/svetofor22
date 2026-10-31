@@ -173,6 +173,9 @@ final class DatabaseIntegrityTest extends TestCase
             'INSERT INTO admins (login,password_hash,role,is_active) VALUES (:login,:hash,\'owner\',1)'
         )->execute(['login' => 'audit-' . $suffix, 'hash' => password_hash('test-password', PASSWORD_DEFAULT)]);
         $adminId = (int)$this->pdo->lastInsertId();
+        // Admin controllers own their transactions; this scenario runs without
+        // the per-test wrapping transaction used by the read-only API tests.
+        $this->pdo->commit();
 
         AdminGuard::startSession();
         $_SESSION = [
