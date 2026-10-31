@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\RateLimiter;
 use App\Services\RequestUser;
 
 final class SubscriptionController
@@ -28,6 +29,7 @@ final class SubscriptionController
     public function create(Request $request): void
     {
         $user = RequestUser::fromBearer($request);
+        RateLimiter::hit('subscription_create_user', (string)$user['id'], 20, 3600);
         $productId = filter_var($request->body['product_id'] ?? null, FILTER_VALIDATE_INT);
         $branchId = filter_var($request->body['branch_id'] ?? null, FILTER_VALIDATE_INT);
         if (!$productId || $productId < 1 || !$branchId || $branchId < 1) {
@@ -56,6 +58,7 @@ final class SubscriptionController
     public function cancel(Request $request): void
     {
         $user = RequestUser::fromBearer($request);
+        RateLimiter::hit('subscription_cancel_user', (string)$user['id'], 30, 3600);
         $subscriptionId = filter_var($request->body['subscription_id'] ?? null, FILTER_VALIDATE_INT);
         if (!$subscriptionId || $subscriptionId < 1) {
             throw new HttpException(422, 'VALIDATION_ERROR', 'Укажите корректный subscription_id.');
