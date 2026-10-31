@@ -11,7 +11,14 @@ final class ImportHeaderMapperTest extends TestCase
     public function testMapsRussianStoreHeaders(): void
     {
         $map = ImportHeaderMapper::map(['Штрихкод', 'Артикул', 'Наименование товара', 'Розничная цена', 'Остаток на складе', 'Ед. изм.']);
-        self::assertNull($map, 'Unsupported compound header should not be guessed.');
+        self::assertSame([
+            'barcode' => 0,
+            'sku' => 1,
+            'name' => 2,
+            'price' => 3,
+            'quantity' => 4,
+            'unit' => 5,
+        ], $map);
 
         $map = ImportHeaderMapper::map(['Штрихкод', 'Артикул', 'Наименование', 'Цена', 'Остаток', 'Ед.']);
         self::assertSame([
