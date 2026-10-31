@@ -507,9 +507,10 @@ final class DatabaseIntegrityTest extends TestCase
         $finish = new \ReflectionMethod($service, 'finishDelivery');
         $finish->setAccessible(true);
 
-        $deliveryId = $claim->invoke($service, $this->pdo, $successSubscriptionId, 'restock-success-' . bin2hex(random_bytes(4)));
+        $successEventKey = 'restock-success-' . bin2hex(random_bytes(4));
+        $deliveryId = $claim->invoke($service, $this->pdo, $successSubscriptionId, $successEventKey);
         self::assertGreaterThan(0, $deliveryId);
-        self::assertNull($claim->invoke($service, $this->pdo, $successSubscriptionId, 'restock-success-' . 'different-event'));
+        self::assertNull($claim->invoke($service, $this->pdo, $successSubscriptionId, $successEventKey));
 
         $finish->invoke($service, $this->pdo, $deliveryId, true, 'onesignal-test-id', ['id' => 'onesignal-test-id'], null);
         $status = $this->pdo->prepare('SELECT status FROM subscriptions WHERE id=:id');
