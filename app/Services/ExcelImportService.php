@@ -316,14 +316,32 @@ final class ExcelImportService
     private function upsertProductAndStock(PDO $pdo, array $record, int $branchId, int $importId): array
     {
         $product = false;
+        $barcodeMatch = false;
+        $skuMatch = false;
         if ($record['barcode'] !== null) {
-            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit,catalog_source_branch_id FROM products WHERE barcode=:identifier LIMIT 1 FOR UPDATE');
-            $find->execute(['identifier' => $record['barcode']]);
-            $product = $find->fetch();
-        } elseif ($record['sku'] !== null) {
-            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit,catalog_source_branch_id FROM products WHERE sku=:identifier LIMIT 1 FOR UPDATE');
-            $find->execute(['identifier' => $record['sku']]);
-            $product = $find->fetch();
+            $findByBarcode = $pdo->prepare(
+                'SELECT id,name,sku,barcode,unit,catalog_source_branch_id
+                 FROM products WHERE barcode=:identifier LIMIT 1 FOR UPDATE'
+            );
+            $findByBarcode->execute(['identifier' => $record['barcode']]);
+            $barcodeMatch = $findByBarcode->fetch();
+        }
+        if ($record['sku'] !== null) {
+            $findBySku = $pdo->prepare(
+                'SELECT id,name,sku,barcode,unit,catalog_source_branch_id
+                 FROM products WHERE sku=:identifier LIMIT 1 FOR UPDATE'
+            );
+            $findBySku->execute(['identifier' => $record['sku']]);
+            $skuMatch = $findBySku->fetch();
+        }
+
+        if ($barcodeMatch && $skuMatch && (int)$barcodeMatch['id'] !== (int)$skuMatch['id']) {
+            throw new \\RuntimeException('Штрихкод и артикул в этой строке относятся к разным товарам.');
+        }
+        $product = $barcodeMatch ?: $skuMatch;
+        if ($product && $record['barcode'] !== null && $product['barcode'] !== null
+            && (string)$product['barcode'] !== $record['barcode']) {
+            throw new \\RuntimeException('Штрихкод строки не совпадает со штрихкодом найденного по артикулу товара.');
         }
 
         $created = false;
