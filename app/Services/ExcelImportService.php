@@ -12,6 +12,10 @@ use Throwable;
 final class ExcelImportService
 {
     private const MAX_FILE_BYTES = 5 * 1024 * 1024;
+    private const MAX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024;
+    private const MAX_ROWS = 30000;
+    private const MAX_COLUMNS = 20;
+    private const MAX_CELLS = 120000;
 
     public function importUploadedFile(int $branchId, array $file): array
     {
@@ -52,8 +56,9 @@ final class ExcelImportService
             $sheet = $spreadsheet->getSheet(0);
             $highestRow = $sheet->getHighestRow();
             $highestColumn = Coordinate::columnIndexFromString($sheet->getHighestColumn());
-            if ($highestRow > 100000 || $highestColumn > 100) {
-                throw new HttpException(422, 'XLSX_DIMENSIONS_INVALID', 'В файле слишком много строк или столбцов для безопасного импорта.');
+            if ($highestRow > self::MAX_ROWS || $highestColumn > self::MAX_COLUMNS
+                || ($highestRow * $highestColumn) > self::MAX_CELLS) {
+                throw new HttpException(422, 'XLSX_DIMENSIONS_INVALID', 'В файле слишком много строк, столбцов или заполненных ячеек для безопасного импорта.');
             }
             $header = $this->detectHeader($sheet, $highestRow, $highestColumn);
             if ($header === null) {
@@ -99,8 +104,8 @@ final class ExcelImportService
                 $stat = $zip->statIndex($i);
                 if (!is_array($stat)) continue;
                 $totalUncompressed += (int)($stat['size'] ?? 0);
-                if ($totalUncompressed > 50 * 1024 * 1024) {
-                    throw new HttpException(422, 'XLSX_UNCOMPRESSED_TOO_LARGE', 'Распакованный объём Excel-файла превышает допустимые 50 МБ.');
+                if ($totalUncompressed > self::MAX_UNCOMPRESSED_BYTES) {
+                    throw new HttpException(422, 'XLSX_UNCOMPRESSED_TOO_LARGE', 'Распакованный объём Excel-файла превышает допустимые 25 МБ.');
                 }
                 $name = (string)($stat['name'] ?? '');
                 if ($name === 'xl/workbook.xml') $hasWorkbook = true;
