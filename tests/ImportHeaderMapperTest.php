@@ -46,9 +46,15 @@ final class ImportHeaderMapperTest extends TestCase
         self::assertSame('0.00', ImportHeaderMapper::parseDecimal(0, 2));
     }
 
-    public function testRejectsNegativeAndOverPreciseNumbers(): void
+    public function testRejectsNegativeNumbers(): void
     {
         $this->expectException(RuntimeException::class);
         ImportHeaderMapper::parseDecimal('-1,00', 2);
+    }
+
+    public function testRejectsExcessFractionalDigitsInsteadOfRounding(): void
+    {
+        $this->expectException(RuntimeException::class);
+        ImportHeaderMapper::parseDecimal('1,234', 2);
     }
 }
