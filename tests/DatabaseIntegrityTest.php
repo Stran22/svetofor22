@@ -499,6 +499,9 @@ final class DatabaseIntegrityTest extends TestCase
              VALUES (:user_id,:product_id,:branch_id,'active')"
         )->execute(['user_id' => $userTwo, 'product_id' => $productId, 'branch_id' => $branchId]);
         $retrySubscriptionId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,10.00,2.000)'
+        )->execute(['branch_id' => $branchId, 'product_id' => $productId]);
         $this->pdo->commit();
 
         $service = new PushNotificationService();
@@ -517,14 +520,22 @@ final class DatabaseIntegrityTest extends TestCase
         $status->execute(['id' => $successSubscriptionId]);
         self::assertSame('triggered', $status->fetchColumn());
 
-        $result = $service->notifyRestock($productId, $branchId, 'restock-retry-' . bin2hex(random_bytes(4)));
+        // Simulate a process crash after the stock transaction commits:
+        // the pending outbox row must still be picked up by the retry worker.
+        $retryEventKey = 'restock-retry-' . bin2hex(random_bytes(4));
+        $this->pdo->beginTransaction();
+        self::assertSame(1, $service->enqueueRestock($this->pdo, $productId, $branchId, $retryEventKey));
+        self::assertSame(0, $service->enqueueRestock($this->pdo, $productId, $branchId, $retryEventKey));
+        $this->pdo->commit();
+
+        $result = $service->retryFailedDeliveries(10);
         self::assertSame(1, $result['matched']);
         self::assertSame(1, $result['failed']);
 
         $delivery = $this->pdo->prepare(
-            'SELECT id,status,attempt_count,last_error FROM push_delivery_log WHERE subscription_id=:id'
+            'SELECT id,status,attempt_count,last_error FROM push_delivery_log WHERE subscription_id=:id AND event_key=:event_key'
         );
-        $delivery->execute(['id' => $retrySubscriptionId]);
+        $delivery->execute(['id' => $retrySubscriptionId, 'event_key' => $retryEventKey]);
         $failed = $delivery->fetch();
         self::assertSame('failed', $failed['status']);
         self::assertSame(1, (int)$failed['attempt_count']);
