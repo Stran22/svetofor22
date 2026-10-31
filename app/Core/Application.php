@@ -5,6 +5,7 @@ namespace App\Core;
 use App\Controllers\AdminAuthController;
 use App\Controllers\AuthController;
 use App\Controllers\CatalogController;
+use App\Controllers\OAuthController;
 use App\Controllers\PriceHistoryController;
 use App\Controllers\ReviewsController;
 use App\Controllers\SubscriptionController;
@@ -20,9 +21,11 @@ final class Application
         $catalog = new CatalogController();
         $auth = new AuthController();
         $adminAuth = new AdminAuthController();
-        $priceHistory = new PriceHistoryController();\n        $oauth = new OAuthController();
+        $oauth = new OAuthController();
+        $priceHistory = new PriceHistoryController();
         $reviews = new ReviewsController();
         $subscriptions = new SubscriptionController();
+
         $router->get('/api/v1/health', [$system, 'health']);
         $router->get('/api/v1/branches', [$catalog, 'branches']);
         $router->get('/api/v1/categories', [$catalog, 'categories']);
@@ -34,12 +37,18 @@ final class Application
         $router->get('/api/v1/subscriptions', [$subscriptions, 'index']);
         $router->post('/api/v1/subscriptions', [$subscriptions, 'create']);
         $router->post('/api/v1/subscriptions/cancel', [$subscriptions, 'cancel']);
-        $router->post('/api/v1/auth/guest', [$auth, 'guest']);\n        $router->post('/api/v1/auth/oauth/start', [$oauth, 'start']);\n        $router->get('/api/v1/auth/oauth/callback', [$oauth, 'callback']);\n        $router->post('/api/v1/auth/oauth/exchange', [$oauth, 'exchange']);
+
+        $router->post('/api/v1/auth/guest', [$auth, 'guest']);
         $router->get('/api/v1/auth/me', [$auth, 'me']);
+        $router->post('/api/v1/auth/oauth/start', [$oauth, 'start']);
+        $router->get('/api/v1/auth/oauth/callback', [$oauth, 'callback']);
+        $router->post('/api/v1/auth/oauth/exchange', [$oauth, 'exchange']);
+
         $router->get('/api/v1/admin/csrf', [$adminAuth, 'csrf']);
         $router->post('/api/v1/admin/login', [$adminAuth, 'login']);
         $router->get('/api/v1/admin/me', [$adminAuth, 'me']);
         $router->post('/api/v1/admin/logout', [$adminAuth, 'logout']);
+
         try {
             $router->dispatch(Request::fromGlobals());
         } catch (HttpException $e) {
