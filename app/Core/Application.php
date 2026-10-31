@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use App\Controllers\AdminAuthController;
+use App\Controllers\AdminCatalogController;
 use App\Controllers\AdminImportController;
 use App\Controllers\AdminReviewController;
 use App\Controllers\AuthController;
