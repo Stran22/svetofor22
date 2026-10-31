@@ -141,7 +141,7 @@ final class ExcelImportService
         $pdo->beginTransaction();
         try {
             $find = $pdo->prepare(
-                'SELECT id,status,rows_total,rows_created,rows_updated,rows_unchanged,rows_errors
+                'SELECT id,status,started_at,rows_total,rows_created,rows_updated,rows_unchanged,rows_errors
                  FROM import_log WHERE branch_id=:branch_id AND file_sha256=:hash
                  LIMIT 1 FOR UPDATE'
             );
@@ -162,7 +162,10 @@ final class ExcelImportService
                     ];
                 }
                 if ($existing['status'] === 'processing') {
-                    throw new HttpException(409, 'IMPORT_ALREADY_PROCESSING', 'Этот файл уже обрабатывается.');
+                    $startedAt = $existing['started_at'] === null ? false : strtotime((string)$existing['started_at']);
+                    if ($startedAt !== false && $startedAt > time() - 1800) {
+                        throw new HttpException(409, 'IMPORT_ALREADY_PROCESSING', 'Этот файл уже обрабатывается.');
+                    }
                 }
                 $importId = (int)$existing['id'];
                 $pdo->prepare('DELETE FROM import_errors WHERE import_id=:id')->execute(['id' => $importId]);
