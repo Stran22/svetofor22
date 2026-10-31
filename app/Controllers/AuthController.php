@@ -13,11 +13,11 @@ final class AuthController
 {
     public function guest(Request $request): void
     {
-        $uuid = strtolower(trim((string)($request->body['device_uuid'] ?? '')));
+        $ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 0, 45);\n        RateLimiter::hit('guest_ip', $ip, 30, 60);\n        $uuid = strtolower(trim((string)($request->body['device_uuid'] ?? '')));
         if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $uuid)) {
             throw new HttpException(422, 'VALIDATION_ERROR', 'Передан некорректный device_uuid.');
         }
-        $issued = (new TokenService())->issueGuestToken($uuid);
+        RateLimiter::hit('guest_device', $uuid, 5, 3600);\n        $issued = (new TokenService())->issueGuestToken($uuid);
         Response::json(['success' => true, 'data' => $issued], 201);
     }
 
