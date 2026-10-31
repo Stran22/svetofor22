@@ -19,8 +19,9 @@ PHP 8.1+, MySQL 8, PDO, Composer 2.2+, PhpSpreadsheet 2.x, cURL. Android-кли�
 3. Скопировать `.env.example` в `.env`, задать доступы к MySQL и OAuth credentials.
 4. Создать БД MySQL с кодировкой utf8mb4.
 5. Применить миграции по порядку: `001_initial_schema.sql`, `002_admin_oauth_security.sql`, `003_oauth_attempt_context.sql`, затем `004_push_delivery_state.sql`, затем `005_product_catalog_source.sql`, затем `006_review_moderation.sql`.
-6. Проверить `/api/v1/health`.
-7. В кабинетах VK ID и Яндекс ID зарегистрировать точный Redirect URI: `https://baza.altaj-otdyh.ru/api/v1/auth/oauth/callback`. Этот же адрес должен совпадать с `APP_URL` в `.env`.
+6. Создать первую учётную запись администратора из корня проекта: `php bin/create-admin.php adminlogin owner`. Скрипт запросит пароль, сохранит только `password_hash`; первая учётная запись обязана быть `owner`. Дополнительных администраторов можно создать с ролями `manager` или `moderator`.
+7. Открыть панель по адресу `/admin/` и проверить `/api/v1/health`.
+8. В кабинетах VK ID и Яндекс ID зарегистрировать точный Redirect URI: `https://baza.altaj-otdyh.ru/api/v1/auth/oauth/callback`. Этот же адрес должен совпадать с `APP_URL` в `.env`.
 
 ## API v1
 
