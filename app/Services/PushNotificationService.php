@@ -22,6 +22,29 @@ final class PushNotificationService
     }
 
     /**
+     * Persist a delivery intent inside the same transaction as the stock
+     * transition. The retry worker can deliver it if the web request crashes
+     * after the stock transaction commits.
+     */
+    public function enqueueRestock(PDO $pdo, int $productId, int $branchId, string $eventKey): int
+    {
+        if (!$pdo->inTransaction()) {
+            throw new RuntimeException('Restock delivery must be enqueued inside the stock transaction.');
+        }
+        if ($productId < 1 || $branchId < 1 || $eventKey === '' || strlen($eventKey) > 190) {
+            throw new RuntimeException('Invalid restock event parameters.');
+        }
+        $stmt = $pdo->prepare(
+            "INSERT IGNORE INTO push_delivery_log (subscription_id,event_key,status)
+             SELECT s.id,:event_key,'pending'
+             FROM subscriptions s
+             WHERE s.product_id=:product_id AND s.branch_id=:branch_id AND s.status='active'"
+        );
+        $stmt->execute(['event_key' => $eventKey, 'product_id' => $productId, 'branch_id' => $branchId]);
+        return $stmt->rowCount();
+    }
+
+    /**
      * Call only after the stock transaction has committed and a 0 -> positive
      * quantity transition has been confirmed.
      */
@@ -85,6 +108,16 @@ final class PushNotificationService
     {
         $limit = min(500, max(1, $limit));
         $pdo = Database::connection();
+        // Do not send a delayed outbox event if the item is no longer available.
+        $pdo->exec(
+            "UPDATE push_delivery_log d
+             JOIN subscriptions s ON s.id=d.subscription_id
+             LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id
+             SET d.status='failed',d.locked_at=NULL,d.last_error='STOCK_NO_LONGER_AVAILABLE'
+             WHERE d.status IN ('pending','processing')
+               AND (d.status='pending' OR d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+               AND (st.id IS NULL OR st.quantity<=0)"
+        );
         $stmt = $pdo->query(
             "SELECT d.subscription_id,d.event_key,s.user_id,s.product_id,s.branch_id,
                     p.name AS product_name,b.name AS branch_name
@@ -92,10 +125,12 @@ final class PushNotificationService
              JOIN subscriptions s ON s.id=d.subscription_id
              JOIN products p ON p.id=s.product_id
              JOIN branches b ON b.id=s.branch_id
+             JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.status='active' AND d.attempt_count<10
-               AND COALESCE(d.last_error,'')<>'NO_SUBSCRIBED_DEVICES'
+               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE')
                AND (
-                    (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))
+                    d.status='pending'
+                    OR (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))
                     OR (d.status='processing' AND d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
                )
              ORDER BY d.id ASC LIMIT " . $limit
