@@ -43,7 +43,9 @@ jobs:
         run: |
           find app public_html bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
           node --check public_html/admin/admin.js
-      - name: Apply MySQL migrations
-        run: php bin/migrate.php
+      - name: Apply MySQL migrations and verify idempotency
+        run: |
+          php bin/migrate.php
+          php bin/migrate.php
       - name: Unit and database integration tests
         run: composer test
