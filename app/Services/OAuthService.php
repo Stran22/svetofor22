@@ -119,7 +119,7 @@ final class OAuthService
             if (!$attempt) {
                 throw new HttpException(400, 'OAUTH_STATE_INVALID', 'Проверка OAuth state не пройдена или срок авторизации истёк.');
             }
-            $pdo->prepare('UPDATE oauth_attempts SET consumed_at=NOW() WHERE id=:id')->execute(['id' => $attempt['id']]);
+            $pdo->prepare('UPDATE oauth_attempts SET consumed_at=NOW(),code_verifier=NULL WHERE id=:id')->execute(['id' => $attempt['id']]);
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -343,7 +343,7 @@ final class OAuthService
     {
         $base = (string)Config::get('app.auth_return_uri', '');
         $parts = parse_url($base);
-        if ($base === '' || !is_array($parts) || empty($parts['scheme'])) {
+        if ($base === '' || !is_array($parts) || ($parts['scheme'] ?? '') !== 'svetofor2' || ($parts['host'] ?? '') !== 'oauth' || ($parts['path'] ?? '') !== '/callback' || isset($parts['fragment']) || isset($parts['user']) || isset($parts['pass'])) {
             throw new HttpException(503, 'OAUTH_APP_RETURN_NOT_CONFIGURED', 'Не настроен адрес возврата в Android-приложение.');
         }
         $separator = str_contains($base, '?') ? '&' : '?';
