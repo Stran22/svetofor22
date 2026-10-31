@@ -241,7 +241,7 @@ final class ExcelImportService
                         'row_number' => $rowNumber,
                         'error_code' => $errorCode,
                         'message' => mb_substr($rowError->getMessage(), 0, 500),
-                        'row_data' => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'row_data' => json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE),
                     ]);
                 }
             }
