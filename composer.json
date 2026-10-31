@@ -24,7 +24,7 @@
     }
   },
   "scripts": {
-    "check": "find app public_html tests -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "check": "find app public_html bin tests -name '*.php' -print0 | xargs -0 -n1 php -l",
     "test": "phpunit"
   },
   "config": {
