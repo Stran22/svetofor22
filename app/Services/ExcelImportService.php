@@ -317,11 +317,11 @@ final class ExcelImportService
     {
         $product = false;
         if ($record['barcode'] !== null) {
-            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit FROM products WHERE barcode=:identifier LIMIT 1 FOR UPDATE');
+            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit,catalog_source_branch_id FROM products WHERE barcode=:identifier LIMIT 1 FOR UPDATE');
             $find->execute(['identifier' => $record['barcode']]);
             $product = $find->fetch();
         } elseif ($record['sku'] !== null) {
-            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit FROM products WHERE sku=:identifier LIMIT 1 FOR UPDATE');
+            $find = $pdo->prepare('SELECT id,name,sku,barcode,unit,catalog_source_branch_id FROM products WHERE sku=:identifier LIMIT 1 FOR UPDATE');
             $find->execute(['identifier' => $record['sku']]);
             $product = $find->fetch();
         }
@@ -336,32 +336,37 @@ final class ExcelImportService
             if ($slugBase === '') $slugBase = 'product';
             $slug = substr($slugBase, 0, 220) . '-' . substr(hash('sha256', (string)$identifier), 0, 8);
             $insert = $pdo->prepare(
-                'INSERT INTO products (name,slug,sku,barcode,unit)
-                 VALUES (:name,:slug,:sku,:barcode,:unit)'
+                'INSERT INTO products (name,slug,sku,barcode,unit,catalog_source_branch_id)
+                 VALUES (:name,:slug,:sku,:barcode,:unit,:source_branch_id)'
             );
             $insert->execute([
                 'name' => $record['name'], 'slug' => $slug, 'sku' => $record['sku'],
                 'barcode' => $record['barcode'], 'unit' => $record['unit'] ?? 'шт.',
+                'source_branch_id' => $branchId,
             ]);
             $productId = (int)$pdo->lastInsertId();
             $created = true;
         } else {
             $productId = (int)$product['id'];
-            if ($product['sku'] !== null && $record['sku'] !== null && $product['sku'] !== $record['sku']) {
-                throw new \RuntimeException('Артикул не совпадает с уже сохранённым для этого штрихкода.');
-            }
-            if ($product['barcode'] !== null && $record['barcode'] !== null && $product['barcode'] !== $record['barcode']) {
-                throw new \RuntimeException('Штрихкод не совпадает с уже сохранённым для этого артикула.');
-            }
-            if ($record['unit'] !== null && $product['unit'] !== $record['unit']) {
-                throw new \RuntimeException('Единица измерения отличается от уже сохранённой для этого товара.');
-            }
-            $sku = $product['sku'] ?? $record['sku'];
+            $isSourceBranch = $product['catalog_source_branch_id'] === null
+                || (int)$product['catalog_source_branch_id'] === $branchId;
+            $sourceBranchId = $product['catalog_source_branch_id'] === null
+                ? $branchId
+                : (int)$product['catalog_source_branch_id'];
+            $name = $isSourceBranch ? $record['name'] : $product['name'];
+            $unit = $isSourceBranch && $record['unit'] !== null ? $record['unit'] : $product['unit'];
+            $sku = $isSourceBranch && $record['sku'] !== null ? $record['sku'] : ($product['sku'] ?? $record['sku']);
             $barcode = $product['barcode'] ?? $record['barcode'];
-            $productChanged = $product['sku'] !== $sku || $product['barcode'] !== $barcode;
+            $productChanged = $product['name'] !== $name || $product['unit'] !== $unit
+                || $product['sku'] !== $sku || $product['barcode'] !== $barcode
+                || $product['catalog_source_branch_id'] === null;
             if ($productChanged) {
-                $pdo->prepare('UPDATE products SET sku=:sku,barcode=:barcode WHERE id=:id')
-                    ->execute(['sku' => $sku, 'barcode' => $barcode, 'id' => $productId]);
+                $pdo->prepare(
+                    'UPDATE products SET name=:name,sku=:sku,barcode=:barcode,unit=:unit,catalog_source_branch_id=:source_branch_id WHERE id=:id'
+                )->execute([
+                    'name' => $name, 'sku' => $sku, 'barcode' => $barcode, 'unit' => $unit,
+                    'source_branch_id' => $sourceBranchId, 'id' => $productId,
+                ]);
             }
         }
 
