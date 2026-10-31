@@ -32,7 +32,7 @@ final class AdminImportController
         if ($branchId !== null && (!$branchId || $branchId < 1)) {
             throw new HttpException(422, 'BRANCH_ID_INVALID', 'Некорректный branch_id.');
         }
-        $page = max(1, (int)($request->query['page'] ?? 1));
+        $page = min(100000, max(1, (int)($request->query['page'] ?? 1)));
         $perPage = min(100, max(1, (int)($request->query['per_page'] ?? 20)));
         $offset = ($page - 1) * $perPage;
         $pdo = Database::connection();
