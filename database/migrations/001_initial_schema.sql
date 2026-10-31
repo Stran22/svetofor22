@@ -98,7 +98,7 @@ CREATE TABLE import_errors (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_id BIGINT UNSIGNED NOT NULL, `row_number` INT UNSIGNED NOT NULL,
  error_code VARCHAR(80) NOT NULL, message VARCHAR(500) NOT NULL, row_data JSON NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  CONSTRAINT fk_import_errors_import FOREIGN KEY(import_id) REFERENCES import_log(id) ON DELETE CASCADE,
- INDEX idx_import_errors_row(import_id,row_number)
+ INDEX idx_import_errors_row(import_id,`row_number`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE push_delivery_log (
