@@ -12,6 +12,7 @@ use App\Controllers\ReviewsController;
 use App\Controllers\SubscriptionController;
 use App\Core\Database;
 use App\Security\AdminGuard;
+use App\Services\OAuthService;
 use App\Core\HttpException;
 use App\Core\Request;
 use PDO;
@@ -332,6 +333,71 @@ final class DatabaseIntegrityTest extends TestCase
         $check = $this->pdo->prepare('SELECT last_login_at FROM admins WHERE id=:id');
         $check->execute(['id' => $adminId]);
         self::assertNotFalse($check->fetchColumn());
+    }
+
+
+    public function testOAuthSocialAccountLinkingAndHandoffCodesAreTransactionalAndOneTime(): void
+    {
+        $suffix = bin2hex(random_bytes(8));
+        $this->pdo->prepare('INSERT INTO users (display_name) VALUES (:name)')
+            ->execute(['name' => 'OAuth guest']);
+        $guestId = (int)$this->pdo->lastInsertId();
+        $this->pdo->commit();
+
+        $service = new OAuthService();
+        $linkMethod = new \ReflectionMethod($service, 'createOrLinkAccount');
+        $linkMethod->setAccessible(true);
+
+        $code = $linkMethod->invoke(
+            $service, 'yandex', 'yandex-' . $suffix, 'OAuth User', 'oauth-' . $suffix . '@example.test', null
+        );
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $code);
+        $issued = $service->exchangeHandoffCode($code);
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $issued['token']);
+
+        $account = $this->pdo->prepare(
+            "SELECT sa.user_id,u.display_name,u.email
+             FROM social_accounts sa JOIN users u ON u.id=sa.user_id
+             WHERE sa.provider='yandex' AND sa.provider_user_id=:provider_user_id"
+        );
+        $account->execute(['provider_user_id' => 'yandex-' . $suffix]);
+        $row = $account->fetch();
+        self::assertNotFalse($row);
+        self::assertSame('OAuth User', $row['display_name']);
+        self::assertSame('oauth-' . $suffix . '@example.test', $row['email']);
+
+        $tokenCheck = $this->pdo->prepare('SELECT COUNT(*) FROM api_tokens WHERE user_id=:user_id AND token_hash=:hash');
+        $tokenCheck->execute(['user_id' => $row['user_id'], 'hash' => hash('sha256', $issued['token'])]);
+        self::assertSame(1, (int)$tokenCheck->fetchColumn());
+
+        try {
+            $service->exchangeHandoffCode($code);
+            self::fail('A handoff code must not be reusable.');
+        } catch (HttpException $e) {
+            self::assertSame(401, $e->status);
+        }
+
+        $linkedCode = $linkMethod->invoke(
+            $service, 'vk', 'vk-' . $suffix, 'Linked guest', null, $guestId
+        );
+        $linked = $this->pdo->prepare(
+            "SELECT user_id FROM social_accounts WHERE provider='vk' AND provider_user_id=:provider_user_id"
+        );
+        $linked->execute(['provider_user_id' => 'vk-' . $suffix]);
+        self::assertSame($guestId, (int)$linked->fetchColumn());
+
+        $this->pdo->prepare('INSERT INTO users (display_name) VALUES (:name)')
+            ->execute(['name' => 'Other guest']);
+        $otherGuestId = (int)$this->pdo->lastInsertId();
+        try {
+            $linkMethod->invoke($service, 'vk', 'vk-' . $suffix, 'Other', null, $otherGuestId);
+            self::fail('A social account already linked to another user must be rejected.');
+        } catch (HttpException $e) {
+            self::assertSame(409, $e->status);
+        }
+
+        $linkedIssued = $service->exchangeHandoffCode($linkedCode);
+        self::assertSame($guestId, (int)$linkedIssued['user_id']);
     }
 
     private function seedCatalog(): array
