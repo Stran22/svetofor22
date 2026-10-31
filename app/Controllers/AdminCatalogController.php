@@ -227,6 +227,7 @@ final class AdminCatalogController
                 $this->audit($pdo, (int)$admin['id'], 'category.create', 'category', $id, ['name' => $name]);
                 $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
+                return;
             }
             $pdo->prepare(
                 'UPDATE categories SET parent_id=:parent_id,name=:name,slug=:slug,image_url=:image_url,
@@ -299,6 +300,7 @@ final class AdminCatalogController
                 $this->audit($pdo, (int)$admin['id'], 'branch.create', 'branch', $id, ['name' => $name]);
                 $pdo->commit();
                 Response::json(['success' => true, 'data' => ['id' => $id]], 201);
+                return;
             }
             $pdo->prepare(
                 'UPDATE branches SET name=:name,slug=:slug,address=:address,phone=:phone,sort_order=:sort_order,is_active=:is_active
