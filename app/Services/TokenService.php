@@ -12,16 +12,16 @@ final class TokenService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $find = $pdo->prepare('SELECT id FROM users WHERE device_uuid=:uuid LIMIT 1');
-            $find->execute(['uuid' => $deviceUuid]);
-            $userId = $find->fetchColumn();
-            if ($userId === false) {
-                $insert = $pdo->prepare('INSERT INTO users (device_uuid,display_name) VALUES (:uuid,:name)');
-                $insert->execute(['uuid' => $deviceUuid, 'name' => 'Гость']);
-                $userId = (int)$pdo->lastInsertId();
-            } else {
-                $userId = (int)$userId;
-            }
+            // A single device can send two first-login requests concurrently.
+            // LAST_INSERT_ID(id) returns the existing user's id on duplicate UUID
+            // instead of leaking a duplicate-key error to one of those requests.
+            $insert = $pdo->prepare(
+                'INSERT INTO users (device_uuid,display_name) VALUES (:uuid,:name)
+                 ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)'
+            );
+            $insert->execute(['uuid' => $deviceUuid, 'name' => 'Гость']);
+            $userId = (int)$pdo->lastInsertId();
+            if ($userId < 1) throw new \RuntimeException('Could not resolve guest account id.');
 
             $plainToken = bin2hex(random_bytes(32));
             $token = $pdo->prepare(
