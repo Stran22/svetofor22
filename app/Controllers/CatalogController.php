@@ -10,6 +10,15 @@ use PDO;
 
 final class CatalogController
 {
+    private const ACTIVE_CATEGORY_CTE = 'WITH RECURSIVE active_categories AS (
+        SELECT id,parent_id,name,slug,image_url,sort_order FROM categories
+        WHERE parent_id IS NULL AND is_active=1
+        UNION ALL
+        SELECT c.id,c.parent_id,c.name,c.slug,c.image_url,c.sort_order
+        FROM categories c JOIN active_categories ac ON c.parent_id=ac.id
+        WHERE c.is_active=1
+    )';
+
     public function branches(Request $request): void
     {
         $rows = Database::connection()->query('SELECT id,name,slug,address,is_active FROM branches WHERE is_active=1 ORDER BY sort_order,name')->fetchAll();
@@ -18,7 +27,10 @@ final class CatalogController
 
     public function categories(Request $request): void
     {
-        $rows = Database::connection()->query('SELECT id,parent_id,name,slug,image_url,sort_order FROM categories WHERE is_active=1 ORDER BY sort_order,name')->fetchAll();
+        $rows = Database::connection()->query(
+            self::ACTIVE_CATEGORY_CTE .
+            ' SELECT id,parent_id,name,slug,image_url,sort_order FROM active_categories ORDER BY sort_order,name'
+        )->fetchAll();
         Response::json(['success' => true, 'data' => $rows]);
     }
 
@@ -38,13 +50,15 @@ final class CatalogController
             }
         }
         if ($categoryId !== null) {
-            $categoryCheck = $pdo->prepare('SELECT id FROM categories WHERE id=:id AND is_active=1 LIMIT 1');
+            $categoryCheck = $pdo->prepare(
+                self::ACTIVE_CATEGORY_CTE . ' SELECT id FROM active_categories WHERE id=:id LIMIT 1'
+            );
             $categoryCheck->execute(['id' => $categoryId]);
             if (!$categoryCheck->fetchColumn()) {
                 throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена или отключена.');
             }
         }
-        $where = ['p.is_active=1', '(p.category_id IS NULL OR EXISTS (SELECT 1 FROM categories active_category WHERE active_category.id=p.category_id AND active_category.is_active=1))'];
+        $where = ['p.is_active=1', '(p.category_id IS NULL OR EXISTS (SELECT 1 FROM active_categories visible_category WHERE visible_category.id=p.category_id))'];
         $params = [];
         if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = [$categoryId, PDO::PARAM_INT]; }
         if ($search !== '') {
@@ -60,7 +74,7 @@ final class CatalogController
             $stock = 's.price,COALESCE(s.quantity,0.000) AS quantity,(COALESCE(s.quantity,0)>0) AS is_available';
             $params['branch_id'] = [$branchId, PDO::PARAM_INT];
         }
-        $sql = 'SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
+        $sql = self::ACTIVE_CATEGORY_CTE . ' SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
             ' FROM products p' . $join . ' WHERE ' . implode(' AND ', $where) .
             ' ORDER BY p.name LIMIT :limit OFFSET :offset';
         $stmt = $pdo->prepare($sql);
@@ -77,7 +91,12 @@ final class CatalogController
         $id = $this->positiveInt($request->query['id'] ?? null);
         if ($id === null) throw new HttpException(400, 'VALIDATION_ERROR', 'Параметр id обязателен.');
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products WHERE id=:id AND is_active=1 AND (category_id IS NULL OR EXISTS (SELECT 1 FROM categories c WHERE c.id=products.category_id AND c.is_active=1))');
+        $stmt = $pdo->prepare(
+            self::ACTIVE_CATEGORY_CTE .
+            ' SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products
+              WHERE id=:id AND is_active=1
+                AND (category_id IS NULL OR EXISTS (SELECT 1 FROM active_categories ac WHERE ac.id=products.category_id))'
+        );
         $stmt->execute(['id' => $id]);
         $product = $stmt->fetch();
         if (!$product) {

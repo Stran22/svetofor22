@@ -85,12 +85,18 @@ final class AdminCatalogController
 
         $pdo = Database::connection();
         if ($categoryId !== null) {
-            $category = $pdo->prepare('SELECT id,is_active FROM categories WHERE id=:id LIMIT 1');
+            $category = $pdo->prepare(
+                'WITH RECURSIVE active_categories AS (
+                    SELECT id,parent_id FROM categories WHERE parent_id IS NULL AND is_active=1
+                    UNION ALL
+                    SELECT c.id,c.parent_id FROM categories c
+                    JOIN active_categories ac ON c.parent_id=ac.id WHERE c.is_active=1
+                 )
+                 SELECT id FROM active_categories WHERE id=:id LIMIT 1'
+            );
             $category->execute(['id' => $categoryId]);
-            $categoryRow = $category->fetch();
-            if (!$categoryRow) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
-            if (!(bool)$categoryRow['is_active']) {
-                throw new HttpException(409, 'CATEGORY_INACTIVE', 'Нельзя назначить товар отключённой категории.');
+            if (!$category->fetchColumn()) {
+                throw new HttpException(409, 'CATEGORY_INACTIVE', 'Нельзя назначить товар категории с отключённым родителем или самой категории.');
             }
         }
         $pdo->beginTransaction();
@@ -195,9 +201,13 @@ final class AdminCatalogController
         }
         if ($parentId !== null) {
             if ($id !== null && $parentId === $id) throw new HttpException(422, 'CATEGORY_PARENT_CYCLE', 'Категория не может быть родителем самой себе.');
-            $parent = $pdo->prepare('SELECT id FROM categories WHERE id=:id LIMIT 1');
+            $parent = $pdo->prepare('SELECT id,is_active FROM categories WHERE id=:id LIMIT 1');
             $parent->execute(['id' => $parentId]);
-            if (!$parent->fetchColumn()) throw new HttpException(404, 'PARENT_CATEGORY_NOT_FOUND', 'Родительская категория не найдена.');
+            $parentRow = $parent->fetch();
+            if (!$parentRow) throw new HttpException(404, 'PARENT_CATEGORY_NOT_FOUND', 'Родительская категория не найдена.');
+            if ($isActive && !(bool)$parentRow['is_active']) {
+                throw new HttpException(409, 'PARENT_CATEGORY_INACTIVE', 'Нельзя включить категорию под отключённым родителем.');
+            }
             if ($id !== null) {
                 $cycle = $pdo->prepare(
                     'WITH RECURSIVE ancestors AS (

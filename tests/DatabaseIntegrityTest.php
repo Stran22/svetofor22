@@ -216,6 +216,43 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertFalse($hiddenDetail['success']);
         self::assertSame('PRODUCT_NOT_FOUND', $hiddenDetail['error']['code']);
 
+        // An active child category must also remain hidden when any ancestor is inactive.
+        $treeSuffix = bin2hex(random_bytes(6));
+        $this->pdo->prepare(
+            'INSERT INTO categories (name,slug,is_active) VALUES (:name,:slug,0)'
+        )->execute(['name' => 'Inactive parent', 'slug' => 'inactive-parent-' . $treeSuffix]);
+        $inactiveParentId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            'INSERT INTO categories (parent_id,name,slug,is_active) VALUES (:parent_id,:name,:slug,1)'
+        )->execute([
+            'parent_id' => $inactiveParentId,
+            'name' => 'Active child',
+            'slug' => 'active-child-' . $treeSuffix,
+        ]);
+        $activeChildId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            'INSERT INTO products (category_id,name,slug,is_active) VALUES (:category_id,:name,:slug,1)'
+        )->execute([
+            'category_id' => $activeChildId,
+            'name' => 'Hidden descendant product',
+            'slug' => 'hidden-descendant-' . $treeSuffix,
+        ]);
+        $hiddenDescendantProductId = (int)$this->pdo->lastInsertId();
+        $nestedCatalog = $this->capture(fn() => (new CatalogController())->products(
+            new Request('GET', '/api/v1/products', [], [], [])
+        ));
+        self::assertNotContains($hiddenDescendantProductId, array_map(
+            static fn(array $item): int => (int)$item['id'],
+            $nestedCatalog['data']
+        ));
+        $visibleCategories = $this->capture(fn() => (new CatalogController())->categories(
+            new Request('GET', '/api/v1/categories', [], [], [])
+        ));
+        self::assertNotContains($activeChildId, array_map(
+            static fn(array $item): int => (int)$item['id'],
+            $visibleCategories['data']
+        ));
+
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
                 'product_id' => (string)$productId, 'branch_id' => (string)$branchTwo,
