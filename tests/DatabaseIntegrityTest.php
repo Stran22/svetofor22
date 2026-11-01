@@ -686,6 +686,24 @@ final class DatabaseIntegrityTest extends TestCase
         $noDeviceRetry = $service->retryFailedDeliveries(10);
         self::assertSame(0, $noDeviceRetry['matched']);
 
+        // A branch can be deactivated after an outbox event is committed.
+        // Do not send a notification for a branch no longer visible to customers.
+        $inactiveBranchEventKey = 'restock-inactive-branch-' . bin2hex(random_bytes(4));
+        $this->pdo->prepare(
+            "INSERT INTO push_delivery_log (subscription_id,event_key,status)
+             VALUES (:subscription_id,:event_key,'pending')"
+        )->execute(['subscription_id' => $retrySubscriptionId, 'event_key' => $inactiveBranchEventKey]);
+        $this->pdo->prepare('UPDATE branches SET is_active=0 WHERE id=:id')->execute(['id' => $branchId]);
+        self::assertNull($claim->invoke($service, $this->pdo, $retrySubscriptionId, $inactiveBranchEventKey));
+        $inactiveBranch = $this->pdo->prepare(
+            'SELECT status,last_error FROM push_delivery_log WHERE subscription_id=:id AND event_key=:event_key'
+        );
+        $inactiveBranch->execute(['id' => $retrySubscriptionId, 'event_key' => $inactiveBranchEventKey]);
+        $inactiveBranchRow = $inactiveBranch->fetch();
+        self::assertSame('failed', $inactiveBranchRow['status']);
+        self::assertSame('TARGET_INACTIVE', $inactiveBranchRow['last_error']);
+        $this->pdo->prepare('UPDATE branches SET is_active=1 WHERE id=:id')->execute(['id' => $branchId]);
+
         // The stock may be depleted after the outbox event is committed but
         // before the immediate sender claims it. Such an event must be retired.
         $this->pdo->prepare(

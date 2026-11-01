@@ -62,6 +62,7 @@ final class PushNotificationService
              JOIN branches b ON b.id=s.branch_id
              JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.product_id=:product_id AND s.branch_id=:branch_id AND s.status='active'
+               AND p.is_active=1 AND b.is_active=1
              ORDER BY s.id"
         );
         $stmt->execute(['product_id' => $productId, 'branch_id' => $branchId]);
@@ -113,13 +114,16 @@ final class PushNotificationService
         $pdo->exec(
             "UPDATE push_delivery_log d
              JOIN subscriptions s ON s.id=d.subscription_id
+             JOIN products p ON p.id=s.product_id
+             JOIN branches b ON b.id=s.branch_id
              LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id
              SET d.status='failed',d.locked_at=NULL,
                  d.last_error=CASE WHEN s.status<>'active' THEN 'SUBSCRIPTION_INACTIVE'
+                                   WHEN p.is_active<>1 OR b.is_active<>1 THEN 'TARGET_INACTIVE'
                                    ELSE 'STOCK_NO_LONGER_AVAILABLE' END
              WHERE d.status IN ('pending','failed','processing')
                AND (d.status IN ('pending','failed') OR d.locked_at<DATE_SUB(NOW(), INTERVAL 5 MINUTE))
-               AND (s.status<>'active' OR st.id IS NULL OR st.quantity<=0)"
+               AND (s.status<>'active' OR st.id IS NULL OR st.quantity<=0 OR p.is_active<>1 OR b.is_active<>1)"
         );
         $stmt = $pdo->query(
             "SELECT d.subscription_id,d.event_key,s.user_id,s.product_id,s.branch_id,
@@ -129,7 +133,7 @@ final class PushNotificationService
              JOIN products p ON p.id=s.product_id
              JOIN branches b ON b.id=s.branch_id
              JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
-             WHERE s.status='active' AND d.attempt_count<10
+             WHERE s.status='active' AND p.is_active=1 AND b.is_active=1 AND d.attempt_count<10
                AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE')
                AND (
                     d.status='pending'
@@ -177,8 +181,10 @@ final class PushNotificationService
         $pdo->beginTransaction();
         try {
             $active = $pdo->prepare(
-                'SELECT s.status,st.quantity
+                'SELECT s.status,st.quantity,p.is_active AS product_active,b.is_active AS branch_active
                  FROM subscriptions s
+                 JOIN products p ON p.id=s.product_id
+                 JOIN branches b ON b.id=s.branch_id
                  LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id
                  WHERE s.id=:id LIMIT 1 FOR UPDATE'
             );
@@ -201,6 +207,14 @@ final class PushNotificationService
             $stmt->execute(['subscription_id' => $subscriptionId, 'event_key' => $eventKey]);
             $delivery = $stmt->fetch();
             if (!$delivery || $delivery['status'] === 'sent') {
+                $pdo->commit();
+                return null;
+            }
+            if (!(bool)$subscription['product_active'] || !(bool)$subscription['branch_active']) {
+                $pdo->prepare(
+                    "UPDATE push_delivery_log SET status='failed',locked_at=NULL,
+                     last_error='TARGET_INACTIVE' WHERE id=:id"
+                )->execute(['id' => $delivery['id']]);
                 $pdo->commit();
                 return null;
             }
