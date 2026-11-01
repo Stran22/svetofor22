@@ -210,14 +210,11 @@ final class DatabaseIntegrityTest extends TestCase
             static fn(array $item): int => (int)$item['id'],
             $publicCatalog['data']
         ));
-        try {
-            (new CatalogController())->productDetail(new Request(
-                'GET', '/api/v1/products/detail', ['id' => (string)$hiddenProductId], [], []
-            ));
-            self::fail('Products in inactive categories must not be publicly accessible.');
-        } catch (HttpException $e) {
-            self::assertSame(404, $e->status);
-        }
+        $hiddenDetail = $this->capture(fn() => (new CatalogController())->productDetail(new Request(
+            'GET', '/api/v1/products/detail', ['id' => (string)$hiddenProductId], [], []
+        )));
+        self::assertFalse($hiddenDetail['success']);
+        self::assertSame('PRODUCT_NOT_FOUND', $hiddenDetail['error']['code']);
 
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
