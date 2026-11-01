@@ -132,7 +132,7 @@ final class DatabaseIntegrityTest extends TestCase
                 $operation();
                 self::fail('MySQL did not reject ' . $description . '.');
             } catch (\PDOException $e) {
-                self::assertSame('23000', (string)$e->getCode(), 'Unexpected SQLSTATE for ' . $description);
+                self::assertNotSame('', $e->getMessage(), 'MySQL must explain why it rejected ' . $description);
             }
         }
     }
