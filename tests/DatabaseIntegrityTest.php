@@ -90,6 +90,23 @@ final class DatabaseIntegrityTest extends TestCase
     }
 
 
+    public function testAdminLoginRateLimitUsesAtomicSharedCounterAndCanBeCleared(): void
+    {
+        $identity = 'admin-login-test-' . bin2hex(random_bytes(8));
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            RateLimiter::hit('admin_login_test', $identity, 10, 900, 'LOGIN_RATE_LIMITED', 'Too many attempts.');
+        }
+        try {
+            RateLimiter::hit('admin_login_test', $identity, 10, 900, 'LOGIN_RATE_LIMITED', 'Too many attempts.');
+            self::fail('The eleventh login attempt must be blocked.');
+        } catch (HttpException $e) {
+            self::assertSame(429, $e->status);
+            self::assertSame('LOGIN_RATE_LIMITED', $e->errorCode);
+        }
+        RateLimiter::clear('admin_login_test', $identity);
+        RateLimiter::hit('admin_login_test', $identity, 10, 900, 'LOGIN_RATE_LIMITED', 'Too many attempts.');
+    }
+
     public function testMySqlEnforcesStockPriceAndImportRelations(): void
     {
         [$branchOne, $branchTwo, $productId] = $this->seedCatalog();

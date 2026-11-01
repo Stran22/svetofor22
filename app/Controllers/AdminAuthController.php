@@ -25,11 +25,11 @@ final class AdminAuthController
         }
         $ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
         $pdo = Database::connection();
-        $limit = $pdo->prepare('SELECT COUNT(*) FROM admin_login_attempts WHERE login=:login AND ip_address=:ip AND attempted_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)');
-        $limit->execute(['login' => $login, 'ip' => $ip]);
-        if ((int)$limit->fetchColumn() >= 10) {
-            throw new HttpException(429, 'LOGIN_RATE_LIMITED', 'Слишком много неудачных попыток. Попробуйте позже.');
-        }
+        $rateIdentity = hash('sha256', $login . "\\0" . $ip);
+        RateLimiter::hit(
+            'admin_login', $rateIdentity, 10, 900,
+            'LOGIN_RATE_LIMITED', 'Слишком много неудачных попыток. Попробуйте позже.'
+        );
         $stmt = $pdo->prepare('SELECT id,login,password_hash,role,is_active FROM admins WHERE login=:login LIMIT 1');
         $stmt->execute(['login' => $login]);
         $admin = $stmt->fetch();
@@ -47,6 +47,7 @@ final class AdminAuthController
         $pdo->prepare('UPDATE admins SET last_login_at=NOW() WHERE id=:id')->execute(['id' => $admin['id']]);
         $pdo->prepare('DELETE FROM admin_login_attempts WHERE login=:login AND ip_address=:ip')
             ->execute(['login' => $login, 'ip' => $ip]);
+        RateLimiter::clear('admin_login', $rateIdentity);
         $this->audit((int)$admin['id'], 'admin.login', (int)$admin['id']);
         Response::json(['success' => true, 'data' => ['admin' => $_SESSION['admin'], 'csrf_token' => $_SESSION['csrf_token']]]);
     }

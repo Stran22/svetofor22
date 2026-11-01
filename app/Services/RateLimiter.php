@@ -7,7 +7,14 @@ use App\Core\HttpException;
 
 final class RateLimiter
 {
-    public static function hit(string $scope, string $identity, int $limit, int $windowSeconds): void
+    public static function hit(
+        string $scope,
+        string $identity,
+        int $limit,
+        int $windowSeconds,
+        string $errorCode = 'RATE_LIMIT_EXCEEDED',
+        string $message = 'Слишком много запросов. Подождите и повторите попытку.'
+    ): void
     {
         if ($scope === '' || $identity === '' || $limit < 1 || $windowSeconds < 1 || $windowSeconds > 86400) {
             throw new \InvalidArgumentException('Invalid rate limit parameters.');
@@ -26,7 +33,18 @@ final class RateLimiter
         $stmt = $pdo->prepare('SELECT attempts FROM api_rate_limits WHERE bucket_hash=:bucket_hash LIMIT 1');
         $stmt->execute(['bucket_hash' => $bucketHash]);
         if ((int)$stmt->fetchColumn() > $limit) {
-            throw new HttpException(429, 'RATE_LIMIT_EXCEEDED', 'Слишком много запросов. Подождите и повторите попытку.');
+            throw new HttpException(429, $errorCode, $message);
         }
+    }
+
+    public static function clear(string $scope, string $identity): void
+    {
+        if ($scope === '' || $identity === '') {
+            throw new \\InvalidArgumentException('Invalid rate limit identity.');
+        }
+        $bucketHash = hash('sha256', $scope . ':' . $identity);
+        Database::connection()->prepare(
+            'DELETE FROM api_rate_limits WHERE bucket_hash=:bucket_hash'
+        )->execute(['bucket_hash' => $bucketHash]);
     }
 }
