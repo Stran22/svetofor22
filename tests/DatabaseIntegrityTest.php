@@ -253,6 +253,23 @@ final class DatabaseIntegrityTest extends TestCase
             $visibleCategories['data']
         ));
         self::assertFalse(\App\Services\CatalogVisibility::isProductVisible($this->pdo, $hiddenDescendantProductId));
+        try {
+            (new ReviewsController())->index(new Request(
+                'GET', '/api/v1/products/reviews', ['product_id' => (string)$hiddenDescendantProductId], [], []
+            ));
+            self::fail('Products under inactive category ancestors must not expose reviews.');
+        } catch (HttpException $e) {
+            self::assertSame(404, $e->status);
+        }
+        try {
+            (new PriceHistoryController())->index(new Request(
+                'GET', '/api/v1/products/price-history',
+                ['product_id' => (string)$hiddenDescendantProductId, 'branch_id' => (string)$branchOne], [], []
+            ));
+            self::fail('Products under inactive category ancestors must not expose price history.');
+        } catch (HttpException $e) {
+            self::assertSame(404, $e->status);
+        }
 
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
