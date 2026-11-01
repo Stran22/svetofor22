@@ -54,7 +54,7 @@ final class CatalogController
             $params['sku'] = [$search, PDO::PARAM_STR];
         }
         $join = '';
-        $stock = 'NULL AS price,0.000 AS quantity,0 AS is_available';
+        $stock = 'NULL AS price,NULL AS quantity,NULL AS is_available';
         if ($branchId !== null) {
             $join = ' LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=:branch_id';
             $stock = 's.price,COALESCE(s.quantity,0.000) AS quantity,(COALESCE(s.quantity,0)>0) AS is_available';
