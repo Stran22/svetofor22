@@ -85,9 +85,13 @@ final class AdminCatalogController
 
         $pdo = Database::connection();
         if ($categoryId !== null) {
-            $category = $pdo->prepare('SELECT id FROM categories WHERE id=:id LIMIT 1');
+            $category = $pdo->prepare('SELECT id,is_active FROM categories WHERE id=:id LIMIT 1');
             $category->execute(['id' => $categoryId]);
-            if (!$category->fetchColumn()) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
+            $categoryRow = $category->fetch();
+            if (!$categoryRow) throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена.');
+            if (!(bool)$categoryRow['is_active']) {
+                throw new HttpException(409, 'CATEGORY_INACTIVE', 'Нельзя назначить товар отключённой категории.');
+            }
         }
         $pdo->beginTransaction();
         try {

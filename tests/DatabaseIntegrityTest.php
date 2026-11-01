@@ -189,6 +189,36 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame('0.000', (string)$branchWithoutStock[0]['quantity']);
         self::assertSame(0, (int)$branchWithoutStock[0]['is_available']);
 
+        // Products assigned to an inactive category must not leak into the public catalog.
+        $inactiveCategorySuffix = bin2hex(random_bytes(6));
+        $this->pdo->prepare(
+            'INSERT INTO categories (name,slug,is_active) VALUES (:name,:slug,0)'
+        )->execute(['name' => 'Inactive category', 'slug' => 'inactive-' . $inactiveCategorySuffix]);
+        $inactiveCategoryId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            'INSERT INTO products (category_id,name,slug,is_active) VALUES (:category_id,:name,:slug,1)'
+        )->execute([
+            'category_id' => $inactiveCategoryId,
+            'name' => 'Hidden category product',
+            'slug' => 'hidden-category-product-' . $inactiveCategorySuffix,
+        ]);
+        $hiddenProductId = (int)$this->pdo->lastInsertId();
+        $publicCatalog = $this->capture(fn() => (new CatalogController())->products(
+            new Request('GET', '/api/v1/products', [], [], [])
+        ));
+        self::assertNotContains($hiddenProductId, array_map(
+            static fn(array $item): int => (int)$item['id'],
+            $publicCatalog['data']
+        ));
+        try {
+            (new CatalogController())->productDetail(new Request(
+                'GET', '/api/v1/products/detail', ['id' => (string)$hiddenProductId], [], []
+            ));
+            self::fail('Products in inactive categories must not be publicly accessible.');
+        } catch (HttpException $e) {
+            self::assertSame(404, $e->status);
+        }
+
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
                 'product_id' => (string)$productId, 'branch_id' => (string)$branchTwo,

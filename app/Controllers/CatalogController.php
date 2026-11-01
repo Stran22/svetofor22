@@ -44,7 +44,7 @@ final class CatalogController
                 throw new HttpException(404, 'CATEGORY_NOT_FOUND', 'Категория не найдена или отключена.');
             }
         }
-        $where = ['p.is_active=1'];
+        $where = ['p.is_active=1', '(p.category_id IS NULL OR EXISTS (SELECT 1 FROM categories active_category WHERE active_category.id=p.category_id AND active_category.is_active=1))'];
         $params = [];
         if ($categoryId !== null) { $where[] = 'p.category_id=:category_id'; $params['category_id'] = [$categoryId, PDO::PARAM_INT]; }
         if ($search !== '') {
@@ -77,7 +77,7 @@ final class CatalogController
         $id = $this->positiveInt($request->query['id'] ?? null);
         if ($id === null) throw new HttpException(400, 'VALIDATION_ERROR', 'Параметр id обязателен.');
         $pdo = Database::connection();
-        $stmt = $pdo->prepare('SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products WHERE id=:id AND is_active=1');
+        $stmt = $pdo->prepare('SELECT id,category_id,name,slug,sku,barcode,description,image_url FROM products WHERE id=:id AND is_active=1 AND (category_id IS NULL OR EXISTS (SELECT 1 FROM categories c WHERE c.id=products.category_id AND c.is_active=1))');
         $stmt->execute(['id' => $id]);
         $product = $stmt->fetch();
         if (!$product) {
