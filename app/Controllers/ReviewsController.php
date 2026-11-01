@@ -18,9 +18,9 @@ final class ReviewsController
             throw new HttpException(422, 'VALIDATION_ERROR', 'Укажите корректный product_id.');
         }
         $pdo = Database::connection();
-        $product = $pdo->prepare('SELECT id FROM products WHERE id=:id AND is_active=1');
-        $product->execute(['id' => $productId]);
-        if (!$product->fetchColumn()) throw new HttpException(404, 'PRODUCT_NOT_FOUND', 'Товар не найден.');
+        if (!CatalogVisibility::isProductVisible($pdo, $productId)) {
+            throw new HttpException(404, 'PRODUCT_NOT_FOUND', 'Товар не найден.');
+        }
         $summary = $pdo->prepare(
             "SELECT COUNT(*) AS reviews_count, ROUND(AVG(rating),2) AS average_rating
              FROM reviews WHERE product_id=:id AND status='published'"
@@ -57,9 +57,9 @@ final class ReviewsController
             throw new HttpException(422, 'VALIDATION_ERROR', 'Проверьте товар, оценку от 1 до 5 и текст от 1 до 500 символов.');
         }
         $pdo = Database::connection();
-        $product = $pdo->prepare('SELECT id FROM products WHERE id=:id AND is_active=1');
-        $product->execute(['id' => $productId]);
-        if (!$product->fetchColumn()) throw new HttpException(404, 'PRODUCT_NOT_FOUND', 'Товар не найден.');
+        if (!CatalogVisibility::isProductVisible($pdo, $productId)) {
+            throw new HttpException(404, 'PRODUCT_NOT_FOUND', 'Товар не найден.');
+        }
         $save = $pdo->prepare(
             "INSERT INTO reviews (user_id,product_id,rating,body,status)
              VALUES (:user_id,:product_id,:rating,:body,'pending')

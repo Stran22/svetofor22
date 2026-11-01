@@ -39,11 +39,20 @@ final class SubscriptionController
         $pdo->beginTransaction();
         try {
             $valid = $pdo->prepare(
-                'SELECT p.id,COALESCE(s.quantity,0) AS quantity
+                'WITH RECURSIVE active_categories AS (
+                    SELECT id,parent_id FROM categories WHERE parent_id IS NULL AND is_active=1
+                    UNION ALL
+                    SELECT c.id,c.parent_id FROM categories c
+                    JOIN active_categories ac ON c.parent_id=ac.id WHERE c.is_active=1
+                 )
+                 SELECT p.id,COALESCE(s.quantity,0) AS quantity
                  FROM products p
                  JOIN branches b ON b.id=:branch_id AND b.is_active=1
                  LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=b.id
                  WHERE p.id=:product_id AND p.is_active=1
+                   AND (p.category_id IS NULL OR EXISTS (
+                       SELECT 1 FROM active_categories ac WHERE ac.id=p.category_id
+                   ))
                  LIMIT 1 FOR UPDATE'
             );
             $valid->execute(['product_id' => $productId, 'branch_id' => $branchId]);

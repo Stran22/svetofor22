@@ -19,6 +19,9 @@ final class PriceHistoryController
         }
         $limit = min($limit, 100);
         $pdo = Database::connection();
+        if (!CatalogVisibility::isProductVisible($pdo, $productId)) {
+            throw new HttpException(404, 'PRICE_HISTORY_NOT_FOUND', 'История цен для этого товара и магазина не найдена.');
+        }
         $check = $pdo->prepare(
             'SELECT p.id FROM products p
              JOIN stock s ON s.product_id=p.id
