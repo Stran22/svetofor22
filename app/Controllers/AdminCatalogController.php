@@ -201,12 +201,23 @@ final class AdminCatalogController
         }
         if ($parentId !== null) {
             if ($id !== null && $parentId === $id) throw new HttpException(422, 'CATEGORY_PARENT_CYCLE', 'Категория не может быть родителем самой себе.');
-            $parent = $pdo->prepare('SELECT id,is_active FROM categories WHERE id=:id LIMIT 1');
-            $parent->execute(['id' => $parentId]);
-            $parentRow = $parent->fetch();
-            if (!$parentRow) throw new HttpException(404, 'PARENT_CATEGORY_NOT_FOUND', 'Родительская категория не найдена.');
-            if ($isActive && !(bool)$parentRow['is_active']) {
-                throw new HttpException(409, 'PARENT_CATEGORY_INACTIVE', 'Нельзя включить категорию под отключённым родителем.');
+            $parent = $pdo->prepare(
+                'WITH RECURSIVE ancestors AS (
+                    SELECT id,parent_id,is_active FROM categories WHERE id=:parent_id
+                    UNION ALL
+                    SELECT p.id,p.parent_id,p.is_active
+                    FROM categories p JOIN ancestors a ON p.id=a.parent_id
+                 )
+                 SELECT COUNT(*) AS total,COALESCE(SUM(is_active=0),0) AS inactive_count
+                 FROM ancestors'
+            );
+            $parent->execute(['parent_id' => $parentId]);
+            $parentState = $parent->fetch();
+            if (!$parentState || (int)$parentState['total'] === 0) {
+                throw new HttpException(404, 'PARENT_CATEGORY_NOT_FOUND', 'Родительская категория не найдена.');
+            }
+            if ($isActive && (int)$parentState['inactive_count'] > 0) {
+                throw new HttpException(409, 'PARENT_CATEGORY_INACTIVE', 'Нельзя включить категорию под отключённым родителем или его отключённым предком.');
             }
             if ($id !== null) {
                 $cycle = $pdo->prepare(
