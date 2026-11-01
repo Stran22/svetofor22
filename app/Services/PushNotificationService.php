@@ -60,6 +60,7 @@ final class PushNotificationService
              FROM subscriptions s
              JOIN products p ON p.id=s.product_id
              JOIN branches b ON b.id=s.branch_id
+             JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.product_id=:product_id AND s.branch_id=:branch_id AND s.status='active'
              ORDER BY s.id"
         );
@@ -175,9 +176,15 @@ final class PushNotificationService
     {
         $pdo->beginTransaction();
         try {
-            $active = $pdo->prepare("SELECT status FROM subscriptions WHERE id=:id LIMIT 1 FOR UPDATE");
+            $active = $pdo->prepare(
+                'SELECT s.status,st.quantity
+                 FROM subscriptions s
+                 LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id
+                 WHERE s.id=:id LIMIT 1 FOR UPDATE'
+            );
             $active->execute(['id' => $subscriptionId]);
-            if ($active->fetchColumn() !== 'active') {
+            $subscription = $active->fetch();
+            if (!$subscription || $subscription['status'] !== 'active') {
                 $pdo->commit();
                 return null;
             }
@@ -194,6 +201,14 @@ final class PushNotificationService
             $stmt->execute(['subscription_id' => $subscriptionId, 'event_key' => $eventKey]);
             $delivery = $stmt->fetch();
             if (!$delivery || $delivery['status'] === 'sent') {
+                $pdo->commit();
+                return null;
+            }
+            if ($subscription['quantity'] === null || (float)$subscription['quantity'] <= 0) {
+                $pdo->prepare(
+                    "UPDATE push_delivery_log SET status='failed',locked_at=NULL,
+                     last_error='STOCK_NO_LONGER_AVAILABLE' WHERE id=:id"
+                )->execute(['id' => $delivery['id']]);
                 $pdo->commit();
                 return null;
             }
