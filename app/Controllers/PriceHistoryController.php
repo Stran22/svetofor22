@@ -20,8 +20,12 @@ final class PriceHistoryController
         $limit = min($limit, 100);
         $pdo = Database::connection();
         $check = $pdo->prepare(
-            'SELECT p.id FROM products p JOIN stock s ON s.product_id=p.id
-             WHERE p.id=:product_id AND s.branch_id=:branch_id LIMIT 1'
+            'SELECT p.id FROM products p
+             JOIN stock s ON s.product_id=p.id
+             JOIN branches b ON b.id=s.branch_id
+             WHERE p.id=:product_id AND p.is_active=1
+               AND s.branch_id=:branch_id AND b.is_active=1
+             LIMIT 1'
         );
         $check->execute(['product_id' => $productId, 'branch_id' => $branchId]);
         if (!$check->fetchColumn()) {

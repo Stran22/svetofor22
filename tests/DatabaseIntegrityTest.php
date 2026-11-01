@@ -196,6 +196,30 @@ final class DatabaseIntegrityTest extends TestCase
         ));
         self::assertSame('12.75', (string)$history['data']['history'][0]['price']);
         self::assertSame($branchTwo, (int)$history['data']['branch_id']);
+
+        // Inactive products and branches must not expose a public price history.
+        $this->pdo->prepare('UPDATE products SET is_active=0 WHERE id=:id')->execute(['id' => $productId]);
+        try {
+            (new PriceHistoryController())->index(new Request(
+                'GET', '/api/v1/products/price-history',
+                ['product_id' => (string)$productId, 'branch_id' => (string)$branchTwo], [], []
+            ));
+            self::fail('Inactive products must not expose public price history.');
+        } catch (HttpException $e) {
+            self::assertSame(404, $e->status);
+        }
+
+        $this->pdo->prepare('UPDATE products SET is_active=1 WHERE id=:id')->execute(['id' => $productId]);
+        $this->pdo->prepare('UPDATE branches SET is_active=0 WHERE id=:id')->execute(['id' => $branchTwo]);
+        try {
+            (new PriceHistoryController())->index(new Request(
+                'GET', '/api/v1/products/price-history',
+                ['product_id' => (string)$productId, 'branch_id' => (string)$branchTwo], [], []
+            ));
+            self::fail('Inactive branches must not expose public price history.');
+        } catch (HttpException $e) {
+            self::assertSame(404, $e->status);
+        }
     }
 
     public function testSubscriptionAndReviewQueriesRespectUserAndProductRelations(): void
