@@ -134,7 +134,7 @@ final class PushNotificationService
              JOIN branches b ON b.id=s.branch_id
              JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.status='active' AND p.is_active=1 AND b.is_active=1 AND d.attempt_count<10
-               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE')
+               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE','TARGET_INACTIVE')
                AND (
                     d.status='pending'
                     OR (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))

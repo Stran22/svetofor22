@@ -703,6 +703,7 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame('failed', $inactiveBranchRow['status']);
         self::assertSame('TARGET_INACTIVE', $inactiveBranchRow['last_error']);
         $this->pdo->prepare('UPDATE branches SET is_active=1 WHERE id=:id')->execute(['id' => $branchId]);
+        self::assertSame(0, $service->retryFailedDeliveries(10)['matched']);
 
         // The stock may be depleted after the outbox event is committed but
         // before the immediate sender claims it. Such an event must be retired.
