@@ -14,6 +14,7 @@ use App\Core\Database;
 use App\Security\AdminGuard;
 use App\Services\OAuthService;
 use App\Services\PushNotificationService;
+use App\Services\RateLimiter;
 use App\Services\TokenService;
 use App\Core\HttpException;
 use App\Core\Request;
