@@ -38,6 +38,16 @@ final class SubscriptionController
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
+            // Lock the branch first, matching the importer's lock order and
+            // reducing deadlock risk when a restock and subscription race.
+            $branchLock = $pdo->prepare(
+                'SELECT id FROM branches WHERE id=:branch_id AND is_active=1 LIMIT 1 FOR UPDATE'
+            );
+            $branchLock->execute(['branch_id' => $branchId]);
+            if (!$branchLock->fetchColumn()) {
+                throw new HttpException(404, 'SUBSCRIPTION_TARGET_NOT_FOUND', 'Товар или магазин не найден.');
+            }
+
             $valid = $pdo->prepare(
                 'WITH RECURSIVE active_categories AS (
                     SELECT id,parent_id FROM categories WHERE parent_id IS NULL AND is_active=1
@@ -47,8 +57,7 @@ final class SubscriptionController
                  )
                  SELECT p.id,COALESCE(s.quantity,0) AS quantity
                  FROM products p
-                 JOIN branches b ON b.id=:branch_id AND b.is_active=1
-                 LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=b.id
+                 LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=:branch_id
                  WHERE p.id=:product_id AND p.is_active=1
                    AND (p.category_id IS NULL OR EXISTS (
                        SELECT 1 FROM active_categories ac WHERE ac.id=p.category_id
