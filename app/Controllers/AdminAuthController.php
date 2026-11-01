@@ -7,6 +7,7 @@ use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Security\AdminGuard;
+use App\Services\RateLimiter;
 
 final class AdminAuthController
 {
@@ -25,7 +26,7 @@ final class AdminAuthController
         }
         $ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
         $pdo = Database::connection();
-        $rateIdentity = hash('sha256', $login . "\\0" . $ip);
+        $rateIdentity = hash('sha256', $login . chr(0) . $ip);
         RateLimiter::hit(
             'admin_login', $rateIdentity, 10, 900,
             'LOGIN_RATE_LIMITED', 'Слишком много неудачных попыток. Попробуйте позже.'

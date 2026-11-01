@@ -40,7 +40,7 @@ final class RateLimiter
     public static function clear(string $scope, string $identity): void
     {
         if ($scope === '' || $identity === '') {
-            throw new \\InvalidArgumentException('Invalid rate limit identity.');
+            throw new \InvalidArgumentException('Invalid rate limit identity.');
         }
         $bucketHash = hash('sha256', $scope . ':' . $identity);
         Database::connection()->prepare(
