@@ -209,6 +209,17 @@ final class ExcelImportService
 
         $pdo->beginTransaction();
         try {
+            // Serialize imports for the same branch. Different files may arrive
+            // concurrently, but their stock updates must be applied one after another.
+            $branchLock = $pdo->prepare(
+                'SELECT id,is_active FROM branches WHERE id=:branch_id LIMIT 1 FOR UPDATE'
+            );
+            $branchLock->execute(['branch_id' => $branchId]);
+            $lockedBranch = $branchLock->fetch();
+            if (!$lockedBranch || !(bool)$lockedBranch['is_active']) {
+                throw new HttpException(404, 'BRANCH_NOT_FOUND', 'Магазин не найден или отключён.');
+            }
+
             for ($rowNumber = $headerRow + 1; $rowNumber <= $highestRow; $rowNumber++) {
                 $row = $this->readRow($sheet, $rowNumber, $highestColumn);
                 if ($this->isEmptyRow($row)) continue;
