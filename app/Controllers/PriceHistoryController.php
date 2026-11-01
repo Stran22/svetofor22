@@ -6,6 +6,7 @@ use App\Core\Database;
 use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
+use App\Services\CatalogVisibility;
 
 final class PriceHistoryController
 {

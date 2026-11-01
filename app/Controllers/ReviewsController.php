@@ -7,6 +7,7 @@ use App\Core\HttpException;
 use App\Core\Request;
 use App\Core\Response;
 use App\Services\RateLimiter;
+use App\Services\CatalogVisibility;
 use App\Services\RequestUser;
 
 final class ReviewsController

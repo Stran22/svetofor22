@@ -252,7 +252,7 @@ final class DatabaseIntegrityTest extends TestCase
             static fn(array $item): int => (int)$item['id'],
             $visibleCategories['data']
         ));
-        self::assertFalse(\\App\\Services\\CatalogVisibility::isProductVisible($this->pdo, $hiddenDescendantProductId));
+        self::assertFalse(\App\Services\CatalogVisibility::isProductVisible($this->pdo, $hiddenDescendantProductId));
 
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
