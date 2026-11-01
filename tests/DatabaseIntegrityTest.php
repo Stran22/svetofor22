@@ -109,6 +109,36 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame('3.000', (string)$payload['data'][0]['quantity']);
         self::assertSame(1, (int)$payload['data'][0]['is_available']);
 
+        // A product may be in the global catalog before a branch has imported it.
+        // The API must represent this as zero stock / unavailable, not SQL NULL.
+        $suffix = bin2hex(random_bytes(6));
+        $this->pdo->prepare(
+            'INSERT INTO products (name,slug,is_active) VALUES (:name,:slug,1)'
+        )->execute(['name' => 'No stock row product', 'slug' => 'no-stock-' . $suffix]);
+        $withoutStockId = (int)$this->pdo->lastInsertId();
+        $branchCatalog = $this->capture(fn() => (new CatalogController())->products(
+            new Request('GET', '/api/v1/products', ['branch_id' => (string)$branchOne], [], [])
+        ));
+        $withoutStock = array_values(array_filter(
+            $branchCatalog['data'],
+            static fn(array $item): bool => (int)$item['id'] === $withoutStockId
+        ));
+        self::assertCount(1, $withoutStock);
+        self::assertSame('0.000', (string)$withoutStock[0]['quantity']);
+        self::assertSame(0, (int)$withoutStock[0]['is_available']);
+        self::assertNull($withoutStock[0]['price']);
+
+        $detail = $this->capture(fn() => (new CatalogController())->productDetail(
+            new Request('GET', '/api/v1/products/detail', ['id' => (string)$withoutStockId], [], [])
+        ));
+        $branchWithoutStock = array_values(array_filter(
+            $detail['data']['branches'],
+            static fn(array $item): bool => (int)$item['branch_id'] === $branchOne
+        ));
+        self::assertCount(1, $branchWithoutStock);
+        self::assertSame('0.000', (string)$branchWithoutStock[0]['quantity']);
+        self::assertSame(0, (int)$branchWithoutStock[0]['is_available']);
+
         $history = $this->capture(fn() => (new PriceHistoryController())->index(
             new Request('GET', '/api/v1/products/price-history', [
                 'product_id' => (string)$productId, 'branch_id' => (string)$branchTwo,
