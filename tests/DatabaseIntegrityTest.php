@@ -755,6 +755,89 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame($first['user_id'], (new TokenService())->authenticate($first['token'])['id']);
     }
 
+    public function testPartialExcelImportOnlyUpdatesRowsPresentInSelectedBranch(): void
+    {
+        [$branchA, $branchB, $productA] = $this->seedCatalog();
+        $suffix = bin2hex(random_bytes(8));
+        $this->pdo->prepare('UPDATE products SET sku=:sku WHERE id=:id')
+            ->execute(['sku' => 'PARTIAL-' . $suffix, 'id' => $productA]);
+        $this->pdo->prepare(
+            'INSERT INTO products (name,slug,sku) VALUES (:name,:slug,:sku)'
+        )->execute([
+            'name' => 'Unchanged product',
+            'slug' => 'partial-unchanged-' . $suffix,
+            'sku' => 'UNCHANGED-' . $suffix,
+        ]);
+        $productB = (int)$this->pdo->lastInsertId();
+
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES
+             (:branch_a,:product_a,10.00,2.000),
+             (:branch_b,:product_a,20.00,5.000),
+             (:branch_a,:product_b,30.00,7.000)'
+        )->execute([
+            'branch_a' => $branchA,
+            'branch_b' => $branchB,
+            'product_a' => $productA,
+            'product_b' => $productB,
+        ]);
+
+        $this->pdo->prepare(
+            "INSERT INTO import_log (branch_id,original_filename,file_sha256,status,started_at)
+             VALUES (:branch_id,'partial.xlsx',:hash,'processing',NOW())"
+        )->execute(['branch_id' => $branchA, 'hash' => hash('sha256', 'partial-' . $suffix)]);
+        $importId = (int)$this->pdo->lastInsertId();
+
+        $service = new \\App\\Services\\ExcelImportService();
+        $method = new \\ReflectionMethod($service, 'upsertProductAndStock');
+        $method->setAccessible(true);
+        $result = $method->invoke($service, $this->pdo, [
+            'name' => 'Updated product',
+            'barcode' => null,
+            'sku' => 'PARTIAL-' . $suffix,
+            'price' => '11.50',
+            'quantity' => '3.000',
+            'unit' => 'шт.',
+        ], $branchA, $importId);
+
+        self::assertSame($productA, (int)$result['product_id']);
+        self::assertTrue($result['changed']);
+
+        $stocks = $this->pdo->prepare(
+            'SELECT product_id,price,quantity FROM stock
+             WHERE (branch_id=:branch_a AND product_id IN (:product_a,:product_b))
+                OR (branch_id=:branch_b AND product_id=:product_a)
+             ORDER BY branch_id,product_id'
+        );
+        $stocks->execute([
+            'branch_a' => $branchA,
+            'branch_b' => $branchB,
+            'product_a' => $productA,
+            'product_b' => $productB,
+        ]);
+        $rows = $stocks->fetchAll();
+        $byKey = [];
+        foreach ($rows as $row) {
+            $key = ((int)$row['product_id'] === $productA ? 'A' : 'B');
+            $byKey[((int)$row['product_id'] === $productA ? 'A' : 'B') . ':' . count($byKey)] = $row;
+        }
+        $target = $this->pdo->prepare(
+            'SELECT price,quantity FROM stock WHERE branch_id=:branch_id AND product_id=:product_id'
+        );
+        $target->execute(['branch_id' => $branchA, 'product_id' => $productA]);
+        self::assertSame('11.50', $target->fetch()['price']);
+
+        $target->execute(['branch_id' => $branchA, 'product_id' => $productB]);
+        $untouchedProduct = $target->fetch();
+        self::assertSame('30.00', $untouchedProduct['price']);
+        self::assertSame('7.000', $untouchedProduct['quantity']);
+
+        $target->execute(['branch_id' => $branchB, 'product_id' => $productA]);
+        $otherBranch = $target->fetch();
+        self::assertSame('20.00', $otherBranch['price']);
+        self::assertSame('5.000', $otherBranch['quantity']);
+    }
+
     private function seedCatalog(): array
     {
         $suffix = bin2hex(random_bytes(8));
