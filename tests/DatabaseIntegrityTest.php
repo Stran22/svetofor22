@@ -633,6 +633,25 @@ final class DatabaseIntegrityTest extends TestCase
         )->execute(['id' => $failed['id']]);
         $noDeviceRetry = $service->retryFailedDeliveries(10);
         self::assertSame(0, $noDeviceRetry['matched']);
+
+        // The stock may be depleted after the outbox event is committed but
+        // before the immediate sender claims it. Such an event must be retired.
+        $this->pdo->prepare(
+            'UPDATE stock SET quantity=0 WHERE branch_id=:branch_id AND product_id=:product_id'
+        )->execute(['branch_id' => $branchId, 'product_id' => $productId]);
+        $staleEventKey = 'restock-stale-' . bin2hex(random_bytes(4));
+        $this->pdo->prepare(
+            "INSERT INTO push_delivery_log (subscription_id,event_key,status)
+             VALUES (:subscription_id,:event_key,'pending')"
+        )->execute(['subscription_id' => $retrySubscriptionId, 'event_key' => $staleEventKey]);
+        self::assertNull($claim->invoke($service, $this->pdo, $retrySubscriptionId, $staleEventKey));
+        $stale = $this->pdo->prepare(
+            'SELECT status,last_error FROM push_delivery_log WHERE subscription_id=:id AND event_key=:event_key'
+        );
+        $stale->execute(['id' => $retrySubscriptionId, 'event_key' => $staleEventKey]);
+        $staleRow = $stale->fetch();
+        self::assertSame('failed', $staleRow['status']);
+        self::assertSame('STOCK_NO_LONGER_AVAILABLE', $staleRow['last_error']);
     }
 
     private function seedCatalog(): array
