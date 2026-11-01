@@ -815,12 +815,6 @@ final class DatabaseIntegrityTest extends TestCase
             'product_a' => $productA,
             'product_b' => $productB,
         ]);
-        $rows = $stocks->fetchAll();
-        $byKey = [];
-        foreach ($rows as $row) {
-            $key = ((int)$row['product_id'] === $productA ? 'A' : 'B');
-            $byKey[((int)$row['product_id'] === $productA ? 'A' : 'B') . ':' . count($byKey)] = $row;
-        }
         $target = $this->pdo->prepare(
             'SELECT price,quantity FROM stock WHERE branch_id=:branch_id AND product_id=:product_id'
         );
