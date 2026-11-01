@@ -788,8 +788,8 @@ final class DatabaseIntegrityTest extends TestCase
         )->execute(['branch_id' => $branchA, 'hash' => hash('sha256', 'partial-' . $suffix)]);
         $importId = (int)$this->pdo->lastInsertId();
 
-        $service = new \\App\\Services\\ExcelImportService();
-        $method = new \\ReflectionMethod($service, 'upsertProductAndStock');
+        $service = new \App\Services\ExcelImportService();
+        $method = new \ReflectionMethod($service, 'upsertProductAndStock');
         $method->setAccessible(true);
         $result = $method->invoke($service, $this->pdo, [
             'name' => 'Updated product',
@@ -803,18 +803,6 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame($productA, (int)$result['product_id']);
         self::assertTrue($result['changed']);
 
-        $stocks = $this->pdo->prepare(
-            'SELECT product_id,price,quantity FROM stock
-             WHERE (branch_id=:branch_a AND product_id IN (:product_a,:product_b))
-                OR (branch_id=:branch_b AND product_id=:product_a)
-             ORDER BY branch_id,product_id'
-        );
-        $stocks->execute([
-            'branch_a' => $branchA,
-            'branch_b' => $branchB,
-            'product_a' => $productA,
-            'product_b' => $productB,
-        ]);
         $target = $this->pdo->prepare(
             'SELECT price,quantity FROM stock WHERE branch_id=:branch_id AND product_id=:product_id'
         );
