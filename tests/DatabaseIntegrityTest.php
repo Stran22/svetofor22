@@ -14,6 +14,7 @@ use App\Core\Database;
 use App\Security\AdminGuard;
 use App\Services\OAuthService;
 use App\Services\PushNotificationService;
+use App\Services\TokenService;
 use App\Core\HttpException;
 use App\Core\Request;
 use PDO;
@@ -652,6 +653,36 @@ final class DatabaseIntegrityTest extends TestCase
         $staleRow = $stale->fetch();
         self::assertSame('failed', $staleRow['status']);
         self::assertSame('STOCK_NO_LONGER_AVAILABLE', $staleRow['last_error']);
+    }
+
+
+    public function testGuestLoginReusesOneDeviceAccountWithoutDuplicateKeyRace(): void
+    {
+        $this->pdo->commit();
+        $deviceUuid = sprintf(
+            '%08x-%04x-4%03x-8%03x-%012x',
+            random_int(0, 0xffffffff),
+            random_int(0, 0xffff),
+            random_int(0, 0xfff),
+            random_int(0, 0xfff),
+            random_int(0, 0xffffffffffff)
+        );
+        $service = new TokenService();
+        $first = $service->issueGuestToken($deviceUuid);
+        $second = $service->issueGuestToken($deviceUuid);
+
+        self::assertSame($first['user_id'], $second['user_id']);
+        self::assertNotSame($first['token'], $second['token']);
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM users WHERE device_uuid=:uuid');
+        $count->execute(['uuid' => $deviceUuid]);
+        self::assertSame(1, (int)$count->fetchColumn());
+
+        $tokens = $this->pdo->prepare('SELECT token_hash FROM api_tokens WHERE user_id=:user_id ORDER BY id');
+        $tokens->execute(['user_id' => $first['user_id']]);
+        $hashes = $tokens->fetchAll(PDO::FETCH_COLUMN);
+        self::assertCount(2, $hashes);
+        self::assertNotSame($first['token'], $hashes[0]);
+        self::assertSame($first['user_id'], (new TokenService())->authenticate($first['token'])['id']);
     }
 
     private function seedCatalog(): array
