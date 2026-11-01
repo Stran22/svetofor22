@@ -91,6 +91,53 @@ final class DatabaseIntegrityTest extends TestCase
     }
 
 
+    public function testAdminCannotCreateActiveCategoryUnderInactiveAncestor(): void
+    {
+        $suffix = bin2hex(random_bytes(8));
+        $this->pdo->prepare(
+            'INSERT INTO admins (login,password_hash,role,is_active)
+             VALUES (:login,:password_hash,\'owner\',1)'
+        )->execute([
+            'login' => 'category-admin-' . $suffix,
+            'password_hash' => password_hash('Strong-test-password-2026', PASSWORD_DEFAULT),
+        ]);
+        $adminId = (int)$this->pdo->lastInsertId();
+
+        $this->pdo->prepare(
+            'INSERT INTO categories (name,slug,is_active) VALUES (:name,:slug,0)'
+        )->execute(['name' => 'Inactive root', 'slug' => 'inactive-root-' . $suffix]);
+        $rootId = (int)$this->pdo->lastInsertId();
+        $this->pdo->prepare(
+            'INSERT INTO categories (parent_id,name,slug,is_active) VALUES (:parent_id,:name,:slug,1)'
+        )->execute([
+            'parent_id' => $rootId,
+            'name' => 'Active child under inactive root',
+            'slug' => 'active-child-under-inactive-' . $suffix,
+        ]);
+        $childId = (int)$this->pdo->lastInsertId();
+
+        AdminGuard::startSession();
+        $_SESSION = [
+            'admin' => ['id' => $adminId, 'login' => 'category-admin-' . $suffix, 'role' => 'owner'],
+            'csrf_token' => 'category-csrf-' . $suffix,
+        ];
+        $_SERVER['HTTP_X_CSRF_TOKEN'] = 'category-csrf-' . $suffix;
+        try {
+            (new AdminCatalogController())->saveCategory(new Request(
+                'POST', '/api/v1/admin/categories/save', [], [], [
+                    'name' => 'New active descendant',
+                    'slug' => 'new-active-descendant-' . $suffix,
+                    'parent_id' => $childId,
+                    'is_active' => true,
+                ]
+            ));
+            self::fail('An active category must not be created below an inactive ancestor.');
+        } catch (HttpException $e) {
+            self::assertSame(409, $e->status);
+            self::assertSame('PARENT_CATEGORY_INACTIVE', $e->errorCode);
+        }
+    }
+
     public function testAdminLoginRateLimitUsesAtomicSharedCounterAndCanBeCleared(): void
     {
         $identity = 'admin-login-test-' . bin2hex(random_bytes(8));
