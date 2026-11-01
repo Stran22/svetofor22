@@ -771,15 +771,25 @@ final class DatabaseIntegrityTest extends TestCase
         $productB = (int)$this->pdo->lastInsertId();
 
         $this->pdo->prepare(
-            'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES
-             (:branch_a,:product_a,10.00,2.000),
-             (:branch_b,:product_a,20.00,5.000),
-             (:branch_a,:product_b,30.00,7.000)'
+            'INSERT INTO stock (branch_id,product_id,price,quantity)
+             VALUES (:branch_id,:product_id,:price,:quantity)'
         )->execute([
-            'branch_a' => $branchA,
-            'branch_b' => $branchB,
-            'product_a' => $productA,
-            'product_b' => $productB,
+            'branch_id' => $branchA, 'product_id' => $productA,
+            'price' => '10.00', 'quantity' => '2.000',
+        ]);
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity)
+             VALUES (:branch_id,:product_id,:price,:quantity)'
+        )->execute([
+            'branch_id' => $branchB, 'product_id' => $productA,
+            'price' => '20.00', 'quantity' => '5.000',
+        ]);
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity)
+             VALUES (:branch_id,:product_id,:price,:quantity)'
+        )->execute([
+            'branch_id' => $branchA, 'product_id' => $productB,
+            'price' => '30.00', 'quantity' => '7.000',
         ]);
 
         $this->pdo->prepare(
