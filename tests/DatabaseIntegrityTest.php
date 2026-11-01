@@ -88,6 +88,55 @@ final class DatabaseIntegrityTest extends TestCase
         self::assertSame('import_log', $fk->fetchColumn(), 'stock.last_import_id must reference import_log.id');
     }
 
+
+    public function testMySqlEnforcesStockPriceAndImportRelations(): void
+    {
+        [$branchOne, $branchTwo, $productId] = $this->seedCatalog();
+
+        $this->pdo->prepare(
+            'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,10.00,1.000)'
+        )->execute(['branch_id' => $branchOne, 'product_id' => $productId]);
+
+        $violations = [
+            'duplicate branch/product stock row' => function () use ($branchOne, $productId): void {
+                $this->pdo->prepare(
+                    'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,11.00,2.000)'
+                )->execute(['branch_id' => $branchOne, 'product_id' => $productId]);
+            },
+            'negative stock quantity' => function () use ($branchTwo, $productId): void {
+                $this->pdo->prepare(
+                    'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,10.00,-1.000)'
+                )->execute(['branch_id' => $branchTwo, 'product_id' => $productId]);
+            },
+            'negative stock price' => function () use ($branchTwo, $productId): void {
+                $this->pdo->prepare(
+                    'INSERT INTO stock (branch_id,product_id,price,quantity) VALUES (:branch_id,:product_id,-1.00,0.000)'
+                )->execute(['branch_id' => $branchTwo, 'product_id' => $productId]);
+            },
+            'negative price history value' => function () use ($branchOne, $productId): void {
+                $this->pdo->prepare(
+                    "INSERT INTO price_history (branch_id,product_id,price,recorded_at,source)
+                     VALUES (:branch_id,:product_id,-1.00,NOW(),'admin')"
+                )->execute(['branch_id' => $branchOne, 'product_id' => $productId]);
+            },
+            'unknown last_import_id' => function () use ($branchTwo, $productId): void {
+                $this->pdo->prepare(
+                    'INSERT INTO stock (branch_id,product_id,price,quantity,last_import_id)
+                     VALUES (:branch_id,:product_id,10.00,0.000,999999999)'
+                )->execute(['branch_id' => $branchTwo, 'product_id' => $productId]);
+            },
+        ];
+
+        foreach ($violations as $description => $operation) {
+            try {
+                $operation();
+                self::fail('MySQL did not reject ' . $description . '.');
+            } catch (\PDOException $e) {
+                self::assertSame('23000', (string)$e->getCode(), 'Unexpected SQLSTATE for ' . $description);
+            }
+        }
+    }
+
     public function testCatalogAndPriceHistoryQueriesReturnBranchSpecificValues(): void
     {
         [$branchOne, $branchTwo, $productId] = $this->seedCatalog();
