@@ -54,10 +54,10 @@ final class CatalogController
             $params['sku'] = [$search, PDO::PARAM_STR];
         }
         $join = '';
-        $stock = 'NULL AS price,NULL AS quantity,NULL AS is_available';
+        $stock = 'NULL AS price,0.000 AS quantity,0 AS is_available';
         if ($branchId !== null) {
             $join = ' LEFT JOIN stock s ON s.product_id=p.id AND s.branch_id=:branch_id';
-            $stock = 's.price,s.quantity,(s.quantity>0) AS is_available';
+            $stock = 's.price,COALESCE(s.quantity,0.000) AS quantity,(COALESCE(s.quantity,0)>0) AS is_available';
             $params['branch_id'] = [$branchId, PDO::PARAM_INT];
         }
         $sql = 'SELECT p.id,p.category_id,p.name,p.slug,p.sku,p.barcode,p.description,p.image_url,' . $stock .
@@ -84,7 +84,8 @@ final class CatalogController
             Response::json(['success' => false, 'error' => ['code' => 'PRODUCT_NOT_FOUND', 'message' => 'Товар не найден.']], 404);
             return;
         }
-        $stock = $pdo->prepare('SELECT b.id AS branch_id,b.name AS branch_name,b.address,s.price,s.quantity,(s.quantity>0) AS is_available
+        $stock = $pdo->prepare('SELECT b.id AS branch_id,b.name AS branch_name,b.address,s.price,
+                   COALESCE(s.quantity,0.000) AS quantity,(COALESCE(s.quantity,0)>0) AS is_available
             FROM branches b LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=:product_id
             WHERE b.is_active=1 ORDER BY b.sort_order,b.name');
         $stock->execute(['product_id' => $id]);
