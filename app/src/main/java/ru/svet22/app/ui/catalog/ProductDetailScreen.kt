@@ -1,0 +1,585 @@
+package ru.svet22.app.ui.catalog
+
+// ===== НАЧАЛО БЛОКА: Импорты =====
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ImageNotSupported
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import ru.svet22.app.data.model.Product
+import ru.svet22.app.data.model.ProductReviewsResponse
+import ru.svet22.app.data.remote.RetrofitClient
+import java.net.HttpURLConnection
+import java.net.URL
+// ===== КОНЕЦ БЛОКА: Импорты =====
+
+
+// ===== НАЧАЛО БЛОКА: Цвета карточки =====
+private val ProductYellow = Color(0xFFFFEB4D)
+private val ProductDark = Color(0xFF252525)
+private val ProductLightGray = Color(0xFFF7F7F7)
+private val ProductRed = Color(0xFFE53935)
+// ===== КОНЕЦ БЛОКА: Цвета карточки =====
+
+
+// ===== НАЧАЛО БЛОКА: Настройки отображения характеристик =====
+private object ProductDetailFieldSettings {
+    const val showManufacturer = true
+    const val showCategory = true
+
+    const val showBarcode = false
+    const val showArticle = false
+    const val showUnit = false
+    const val showBranch = false
+    const val showImportedOn = false
+}
+// ===== КОНЕЦ БЛОКА: Настройки отображения характеристик =====
+
+
+// ===== НАЧАЛО БЛОКА: Основной экран карточки товара =====
+@Composable
+fun ProductDetailScreen(
+    product: Product,
+    modifier: Modifier = Modifier,
+
+    // Переход в профиль после нажатия "Войти".
+    // Подключим через AppNavigation.kt на следующем шаге.
+    onLoginClick: () -> Unit = {}
+) {
+
+    // ===== НАЧАЛО БЛОКА: Состояние вкладок =====
+    var selectedTab by remember(product.id) {
+        mutableIntStateOf(0)
+    }
+    // ===== КОНЕЦ БЛОКА: Состояние вкладок =====
+
+    // ===== НАЧАЛО БЛОКА: Состояние диалога авторизации =====
+    var showLoginDialog by remember {
+        mutableStateOf(false)
+    }
+    // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
+
+    // ===== НАЧАЛО БЛОКА: ЗАГРУЗКА ОТЗЫВОВ =====
+    var reviewsResponse by remember(product.id) { mutableStateOf<ProductReviewsResponse?>(null) }
+    var reviewsLoading by remember(product.id) { mutableStateOf(true) }
+    var reviewsError by remember(product.id) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(product.id) {
+        reviewsLoading = true
+        reviewsError = null
+        reviewsResponse = null
+        try {
+            val result = RetrofitClient.api.productReviews(productId = product.id)
+            if (result.success && result.data != null) {
+                reviewsResponse = result.data
+            } else {
+                reviewsError = "Не удалось получить отзывы."
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            reviewsError = "Ошибка загрузки отзывов. Проверьте интернет-соединение."
+        } finally {
+            reviewsLoading = false
+        }
+    }
+    // ===== КОНЕЦ БЛОКА: ЗАГРУЗКА ОТЗЫВОВ =====
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+
+        // ===== НАЧАЛО БЛОКА: Фотография товара =====
+        ProductDetailImage(
+            imageUrl = product.imageUrl,
+            productName = product.name
+        )
+        // ===== КОНЕЦ БЛОКА: Фотография товара =====
+
+        Spacer(Modifier.height(16.dp))
+
+        // ===== НАЧАЛО БЛОКА: Цена товара =====
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = ProductYellow,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(horizontal = 20.dp, vertical = 14.dp)
+        ) {
+            Text(
+                text = product.price
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { "$it ₽" }
+                    ?: "Цена не указана",
+                style = MaterialTheme.typography.headlineLarge,
+                color = ProductDark
+            )
+        }
+        // ===== КОНЕЦ БЛОКА: Цена товара =====
+
+        Spacer(Modifier.height(16.dp))
+
+        // ===== НАЧАЛО БЛОКА: Название товара =====
+        Text(
+            text = product.name,
+            style = MaterialTheme.typography.headlineSmall,
+            color = ProductDark
+        )
+        // ===== КОНЕЦ БЛОКА: Название товара =====
+
+        Spacer(Modifier.height(12.dp))
+
+        // ===== НАЧАЛО БЛОКА: Остаток товара =====
+        Text(
+            text = formatQuantity(product.quantity)?.let {
+                "Остаток: $it"
+            } ?: "Наличие уточняется",
+            style = MaterialTheme.typography.bodyLarge
+        )
+        // ===== КОНЕЦ БЛОКА: Остаток товара =====
+
+        Spacer(Modifier.height(24.dp))
+
+        // ===== НАЧАЛО БЛОКА: Переключатель вкладок =====
+        TabRow(
+            selectedTabIndex = selectedTab
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Описание") }
+            )
+
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Характеристики") }
+            )
+        }
+        // ===== КОНЕЦ БЛОКА: Переключатель вкладок =====
+
+        Spacer(Modifier.height(16.dp))
+
+        // ===== НАЧАЛО БЛОКА: Содержимое выбранной вкладки =====
+        when (selectedTab) {
+            0 -> ProductDescriptionTab(product)
+            1 -> ProductCharacteristicsTab(product)
+        }
+        // ===== КОНЕЦ БЛОКА: Содержимое выбранной вкладки =====
+
+        Spacer(Modifier.height(28.dp))
+        Divider()
+        Spacer(Modifier.height(20.dp))
+
+        // ===== НАЧАЛО БЛОКА: Общий блок отзывов =====
+        ProductReviewsSection(
+            reviewsResponse = reviewsResponse,
+            isLoading = reviewsLoading,
+            errorMessage = reviewsError,
+            onLeaveReviewClick = {
+                showLoginDialog = true
+            }
+        )
+        // ===== КОНЕЦ БЛОКА: Общий блок отзывов =====
+    }
+
+    // ===== НАЧАЛО БЛОКА: Диалог авторизации =====
+    if (showLoginDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showLoginDialog = false
+            },
+            title = {
+                Text("Авторизация")
+            },
+            text = {
+                Text(
+                    "Чтобы оставить отзыв о товаре, необходимо войти в аккаунт."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLoginDialog = false
+                        onLoginClick()
+                    }
+                ) {
+                    Text("Войти")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showLoginDialog = false
+                    }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+    // ===== КОНЕЦ БЛОКА: Диалог авторизации =====
+}
+// ===== КОНЕЦ БЛОКА: Основной экран карточки товара =====
+
+
+// ===== НАЧАЛО БЛОКА: Общий блок отзывов =====
+@Composable
+private fun ProductReviewsSection(
+    reviewsResponse: ProductReviewsResponse?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onLeaveReviewClick: () -> Unit
+) {
+    val summary = reviewsResponse?.summary
+    val reviews = reviewsResponse?.reviews.orEmpty()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isLoading || errorMessage != null) "Отзывы"
+                       else "Отзывы (${summary?.reviewsCount ?: 0})",
+                style = MaterialTheme.typography.titleLarge,
+                color = ProductDark
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val rating = summary?.rating
+                Icon(
+                    imageVector = if (rating != null) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = null,
+                    tint = if (rating != null) Color(0xFFFFB300) else Color.Gray
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    text = rating?.let {
+                        String.format(java.util.Locale.forLanguageTag("ru-RU"), "%.1f", it)
+                    } ?: "Нет оценок",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        when {
+            isLoading -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.size(12.dp))
+                    Text("Загрузка отзывов...")
+                }
+            }
+            errorMessage != null -> Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            reviews.isEmpty() -> Text(
+                text = "Отзывов пока нет. Вы можете стать первым, кто поделится впечатлением об этом товаре.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            else -> {
+                reviews.forEach { review ->
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = review.authorName,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = ProductDark
+                            )
+                            Text(
+                                text = review.createdAt?.substringBefore(" ")?.takeIf { it.isNotBlank() } ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Row {
+                            repeat(5) { index ->
+                                Icon(
+                                    imageVector = if (index < review.rating) Icons.Default.Star else Icons.Default.StarBorder,
+                                    contentDescription = null,
+                                    tint = if (index < review.rating) Color(0xFFFFB300) else Color.LightGray,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        if (!review.reviewText.isNullOrBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(text = review.reviewText, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Divider()
+                }
+                if ((summary?.reviewsCount ?: 0) > reviews.size) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Показаны первые ${reviews.size} отзывов из ${summary?.reviewsCount}.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Button(
+            onClick = onLeaveReviewClick,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = ProductRed,
+                contentColor = Color.White
+            )
+        ) {
+            Text("Оставить отзыв")
+        }
+    }
+}
+// ===== КОНЕЦ БЛОКА: Общий блок отзывов =====
+
+
+// ===== НАЧАЛО БЛОКА: Вкладка Описание =====
+@Composable
+private fun ProductDescriptionTab(product: Product) {
+    val description = product.description
+        ?.takeIf { it.isNotBlank() }
+
+    Text(
+        text = description ?: "Описание товара пока не добавлено.",
+        style = MaterialTheme.typography.bodyLarge,
+        color = if (description == null) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+    )
+}
+// ===== КОНЕЦ БЛОКА: Вкладка Описание =====
+
+
+// ===== НАЧАЛО БЛОКА: Вкладка Характеристики =====
+@Composable
+private fun ProductCharacteristicsTab(product: Product) {
+
+    // ===== НАЧАЛО БЛОКА: Основные характеристики =====
+    if (ProductDetailFieldSettings.showManufacturer) {
+        ProductInfo("Производитель", product.manufacturer)
+    }
+
+    if (ProductDetailFieldSettings.showCategory) {
+        ProductInfo("Категория", product.categoryName)
+    }
+    // ===== КОНЕЦ БЛОКА: Основные характеристики =====
+
+    // ===== НАЧАЛО БЛОКА: Дополнительные характеристики =====
+    if (ProductDetailFieldSettings.showBarcode) {
+        ProductInfo("Штрихкод", product.barcode)
+    }
+
+    if (ProductDetailFieldSettings.showArticle) {
+        ProductInfo("Артикул", product.article)
+    }
+
+    if (ProductDetailFieldSettings.showUnit) {
+        ProductInfo("Единица измерения", product.unit)
+    }
+
+    if (ProductDetailFieldSettings.showBranch) {
+        ProductInfo("Филиал", product.branchId?.toString())
+    }
+
+    if (ProductDetailFieldSettings.showImportedOn) {
+        ProductInfo("Дата обновления", product.importedOn)
+    }
+    // ===== КОНЕЦ БЛОКА: Дополнительные характеристики =====
+
+    // ===== НАЧАЛО БЛОКА: Проверка наличия характеристик =====
+    val hasManufacturer =
+        ProductDetailFieldSettings.showManufacturer &&
+                !product.manufacturer.isNullOrBlank()
+
+    val hasCategory =
+        ProductDetailFieldSettings.showCategory &&
+                !product.categoryName.isNullOrBlank()
+
+    val hasExtraFields =
+        (ProductDetailFieldSettings.showBarcode && !product.barcode.isNullOrBlank()) ||
+                (ProductDetailFieldSettings.showArticle && !product.article.isNullOrBlank()) ||
+                (ProductDetailFieldSettings.showUnit && !product.unit.isNullOrBlank()) ||
+                (ProductDetailFieldSettings.showBranch && product.branchId != null) ||
+                (ProductDetailFieldSettings.showImportedOn && !product.importedOn.isNullOrBlank())
+
+    if (!hasManufacturer && !hasCategory && !hasExtraFields) {
+        Text(
+            text = "Характеристики товара пока не указаны.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    // ===== КОНЕЦ БЛОКА: Проверка наличия характеристик =====
+}
+// ===== КОНЕЦ БЛОКА: Вкладка Характеристики =====
+
+
+// ===== НАЧАЛО БЛОКА: Загрузка фотографии товара =====
+@Composable
+private fun ProductDetailImage(
+    imageUrl: String?,
+    productName: String
+) {
+    val bitmap by produceState<android.graphics.Bitmap?>(
+        initialValue = null,
+        key1 = imageUrl
+    ) {
+        value = withContext(Dispatchers.IO) {
+            if (imageUrl.isNullOrBlank()) {
+                null
+            } else {
+                var connection: HttpURLConnection? = null
+
+                try {
+                    val url = URL(imageUrl)
+
+                    if (url.protocol != "https") {
+                        null
+                    } else {
+                        connection = url.openConnection() as HttpURLConnection
+                        connection.connectTimeout = 8000
+                        connection.readTimeout = 8000
+                        connection.instanceFollowRedirects = false
+
+                        if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                            connection.inputStream.use { input ->
+                                BitmapFactory.decodeStream(input)
+                            }
+                        } else {
+                            null
+                        }
+                    }
+                } catch (_: Exception) {
+                    null
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .background(
+                ProductLightGray,
+                RoundedCornerShape(18.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = productName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.ImageNotSupported,
+                contentDescription = "Фото отсутствует",
+                tint = Color.Gray,
+                modifier = Modifier.size(64.dp)
+            )
+        }
+    }
+}
+// ===== КОНЕЦ БЛОКА: Загрузка фотографии товара =====
+
+
+// ===== НАЧАЛО БЛОКА: Универсальная строка характеристики =====
+@Composable
+private fun ProductInfo(
+    label: String,
+    value: String?
+) {
+    if (!value.isNullOrBlank()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 9.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        Divider()
+    }
+}
+// ===== КОНЕЦ БЛОКА: Универсальная строка характеристики =====
+
