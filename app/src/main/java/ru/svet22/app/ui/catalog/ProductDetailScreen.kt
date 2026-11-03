@@ -232,34 +232,61 @@ fun ProductDetailScreen(
     // ===== НАЧАЛО БЛОКА: Диалог авторизации =====
     if (showLoginDialog) {
         AlertDialog(
-            onDismissRequest = {
-                showLoginDialog = false
-            },
+            onDismissRequest = { showLoginDialog = false },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = Color.White,
             title = {
-                Text("Авторизация")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(ProductYellow, RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✍️", style = MaterialTheme.typography.headlineMedium)
+                    }
+                    Text(
+                        text = "Поделитесь впечатлением!",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = ProductDark
+                    )
+                }
             },
             text = {
                 Text(
-                    "Чтобы оставить отзыв о товаре, необходимо войти в аккаунт."
+                    text = "Ваш отзыв поможет другим покупателям выбрать товар. Для публикации сначала войдите в свой аккаунт.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFF5F6368)
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showLoginDialog = false
                         onLoginClick()
-                    }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = ProductDark,
+                        contentColor = Color.White
+                    )
                 ) {
-                    Text("Войти")
+                    Text("Войти и оставить отзыв")
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = {
-                        showLoginDialog = false
-                    }
+                    onClick = { showLoginDialog = false },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Отмена")
+                    Text("Может быть, позже", color = Color(0xFF6F6F6F))
                 }
             }
         )
