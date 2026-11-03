@@ -241,14 +241,6 @@ fun ProductDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(ProductYellow, RoundedCornerShape(20.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("✍️", style = MaterialTheme.typography.headlineMedium)
-                    }
                     Text(
                         text = "Поделитесь впечатлением!",
                         style = MaterialTheme.typography.titleLarge,
