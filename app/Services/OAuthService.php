@@ -119,7 +119,7 @@ final class OAuthService
             if (!$attempt) {
                 throw new HttpException(400, 'OAUTH_STATE_INVALID', 'Проверка OAuth state не пройдена или срок авторизации истёк.');
             }
-            $pdo->prepare('UPDATE oauth_attempts SET consumed_at=NOW(),code_verifier=NULL WHERE id=:id')->execute(['id' => $attempt['id']]);
+            $pdo->prepare('UPDATE oauth_attempts SET consumed_at=NOW() WHERE id=:id')->execute(['id' => $attempt['id']]);
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
