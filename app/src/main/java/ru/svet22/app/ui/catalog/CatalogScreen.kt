@@ -66,9 +66,11 @@ fun CatalogScreen(
 ) {
     var branchMenuExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
-    val selected = vm.selectedCategory
-    val visibleProducts = vm.products.filter {
-        it.name.contains(vm.search, ignoreCase = true)
+    val selected = if (vm.globalSearchMode) null else vm.selectedCategory
+    val query = vm.search.trim()
+    val visibleProducts = vm.products.filter { product ->
+        query.isEmpty() || listOfNotNull(product.name, product.barcode, product.article)
+            .any { it.contains(query, ignoreCase = true) }
     }
     val topLevelCategories = vm.categories.filter { it.parentId == null }
 
@@ -123,7 +125,10 @@ fun CatalogScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { searchExpanded = !searchExpanded }) {
+                    IconButton(onClick = {
+                        searchExpanded = !searchExpanded
+                        vm.setGlobalSearchMode(searchExpanded)
+                    }) {
                         Icon(Icons.Default.Search, contentDescription = "Поиск")
                     }
                 }
@@ -137,7 +142,7 @@ fun CatalogScreen(
                     onValueChange = vm::updateSearch,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     singleLine = true,
-                    label = { Text("Поиск товаров") }
+                    label = { Text(if (vm.globalSearchMode) "Название, штрихкод или артикул" else "Поиск в категории") }
                 )
             }
             if (selected != null) {
@@ -159,7 +164,7 @@ fun CatalogScreen(
                     Spacer(Modifier.height(8.dp))
                     Button(onClick = vm::retry) { Text("Повторить") }
                 }
-            } else if (selected == null && !searchExpanded) {
+            } else if (selected == null && !vm.globalSearchMode) {
                 if (vm.loadingCategories) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -187,8 +192,8 @@ fun CatalogScreen(
                 }
             } else if (visibleProducts.isEmpty()) {
                 Text(
-                    if (vm.products.isEmpty()) "В этом магазине пока нет товаров."
-                    else "По вашему запросу ничего не найдено.",
+                    if (query.isNotEmpty()) "Товары не найдены"
+                    else "В этом магазине пока нет товаров.",
                     modifier = Modifier.padding(16.dp)
                 )
             } else {
