@@ -1,22 +1,38 @@
 package ru.svet22.app.ui.catalog
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -25,13 +41,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import ru.svet22.app.data.model.Category
 import ru.svet22.app.data.model.Product
+import java.net.URL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,86 +66,193 @@ fun CatalogScreen(
     vm: CatalogViewModel = viewModel()
 ) {
     var branchMenuExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    val selected = vm.selectedCategory
     val visibleProducts = vm.products.filter {
         it.name.contains(vm.search, ignoreCase = true)
     }
+    val topLevelCategories = vm.categories.filter { it.parentId == null }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Светофор")
-                        Text(
-                            text = vm.selectedBranch?.name ?: "Выбор магазина",
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable(enabled = vm.branches.isNotEmpty()) {
+                                branchMenuExpanded = true
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = vm.selectedBranch?.name ?: "Выберите магазин",
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = vm.selectedBranch?.address ?: "Нажмите для выбора филиала",
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Выбрать филиал")
+                        DropdownMenu(
+                            expanded = branchMenuExpanded,
+                            onDismissRequest = { branchMenuExpanded = false }
+                        ) {
+                            vm.branches.forEach { branch ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(branch.name)
+                                            branch.address?.let {
+                                                Text(it, style = MaterialTheme.typography.bodySmall)
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        branchMenuExpanded = false
+                                        vm.selectBranch(branch)
+                                    }
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
-                    Button(onClick = { branchMenuExpanded = true }) {
-                        Text("Магазин")
-                    }
-                    DropdownMenu(
-                        expanded = branchMenuExpanded,
-                        onDismissRequest = { branchMenuExpanded = false }
-                    ) {
-                        vm.branches.forEach { branch ->
-                            DropdownMenuItem(
-                                text = { Text(branch.name) },
-                                onClick = {
-                                    branchMenuExpanded = false
-                                    vm.selectBranch(branch)
-                                }
-                            )
-                        }
+                    IconButton(onClick = { searchExpanded = !searchExpanded }) {
+                        Icon(Icons.Default.Search, contentDescription = "Поиск")
                     }
                 }
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = vm.search,
-                onValueChange = vm::updateSearch,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Поиск товаров") },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                }
-            )
-            Spacer(Modifier.height(12.dp))
-            if (vm.loading && vm.products.isEmpty()) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (searchExpanded || selected != null) {
+                OutlinedTextField(
+                    value = vm.search,
+                    onValueChange = vm::updateSearch,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    singleLine = true,
+                    label = { Text("Поиск товаров") }
                 )
-            } else if (vm.error != null) {
-                Text(vm.error!!, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = vm::retry) { Text("Повторить") }
+            }
+            if (selected != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                ) {
+                    IconButton(onClick = vm::clearCategory) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "К разделам")
+                    }
+                    Text(selected.name, style = MaterialTheme.typography.titleLarge)
+                }
+            }
+            val showError = vm.branchesError ?: vm.categoriesError ?:
+                (if (selected != null || searchExpanded) vm.productsError else null)
+            if (showError != null) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(showError, color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = vm::retry) { Text("Повторить") }
+                }
+            } else if (selected == null && !searchExpanded) {
+                if (vm.loadingCategories) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (topLevelCategories.isEmpty()) {
+                    Text("Разделы каталога пока не добавлены.", modifier = Modifier.padding(16.dp))
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                    ) {
+                        items(topLevelCategories, key = { it.id }) { category ->
+                            CategoryTile(category = category, onClick = {
+                                vm.selectCategory(category)
+                            })
+                        }
+                    }
+                }
+            } else if (vm.loadingProducts && vm.products.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             } else if (visibleProducts.isEmpty()) {
                 Text(
                     if (vm.products.isEmpty()) "В этом магазине пока нет товаров."
-                    else "По вашему запросу ничего не найдено."
+                    else "По вашему запросу ничего не найдено.",
+                    modifier = Modifier.padding(16.dp)
                 )
             } else {
-                Text(
-                    text = "Товары магазина",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(visibleProducts, key = { it.id }) { product ->
                         ProductRow(product = product, onClick = { onProductClick(product) })
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(category: Category, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth().aspectRatio(0.88f)
+    ) {
+        Box(Modifier.fillMaxSize().background(Color(0xFFF3F3F3))) {
+            Column(Modifier.fillMaxSize().padding(12.dp)) {
+                Text(
+                    category.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.weight(1f))
+                CategoryPhoto(
+                    url = category.imageUrl,
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryPhoto(url: String?, modifier: Modifier = Modifier) {
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
+        value = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = URL(url).openConnection()
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.getInputStream().use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
+        }
+    }
+    Box(modifier, contentAlignment = Alignment.Center) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text("🛒", style = MaterialTheme.typography.headlineLarge)
         }
     }
 }
