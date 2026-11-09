@@ -287,7 +287,7 @@ fun ProductDetailScreen(
             modifier = Modifier.fillMaxWidth().height(54.dp),
             shape = RoundedCornerShape(14.dp),
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = ProductRed,
+                containerColor = Color(0xFF2E7D32),
                 contentColor = Color.White
             )
         ) {
