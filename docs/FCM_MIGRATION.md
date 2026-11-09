@@ -1,5 +1,7 @@
 # Svet22 — переход с OneSignal на Firebase Cloud Messaging (FCM)
 
+Firebase Project ID: `svet22-cdc8d`. Пользователь подтвердил скачивание `google-services.json` на локальный компьютер.
+
 Статус: план реализации после аудита ветки work/backend-core. Этот документ не означает, что FCM уже включён на production.
 
 ## Проверенные существующие компоненты
