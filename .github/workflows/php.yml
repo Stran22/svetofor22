@@ -47,5 +47,7 @@ jobs:
         run: |
           php bin/migrate.php
           php bin/migrate.php
+      - name: FCM queue and schema smoke test (no external send)
+        run: php tests/fcm_queue_smoke.php
       - name: Unit and database integration tests
         run: composer test
