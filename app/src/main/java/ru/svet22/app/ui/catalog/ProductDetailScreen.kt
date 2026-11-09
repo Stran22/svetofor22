@@ -45,9 +45,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import ru.svet22.app.data.model.Product
+import ru.svet22.app.data.model.Branch
+import ru.svet22.app.data.repository.ProductRepository
 import ru.svet22.app.data.model.ProductReviewsResponse
 import ru.svet22.app.data.remote.RetrofitClient
 import java.net.HttpURLConnection
@@ -86,7 +93,8 @@ fun ProductDetailScreen(
     // Переход в профиль после нажатия "Войти".
     // Подключим через AppNavigation.kt на следующем шаге.
     onLoginClick: () -> Unit = {},
-    branchName: String? = null
+    branchName: String? = null,
+    branches: List<Branch> = emptyList()
 ) {
 
     // ===== НАЧАЛО БЛОКА: Состояние вкладок =====
@@ -100,6 +108,39 @@ fun ProductDetailScreen(
         mutableStateOf(false)
     }
     // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
+
+    // Остатки по каждому филиалу загружаются независимо.
+    var branchStocks by remember(product.id) { mutableStateOf<Map<Int, String?>>(emptyMap()) }
+    var stockLoading by remember(product.id) { mutableStateOf(true) }
+    var stockFailed by remember(product.id) { mutableStateOf<Set<Int>>(emptySet()) }
+    val repository = remember { ProductRepository() }
+    LaunchedEffect(product.id, branches.map { it.id }) {
+        stockLoading = true
+        branchStocks = emptyMap()
+        stockFailed = emptySet()
+        try {
+            val results = coroutineScope {
+                branches.map { branch ->
+                    async {
+                        try {
+                            // A product may be absent from a branch's catalog; don't report that as zero.
+                            val match = repository.getProducts(branch.id, product.categoryId)
+                                .firstOrNull { it.id == product.id }
+                            Triple(branch.id, match?.quantity, match == null)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            Triple(branch.id, null, true)
+                        }
+                    }
+                }.awaitAll()
+            }
+            branchStocks = results.associate { it.first to it.second }
+            stockFailed = results.filter { it.third }.map { it.first }.toSet()
+        } finally {
+            stockLoading = false
+        }
+    }
 
     // ===== НАЧАЛО БЛОКА: ЗАГРУЗКА ОТЗЫВОВ =====
     var reviewsResponse by remember(product.id) { mutableStateOf<ProductReviewsResponse?>(null) }
@@ -133,6 +174,14 @@ fun ProductDetailScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+
+        Text(
+            text = "СВЕТОФОР",
+            color = ProductRed,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Spacer(Modifier.height(12.dp))
 
         // ===== НАЧАЛО БЛОКА: Фотография товара =====
         ProductDetailImage(
@@ -176,22 +225,43 @@ fun ProductDetailScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ===== НАЧАЛО БЛОКА: Остаток товара =====
+        // ===== НАЧАЛО БЛОКА: Остатки во всех филиалах =====
         Text(
-            text = formatQuantity(product.quantity)?.let { quantity ->
-                if (!branchName.isNullOrBlank()) {
-                    "${branchName}: остаток ${quantity}"
-                } else {
-                    "Остаток: ${quantity}"
-                }
-            } ?: if (!branchName.isNullOrBlank()) {
-                "${branchName}: наличие уточняется"
-            } else {
-                "Наличие уточняется"
-            },
-            style = MaterialTheme.typography.bodyLarge
+            text = "Остатки в магазинах",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = ProductDark
         )
-        // ===== КОНЕЦ БЛОКА: Остаток товара =====
+        Spacer(Modifier.height(8.dp))
+        if (branches.isEmpty()) {
+            Text("Список филиалов пока недоступен")
+        } else {
+            branches.forEach { branch ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = branch.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = when {
+                            stockLoading -> "Загрузка..."
+                            branch.id in stockFailed -> "Нет данных"
+                            else -> formatQuantity(branchStocks[branch.id])
+                                ?.let { "$it шт." } ?: "Нет данных"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Divider()
+            }
+        }
+        // ===== КОНЕЦ БЛОКА: Остатки во всех филиалах =====
 
         Spacer(Modifier.height(24.dp))
 
