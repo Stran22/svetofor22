@@ -83,6 +83,31 @@ object FcmRegistrationManager {
         }
     }
 
+    // Shared device authorization for FCM and product subscriptions.
+    // Call from a background thread (for example, Dispatchers.IO).
+    @Synchronized
+    fun getAccessToken(context: Context): String {
+        val prefs = context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        val savedToken = prefs.getString(KEY_ACCESS_TOKEN, null)
+        if (!savedToken.isNullOrBlank()) return savedToken
+
+        var deviceId = prefs.getString(KEY_DEVICE_ID, null)
+        if (deviceId.isNullOrBlank()) {
+            deviceId = UUID.randomUUID().toString()
+            if (!prefs.edit().putString(KEY_DEVICE_ID, deviceId).commit()) {
+                throw IOException("Cannot persist device ID")
+            }
+        }
+
+        val newToken = authenticateDevice(deviceId)
+        if (!prefs.edit().putString(KEY_ACCESS_TOKEN, newToken).commit()) {
+            throw IOException("Cannot persist authorization")
+        }
+        return newToken
+    }
+
     private fun authenticateDevice(deviceId: String): String {
         val body = JSONObject().put("device_id", deviceId).toString()
         val request = Request.Builder()
