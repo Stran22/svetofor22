@@ -110,13 +110,13 @@ fun ProductDetailScreen(
     // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
 
     // Остатки по каждому филиалу загружаются независимо.
-    var branchStocks by remember(product.id) { mutableStateOf<Map<Int, String?>>(emptyMap()) }
+    var branchProducts by remember(product.id) { mutableStateOf<Map<Int, Product>>(emptyMap()) }
     var stockLoading by remember(product.id) { mutableStateOf(true) }
     var stockFailed by remember(product.id) { mutableStateOf<Set<Int>>(emptySet()) }
     val repository = remember { ProductRepository() }
     LaunchedEffect(product.id, branches.map { it.id }) {
         stockLoading = true
-        branchStocks = emptyMap()
+        branchProducts = emptyMap()
         stockFailed = emptySet()
         try {
             val results = coroutineScope {
@@ -126,7 +126,7 @@ fun ProductDetailScreen(
                             // A product may be absent from a branch's catalog; don't report that as zero.
                             val match = repository.getProducts(branch.id, product.categoryId)
                                 .firstOrNull { it.id == product.id }
-                            Triple(branch.id, match?.quantity, match == null)
+                            Triple(branch.id, match, false)
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (_: Exception) {
@@ -135,7 +135,7 @@ fun ProductDetailScreen(
                     }
                 }.awaitAll()
             }
-            branchStocks = results.associate { it.first to it.second }
+            branchProducts = results.mapNotNull { result -> result.second?.let { result.first to it } }.toMap()
             stockFailed = results.filter { it.third }.map { it.first }.toSet()
         } finally {
             stockLoading = false
@@ -227,7 +227,7 @@ fun ProductDetailScreen(
 
         // ===== НАЧАЛО БЛОКА: Остатки во всех филиалах =====
         Text(
-            text = "Остатки в магазинах",
+            text = "Цены и остатки в магазинах",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = ProductDark
@@ -237,30 +237,46 @@ fun ProductDetailScreen(
             Text("Список филиалов пока недоступен")
         } else {
             branches.forEach { branch ->
+                val branchProduct = branchProducts[branch.id]
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = branch.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = branch.name + if (branch.id == product.branchId) " • выбран" else "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (branch.id == product.branchId) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Text(
+                            text = when {
+                                stockLoading -> "Загрузка..."
+                                branch.id in stockFailed -> "Не удалось загрузить данные"
+                                branchProduct == null -> "Товар не найден в каталоге филиала"
+                                else -> formatQuantity(branchProduct.quantity)?.let { "Остаток: $it шт." }
+                                    ?: "Остаток неизвестен"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
                         text = when {
-                            stockLoading -> "Загрузка..."
-                            branch.id in stockFailed -> "Нет данных"
-                            else -> formatQuantity(branchStocks[branch.id])
-                                ?.let { "$it шт." } ?: "Нет данных"
+                            stockLoading -> "..."
+                            branch.id in stockFailed || branchProduct == null -> "—"
+                            else -> branchProduct.price?.takeIf { it.isNotBlank() }?.let { "$it ₽" }
+                                ?: "Цена не указана"
                         },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ProductDark
                     )
                 }
                 Divider()
             }
         }
+
         // ===== КОНЕЦ БЛОКА: Остатки во всех филиалах =====
 
         Spacer(Modifier.height(24.dp))
