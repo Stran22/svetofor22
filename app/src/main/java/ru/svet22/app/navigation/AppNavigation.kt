@@ -179,6 +179,7 @@ fun AppNavigation() {
                         ProductDetailScreen(
                             product = product,
                             branchName = catalogViewModel.selectedBranch?.name,
+                            branches = catalogViewModel.branches,
                             modifier = Modifier.padding(detailPadding),
                             onLoginClick = {
                                 navController.navigate(AppRoutes.PROFILE) {
