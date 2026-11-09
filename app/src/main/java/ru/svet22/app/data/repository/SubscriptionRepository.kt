@@ -17,7 +17,15 @@ class SubscriptionRepository(private val context: Context) {
         val token = withContext(Dispatchers.IO) {
             FcmRegistrationManager.getAccessToken(context)
         }
-        return action("Bearer $token")
+        return try {
+            action("Bearer $token")
+        } catch (e: HttpException) {
+            if (e.code() != 401) throw e
+            val renewed = withContext(Dispatchers.IO) {
+                FcmRegistrationManager.refreshAccessToken(context)
+            }
+            action("Bearer $renewed")
+        }
     }
 
     suspend fun list(): List<TrackedSubscription> = authorized { bearer ->
