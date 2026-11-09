@@ -60,7 +60,7 @@ final class SubscriptionController
             $stmt = $this->db->prepare(
                 "INSERT INTO subscriptions (user_id,product_id,branch_id,status,notified_at)
                  VALUES (?,?,?,'active',NULL)
-                 ON DUPLICATE KEY UPDATE status='active',notified_at=NULL,updated_at=CURRENT_TIMESTAMP"
+                 ON DUPLICATE KEY UPDATE status='active',notified_at=NULL,last_push_error=NULL,push_attempts=0"
             );
             $stmt->execute([$userId, $productId, $branchId]);
             $stmt = $this->db->prepare('SELECT id,product_id,branch_id,status,created_at FROM subscriptions WHERE user_id=? AND product_id=? AND branch_id=?');
@@ -82,7 +82,7 @@ final class SubscriptionController
         if (!$id || $id < 1) {
             Response::error('VALIDATION_ERROR', 'Укажите subscription_id.', 422);
         }
-        $stmt = $this->db->prepare("UPDATE subscriptions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?");
+        $stmt = $this->db->prepare("UPDATE subscriptions SET status='cancelled' WHERE id=? AND user_id=?");
         $stmt->execute([$id, $userId]);
         if ($stmt->rowCount() === 0) {
             $check = $this->db->prepare('SELECT id FROM subscriptions WHERE id=? AND user_id=?');
