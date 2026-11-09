@@ -20,7 +20,9 @@ import ru.svet22.app.MainActivity
 class SvetFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        // Token is intentionally not logged or uploaded until authenticated API is ready.
+        // Register the refreshed FCM token using the existing authenticated device API.
+        // FcmRegistrationManager handles background I/O and reauthenticates on HTTP 401.
+        FcmRegistrationManager.registerToken(applicationContext, token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
