@@ -21,6 +21,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import ru.svet22.app.push.FcmRegistrationManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +64,10 @@ private data class BottomMenuItem(val route: String, val title: String)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation() {
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(appContext) {
+        FcmRegistrationManager.registerCurrentToken(appContext)
+    }
     val navController = rememberNavController()
     val catalogViewModel: CatalogViewModel = viewModel()
     val backStackEntry by navController.currentBackStackEntryAsState()
