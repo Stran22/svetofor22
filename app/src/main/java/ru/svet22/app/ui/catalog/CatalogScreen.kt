@@ -15,11 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -194,12 +192,15 @@ fun CatalogScreen(
                     modifier = Modifier.padding(16.dp)
                 )
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
                 ) {
                     items(visibleProducts, key = { it.id }) { product ->
-                        ProductRow(product = product, onClick = { onProductClick(product) })
+                        ProductGridTile(product = product, onClick = { onProductClick(product) })
                     }
                 }
             }
@@ -299,5 +300,48 @@ private fun CategoryIllustration(categoryName: String) {
         Text(symbols[0], fontSize = 35.sp)
         Text(symbols[1], fontSize = 44.sp)
         Text(symbols[2], fontSize = 34.sp)
+    }
+}
+
+@Composable
+private fun ProductGridTile(product: Product, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .background(Color.White)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CategoryPhoto(
+                url = product.imageUrl,
+                categoryName = product.categoryName ?: product.name,
+                modifier = Modifier.fillMaxWidth().height(120.dp)
+            )
+            Text(
+                text = product.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 3,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = product.price?.takeIf { it.isNotBlank() }?.let { "$it ₽" }
+                    ?: "Цена не указана",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE53935)
+            )
+            Text(
+                text = formatQuantity(product.quantity)?.let { "Остаток: $it" }
+                    ?: "Наличие уточняется",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF757575)
+            )
+        }
     }
 }
