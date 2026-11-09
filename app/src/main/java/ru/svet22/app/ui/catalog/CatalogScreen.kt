@@ -49,9 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -266,13 +263,10 @@ private fun CategoryPhoto(url: String?, categoryName: String, modifier: Modifier
 @Composable
 private fun SvetoforWordmark() {
     Text(
-        text = buildAnnotatedString {
-            withStyle(SpanStyle(color = Color(0xFFE53935))) { append("СВЕТО") }
-            withStyle(SpanStyle(color = Color(0xFF252525))) { append("ФОР") }
-        },
-        fontWeight = FontWeight.Black,
-        fontSize = 19.sp,
-        letterSpacing = 0.6.sp,
+        text = "СВЕТОФОР",
+        color = Color(0xFFE53935),
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 25.sp,
         maxLines = 1
     )
 }
