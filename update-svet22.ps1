@@ -13,7 +13,8 @@ $files = @(
     'data/remote/SvetApi.kt',
     'data/repository/ProductRepository.kt',
     'ui/catalog/CatalogViewModel.kt',
-    'ui/catalog/CatalogScreen.kt'
+    'ui/catalog/CatalogScreen.kt',
+    'ui/catalog/ProductDetailScreen.kt'
 )
 if (-not (Test-Path -LiteralPath $project -PathType Container)) {
     throw "Android project directory not found: $project"
