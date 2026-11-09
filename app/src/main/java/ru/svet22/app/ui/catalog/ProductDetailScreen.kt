@@ -85,7 +85,8 @@ fun ProductDetailScreen(
 
     // Переход в профиль после нажатия "Войти".
     // Подключим через AppNavigation.kt на следующем шаге.
-    onLoginClick: () -> Unit = {}
+    onLoginClick: () -> Unit = {},
+    branchName: String? = null
 ) {
 
     // ===== НАЧАЛО БЛОКА: Состояние вкладок =====
@@ -177,9 +178,17 @@ fun ProductDetailScreen(
 
         // ===== НАЧАЛО БЛОКА: Остаток товара =====
         Text(
-            text = formatQuantity(product.quantity)?.let {
-                "Остаток: $it"
-            } ?: "Наличие уточняется",
+            text = formatQuantity(product.quantity)?.let { quantity ->
+                if (!branchName.isNullOrBlank()) {
+                    "${branchName}: остаток ${quantity}"
+                } else {
+                    "Остаток: ${quantity}"
+                }
+            } ?: if (!branchName.isNullOrBlank()) {
+                "${branchName}: наличие уточняется"
+            } else {
+                "Наличие уточняется"
+            },
             style = MaterialTheme.typography.bodyLarge
         )
         // ===== КОНЕЦ БЛОКА: Остаток товара =====
