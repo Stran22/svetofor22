@@ -24,7 +24,7 @@ $headers = @{ 'User-Agent' = 'Svet22-Android-Updater'; 'Accept' = 'application/v
 function Get-GitHubJson([string]$uri) {
     $separator = if ($uri.Contains('?')) { '&' } else { '?' }
     $nonce = [guid]::NewGuid().ToString('N')
-    return Invoke-RestMethod -Uri "$uri$separator"+"nonce=$nonce" -Headers $headers -UseBasicParsing -ErrorAction Stop
+    return Invoke-RestMethod -Uri ("$uri$separator" + "nonce=$nonce") -Headers $headers -UseBasicParsing -ErrorAction Stop
 }
 function Get-GitBlobSha([byte[]]$bytes) {
     $prefix = [System.Text.Encoding]::ASCII.GetBytes("blob $($bytes.Length)`0")
