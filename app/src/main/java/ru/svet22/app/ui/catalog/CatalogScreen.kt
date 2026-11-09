@@ -127,7 +127,7 @@ fun CatalogScreen(
                 actions = {
                     IconButton(onClick = {
                         searchExpanded = !searchExpanded
-                        vm.setGlobalSearchMode(searchExpanded)
+                        vm.changeGlobalSearchMode(searchExpanded)
                     }) {
                         Icon(Icons.Default.Search, contentDescription = "Поиск")
                     }
