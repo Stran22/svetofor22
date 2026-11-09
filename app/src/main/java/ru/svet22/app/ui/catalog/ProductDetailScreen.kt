@@ -33,6 +33,10 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import ru.svet22.app.data.repository.SubscriptionRepository
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -109,6 +113,21 @@ fun ProductDetailScreen(
         mutableStateOf(false)
     }
     var showTrackingDialog by remember(product.id) { mutableStateOf(false) }
+    val subscriptionRepository = remember(LocalContext.current) {
+        SubscriptionRepository(it.applicationContext)
+    }
+    val trackingScope = rememberCoroutineScope()
+    var trackingBusy by remember(product.id) { mutableStateOf(false) }
+    var trackingMessage by remember(product.id) { mutableStateOf<String?>(null) }
+    var trackedBranches by remember(product.id) { mutableStateOf<Set<Int>>(emptySet()) }
+    var trackingError by remember(product.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(product.id) {
+        try {
+            trackedBranches = subscriptionRepository.list()
+                .filter { it.productId == product.id && it.status == "active" }
+                .map { it.branchId }.toSet()
+        } catch (_: Exception) { /* The user can retry when subscribing. */ }
+    }
     // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
 
     // Остатки по каждому филиалу загружаются независимо.
@@ -297,7 +316,7 @@ fun ProductDetailScreen(
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Уведомления о появлении товара станут доступны после подключения подписок.",
+            "Выберите магазин, где товара нет в наличии. Уведомим о поступлении.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -348,19 +367,65 @@ fun ProductDetailScreen(
 
     if (showTrackingDialog) {
         AlertDialog(
-            onDismissRequest = { showTrackingDialog = false },
-            title = { Text("Отслеживание товара") },
+            onDismissRequest = { if (!trackingBusy) showTrackingDialog = false },
+            title = { Text("Следить за товаром") },
             text = {
-                Text("Для отслеживания товара потребуется вход в аккаунт. Подписка и уведомления пока не подключены к серверу.")
+                Column {
+                    Text("Выберите филиал, в котором товара пока нет:")
+                    Spacer(Modifier.height(8.dp))
+                    branches.forEach { branch ->
+                        val stock = branchProducts[branch.id]
+                        val quantity = stock?.quantity?.toString()?.toDoubleOrNull()
+                        val availableToTrack = !stockLoading &&
+                            branch.id !in stockFailed && stock != null &&
+                            quantity != null && quantity <= 0.0
+                        val tracked = branch.id in trackedBranches
+                        TextButton(
+                            enabled = availableToTrack && !tracked && !trackingBusy,
+                            onClick = {
+                                trackingBusy = true
+                                trackingError = null
+                                trackingScope.launch {
+                                    try {
+                                        subscriptionRepository.create(product.id, branch.id)
+                                        trackedBranches = trackedBranches + branch.id
+                                        trackingMessage = "Подписка оформлена: ${branch.name}"
+                                        showTrackingDialog = false
+                                    } catch (e: Exception) {
+                                        trackingError = "Не удалось оформить подписку. Проверьте наличие товара и соединение."
+                                    } finally {
+                                        trackingBusy = false
+                                    }
+                                }
+                            }
+                        ) {
+                            Text(branch.name + when {
+                                tracked -> " — отслеживается"
+                                availableToTrack -> " — подписаться"
+                                else -> " — подписка недоступна"
+                            })
+                        }
+                    }
+                    if (trackingBusy) CircularProgressIndicator()
+                    trackingError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showTrackingDialog = false
-                    onLoginClick()
-                }) { Text("Перейти в профиль") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTrackingDialog = false }) { Text("Закрыть") }
+                TextButton(onClick = { showTrackingDialog = false }, enabled = !trackingBusy) {
+                    Text("Закрыть")
+                }
+            }
+        )
+    }
+    trackingMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { trackingMessage = null },
+            title = { Text("Готово") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { trackingMessage = null }) { Text("Понятно") }
             }
         )
     }
