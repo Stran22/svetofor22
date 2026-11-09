@@ -52,7 +52,7 @@ class CatalogViewModel(
 
     private fun effectiveCategoryId(): Int? = if (globalSearchMode) null else selectedCategory?.id
 
-    fun setGlobalSearchMode(enabled: Boolean) {
+    fun changeGlobalSearchMode(enabled: Boolean) {
         if (globalSearchMode == enabled) return
         globalSearchMode = enabled
         search = ""
