@@ -108,10 +108,22 @@ object FcmRegistrationManager {
         return newToken
     }
 
+    @Synchronized
+    fun refreshAccessToken(context: Context): String {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val deviceId = prefs.getString(KEY_DEVICE_ID, null)
+            ?: throw IOException("Device ID not initialized")
+        val freshToken = authenticateDevice(deviceId)
+        if (!prefs.edit().putString(KEY_ACCESS_TOKEN, freshToken).commit()) {
+            throw IOException("Cannot persist refreshed authorization")
+        }
+        return freshToken
+    }
+
     private fun authenticateDevice(deviceId: String): String {
-        val body = JSONObject().put("device_id", deviceId).toString()
+        val body = JSONObject().put("device_uuid", deviceId).toString()
         val request = Request.Builder()
-            .url("$BASE_URL/api/v1/auth/device")
+            .url("$BASE_URL/api/v1/auth/guest")
             .post(body.toRequestBody(jsonType))
             .build()
         client.newCall(request).execute().use { response ->
@@ -121,8 +133,8 @@ object FcmRegistrationManager {
             val json = JSONObject(response.body?.string() ?: "{}")
             // Supports both a direct API response and a {success, data} envelope.
             val data = json.optJSONObject("data") ?: json
-            return data.optString("access_token").takeIf { it.isNotBlank() }
-                ?: throw IOException("Missing access_token in device authorization response")
+            return data.optString("token").takeIf { it.isNotBlank() }
+                ?: throw IOException("Missing token in guest authorization response")
         }
     }
 
