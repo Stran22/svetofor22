@@ -10,7 +10,6 @@ use Throwable;
 
 final class PushNotificationService
 {
-    private const ONESIGNAL_URL = 'https://api.onesignal.com/notifications';
 
     public static function idempotencyKey(int $subscriptionId, string $eventKey): string
     {
@@ -87,20 +86,20 @@ final class PushNotificationService
                     (string)$subscription['branch_name'],
                     $productId,
                     $branchId,
-                    self::idempotencyKey((int)$subscription['subscription_id'], $eventKey)
+                    $eventKey
                 );
                 $messageId = trim((string)($response['id'] ?? ''));
                 if ($messageId === '') {
-                    $this->finishDelivery($pdo, $claim, false, null, $response, 'NO_SUBSCRIBED_DEVICES');
+                    $this->finishDelivery($pdo, $claim, false, null, $response, (string)($response['error'] ?? 'FCM_FAILED'));
                     $result['failed']++;
                     continue;
                 }
                 $this->finishDelivery($pdo, $claim, true, $messageId, $response, null);
                 $result['sent']++;
             } catch (Throwable $e) {
-                $this->finishDelivery($pdo, $claim, false, null, ['error' => 'ONESIGNAL_REQUEST_FAILED'], $e->getMessage());
+                $this->finishDelivery($pdo, $claim, false, null, ['error' => 'FCM_REQUEST_FAILED'], $e->getMessage());
                 $result['failed']++;
-                error_log('OneSignal delivery failed for subscription ' . (int)$subscription['subscription_id'] . ': ' . $e->getMessage());
+                error_log('FCM delivery failed for subscription ' . (int)$subscription['subscription_id'] . ': ' . $e->getMessage());
             }
         }
         return $result;
@@ -157,20 +156,20 @@ final class PushNotificationService
                     (string)$item['branch_name'],
                     (int)$item['product_id'],
                     (int)$item['branch_id'],
-                    self::idempotencyKey((int)$item['subscription_id'], (string)$item['event_key'])
+                    (string)$item['event_key']
                 );
                 $messageId = trim((string)($response['id'] ?? ''));
                 if ($messageId === '') {
-                    $this->finishDelivery($pdo, $deliveryId, false, null, $response, 'NO_SUBSCRIBED_DEVICES');
+                    $this->finishDelivery($pdo, $deliveryId, false, null, $response, (string)($response['error'] ?? 'FCM_FAILED'));
                     $result['failed']++;
                     continue;
                 }
                 $this->finishDelivery($pdo, $deliveryId, true, $messageId, $response, null);
                 $result['sent']++;
             } catch (Throwable $e) {
-                $this->finishDelivery($pdo, $deliveryId, false, null, ['error' => 'ONESIGNAL_REQUEST_FAILED'], $e->getMessage());
+                $this->finishDelivery($pdo, $deliveryId, false, null, ['error' => 'FCM_REQUEST_FAILED'], $e->getMessage());
                 $result['failed']++;
-                error_log('OneSignal retry failed for subscription ' . (int)$item['subscription_id'] . ': ' . $e->getMessage());
+                error_log('FCM retry failed for subscription ' . (int)$item['subscription_id'] . ': ' . $e->getMessage());
             }
         }
         return $result;
@@ -278,61 +277,68 @@ final class PushNotificationService
         }
     }
 
-    private function send(int $userId, string $productName, string $branchName, int $productId, int $branchId, string $idempotencyKey): array
+    /**
+     * Sends to registered FCM devices. Successful device sends are remembered
+     * across queue retries so an intermittent failure does not resend to them.
+     */
+    private function send(int $userId, string $productName, string $branchName, int $productId, int $branchId, string $eventKey): array
     {
-        $appId = (string)Config::get('onesignal.app_id', '');
-        $apiKey = (string)Config::get('onesignal.rest_api_key', '');
-        if ($appId === '' || $apiKey === '') {
-            throw new RuntimeException('OneSignal credentials are not configured.');
-        }
-        if (!function_exists('curl_init')) {
-            throw new RuntimeException('PHP cURL extension is not available.');
-        }
+        $pdo = Database::connection();
+        $tokens = $pdo->prepare('SELECT id,fcm_token FROM user_push_tokens WHERE user_id=:user_id ORDER BY id');
+        $tokens->execute(['user_id' => $userId]);
+        $devices = $tokens->fetchAll(PDO::FETCH_ASSOC);
+        if (!$devices) return ['error' => 'NO_SUBSCRIBED_DEVICES'];
 
-        $body = [
-            'app_id' => $appId,
-            'target_channel' => 'push',
-            'include_aliases' => ['external_id' => [(string)$userId]],
-            'headings' => ['en' => 'Product is back in stock', 'ru' => 'Товар снова в наличии'],
-            'contents' => [
-                'en' => $productName . ' is available at ' . $branchName . '.',
-                'ru' => $productName . ' снова в наличии в магазине «' . $branchName . '».',
-            ],
-            'data' => [
-                'type' => 'product_available',
-                'product_id' => $productId,
-                'branch_id' => $branchId,
-            ],
-            'idempotency_key' => $idempotencyKey,
-        ];
-
-        $ch = curl_init(self::ONESIGNAL_URL);
-        if ($ch === false) throw new RuntimeException('Could not initialize OneSignal request.');
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 8,
-            CURLOPT_TIMEOUT => 20,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Key ' . $apiKey,
-                'Accept: application/json',
-                'Content-Type: application/json',
-            ],
-        ]);
-        $raw = curl_exec($ch);
-        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if (!is_string($raw) || $status < 200 || $status >= 300) {
-            throw new RuntimeException('OneSignal HTTP request failed (' . $status . '). ' . $curlError);
+        $sender = new FcmSender();
+        $firstMessage = null;
+        $failed = false;
+        $title = 'Товар снова в наличии';
+        $body = $productName . ' снова в наличии в магазине «' . $branchName . '».';
+        foreach ($devices as $device) {
+            $tokenId = (int)$device['id'];
+            $hash = hash('sha256', $eventKey . ':' . $tokenId);
+            $previous = $pdo->prepare('SELECT status FROM fcm_device_deliveries WHERE event_hash=:hash LIMIT 1');
+            $previous->execute(['hash' => $hash]);
+            if ($previous->fetchColumn() === 'sent') {
+                $firstMessage ??= 'already-sent';
+                continue;
+            }
+            // Reserve the device/event combination before the external request.
+            // A stale processing record is deliberately not auto-retried: FCM has
+            // no idempotency key, so a timed-out request may already have arrived.
+            $insert = $pdo->prepare(
+                "INSERT IGNORE INTO fcm_device_deliveries (event_hash,token_id,status)
+                 VALUES (:hash,:token_id,'processing')"
+            );
+            $insert->execute(['hash' => $hash, 'token_id' => $tokenId]);
+            if ($insert->rowCount() === 0) {
+                $failed = true;
+                continue;
+            }
+            try {
+                $result = $sender->send((string)$device['fcm_token'], $title, $body, $productId, $branchId);
+                if ($result['success'] ?? false) {
+                    $pdo->prepare("UPDATE fcm_device_deliveries SET status='sent' WHERE event_hash=:hash")
+                        ->execute(['hash' => $hash]);
+                    $firstMessage ??= (string)$result['message_id'];
+                } else {
+                    $reason = (string)($result['reason'] ?? 'UNKNOWN');
+                    $status = (int)($result['http_status'] ?? 0);
+                    if ($status === 404 || ($status === 400 && $reason === 'INVALID_ARGUMENT')) {
+                        // A malformed/expired device registration is not retried.
+                        $pdo->prepare("UPDATE fcm_device_deliveries SET status='invalid' WHERE event_hash=:hash")
+                            ->execute(['hash' => $hash]);
+                    } else {
+                        // Ambiguous failures stay processing; no automatic duplicate.
+                        $failed = true;
+                    }
+                }
+            } catch (Throwable $e) {
+                $failed = true;
+                error_log('FCM delivery attempt failed for user ' . $userId);
+            }
         }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) throw new RuntimeException('OneSignal returned invalid JSON.');
-        return $decoded;
+        if ($failed) return ['error' => 'FCM_DEVICE_DELIVERY_INCOMPLETE'];
+        return $firstMessage === null ? ['error' => 'NO_SUBSCRIBED_DEVICES'] : ['id' => $firstMessage];
     }
 }
