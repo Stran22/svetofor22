@@ -35,7 +35,10 @@ if ($tree.truncated -eq $true) { throw 'GitHub tree is truncated; update aborted
 $prefix = "$source/"
 $entries = @($tree.tree | Where-Object {
     $_.type -eq 'blob' -and $_.path.StartsWith($prefix, [System.StringComparison]::Ordinal) -and
-    $_.path -notmatch '(^|/)\\.gitkeep
+    (-not $_.path.EndsWith('/.gitkeep'))
+} | Sort-Object path)
+if ($entries.Count -eq 0) { throw "No files found under $source in GitHub. Update aborted." }
+Write-Host "Discovered Android files: $($entries.Count)" -ForegroundColor Cyan
 $backupRoot = Join-Path $project ('svet22-backups\' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $changed = 0
 $unchanged = 0
