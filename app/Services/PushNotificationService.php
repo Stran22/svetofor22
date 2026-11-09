@@ -299,8 +299,14 @@ final class PushNotificationService
             $hash = hash('sha256', $eventKey . ':' . $tokenId);
             $previous = $pdo->prepare('SELECT status FROM fcm_device_deliveries WHERE event_hash=:hash LIMIT 1');
             $previous->execute(['hash' => $hash]);
-            if ($previous->fetchColumn() === 'sent') {
+            $previousStatus = $previous->fetchColumn();
+            if ($previousStatus === 'sent') {
                 $firstMessage ??= 'already-sent';
+                continue;
+            }
+            if ($previousStatus === 'invalid') continue;
+            if ($previousStatus === 'processing') {
+                $failed = true;
                 continue;
             }
             // Reserve the device/event combination before the external request.
