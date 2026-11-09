@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import ru.svet22.app.data.model.Branch
+import ru.svet22.app.data.model.Category
 import ru.svet22.app.data.model.Product
 import ru.svet22.app.data.repository.ProductRepository
 
@@ -17,42 +18,63 @@ class CatalogViewModel(
 ) : ViewModel() {
     var branches by mutableStateOf<List<Branch>>(emptyList())
         private set
+    var categories by mutableStateOf<List<Category>>(emptyList())
+        private set
     var products by mutableStateOf<List<Product>>(emptyList())
         private set
     var selectedBranch by mutableStateOf<Branch?>(null)
         private set
+    var selectedCategory by mutableStateOf<Category?>(null)
+        private set
     var loadingBranches by mutableStateOf(false)
+        private set
+    var loadingCategories by mutableStateOf(false)
         private set
     var loadingProducts by mutableStateOf(false)
         private set
-    val loading: Boolean get() = loadingBranches || loadingProducts
+    val loading: Boolean get() = loadingBranches || loadingCategories || loadingProducts
     var branchesError by mutableStateOf<String?>(null)
+        private set
+    var categoriesError by mutableStateOf<String?>(null)
         private set
     var productsError by mutableStateOf<String?>(null)
         private set
-    val error: String? get() = branchesError ?: productsError
+    val error: String? get() = branchesError ?: categoriesError ?: productsError
     var search by mutableStateOf("")
         private set
 
     private var branchesJob: Job? = null
+    private var categoriesJob: Job? = null
     private var productsJob: Job? = null
     private var branchesRequestId = 0
+    private var categoriesRequestId = 0
     private var productsRequestId = 0
 
-    init { loadBranches() }
+    init {
+        loadBranches()
+        loadCategories()
+    }
 
     fun updateSearch(value: String) { search = value }
+
+    fun selectCategory(category: Category) {
+        selectedCategory = category
+        search = ""
+        selectedBranch?.let { loadProducts(it.id, category.id) }
+    }
+
+    fun clearCategory() {
+        selectedCategory = null
+        search = ""
+        selectedBranch?.let { loadProducts(it.id, null) }
+    }
 
     fun selectBranch(branch: Branch) {
         if (selectedBranch?.id == branch.id) return
         selectedBranch = branch
         products = emptyList()
         productsError = null
-        productsRequestId++
-        productsJob?.cancel()
-        productsJob = null
-        loadingProducts = false
-        loadProducts(branch.id)
+        loadProducts(branch.id, selectedCategory?.id)
     }
 
     fun loadBranches() {
@@ -66,70 +88,88 @@ class CatalogViewModel(
                 val result = repository.getBranches()
                 if (requestId != branchesRequestId) return@launch
                 branches = result
-                val currentBranch = selectedBranch
-                val updatedBranch = currentBranch?.let { current ->
-                    result.find { it.id == current.id }
-                }
-                val branchToSelect = updatedBranch ?: result.firstOrNull()
-                if (branchToSelect != null) {
-                    if (selectedBranch?.id == branchToSelect.id) {
-                        selectedBranch = branchToSelect
-                    } else {
-                        selectBranch(branchToSelect)
-                    }
-                } else {
+                val current = selectedBranch
+                val chosen = current?.let { old -> result.find { it.id == old.id } }
+                    ?: result.firstOrNull()
+                if (chosen == null) {
                     selectedBranch = null
                     products = emptyList()
-                    productsError = null
                     productsRequestId++
                     productsJob?.cancel()
-                    productsJob = null
                     loadingProducts = false
+                } else if (selectedBranch?.id == chosen.id) {
+                    selectedBranch = chosen
+                } else {
+                    selectBranch(chosen)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (requestId == branchesRequestId) {
-                    branchesError = "Не удалось загрузить филиалы. Проверьте подключение к интернету."
+                    branchesError = "Не удалось загрузить филиалы. Проверьте интернет."
                 }
             } finally {
-                if (requestId == branchesRequestId) {
-                    loadingBranches = false
-                    branchesJob = null
-                }
+                if (requestId == branchesRequestId) loadingBranches = false
             }
         }
     }
 
-    private fun loadProducts(branchId: Int) {
+    fun loadCategories() {
+        categoriesRequestId++
+        val requestId = categoriesRequestId
+        categoriesJob?.cancel()
+        categoriesJob = viewModelScope.launch {
+            loadingCategories = true
+            categoriesError = null
+            try {
+                val result = repository.getCategories()
+                if (requestId != categoriesRequestId) return@launch
+                categories = result
+                if (selectedCategory != null && result.none { it.id == selectedCategory?.id }) {
+                    clearCategory()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (requestId == categoriesRequestId) {
+                    categoriesError = "Не удалось загрузить разделы каталога."
+                }
+            } finally {
+                if (requestId == categoriesRequestId) loadingCategories = false
+            }
+        }
+    }
+
+    private fun loadProducts(branchId: Int, categoryId: Int?) {
         productsRequestId++
         val requestId = productsRequestId
         productsJob?.cancel()
+        products = emptyList()
         productsJob = viewModelScope.launch {
             loadingProducts = true
             productsError = null
             try {
-                val result = repository.getProducts(branchId)
-                if (requestId != productsRequestId) return@launch
-                if (selectedBranch?.id != branchId) return@launch
+                val result = repository.getProducts(branchId, categoryId)
+                if (requestId != productsRequestId || selectedBranch?.id != branchId ||
+                    selectedCategory?.id != categoryId) return@launch
                 products = result
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (requestId == productsRequestId && selectedBranch?.id == branchId) {
-                    productsError = "Не удалось загрузить каталог. Попробуйте ещё раз."
+                if (requestId == productsRequestId) {
+                    productsError = "Не удалось загрузить товары. Попробуйте ещё раз."
                 }
             } finally {
-                if (requestId == productsRequestId) {
-                    loadingProducts = false
-                    productsJob = null
-                }
+                if (requestId == productsRequestId) loadingProducts = false
             }
         }
     }
 
     fun retry() {
         if (branches.isEmpty()) loadBranches()
-        else selectedBranch?.let { loadProducts(it.id) }
+        if (categories.isEmpty()) loadCategories()
+        if (branches.isNotEmpty()) selectedBranch?.let {
+            loadProducts(it.id, selectedCategory?.id)
+        }
     }
 }
