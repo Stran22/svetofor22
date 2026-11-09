@@ -49,8 +49,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
@@ -85,9 +89,10 @@ fun CatalogScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            SvetoforWordmark()
                             Text(
                                 text = vm.selectedBranch?.name ?: "Выберите магазин",
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -224,6 +229,7 @@ private fun CategoryTile(category: Category, onClick: () -> Unit) {
                 Spacer(Modifier.weight(1f))
                 CategoryPhoto(
                     url = category.imageUrl,
+                    categoryName = category.name,
                     modifier = Modifier.fillMaxWidth().height(100.dp)
                 )
             }
@@ -232,7 +238,7 @@ private fun CategoryTile(category: Category, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CategoryPhoto(url: String?, modifier: Modifier = Modifier) {
+private fun CategoryPhoto(url: String?, categoryName: String, modifier: Modifier = Modifier) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
         value = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
             runCatching {
@@ -252,7 +258,52 @@ private fun CategoryPhoto(url: String?, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            Text("🛒", style = MaterialTheme.typography.headlineLarge)
+            CategoryIllustration(categoryName)
         }
+    }
+}
+
+@Composable
+private fun SvetoforWordmark() {
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = Color(0xFFE53935))) { append("СВЕТО") }
+            withStyle(SpanStyle(color = Color(0xFF252525))) { append("ФОР") }
+        },
+        fontWeight = FontWeight.Black,
+        fontSize = 19.sp,
+        letterSpacing = 0.6.sp,
+        maxLines = 1
+    )
+}
+
+@Composable
+private fun CategoryIllustration(categoryName: String) {
+    val name = categoryName.lowercase()
+    val symbols = when {
+        "молоч" in name || "сыр" in name -> listOf("🥛", "🧀", "🧈")
+        "сахар" in name -> listOf("🍬", "🧊", "🍭")
+        "хлеб" in name || "булоч" in name -> listOf("🍞", "🥐", "🥖")
+        "овощ" in name || "фрукт" in name -> listOf("🍎", "🥕", "🍌")
+        "заморож" in name -> listOf("🧊", "🍦", "🥟")
+        "кондитер" in name || "слад" in name -> listOf("🍫", "🍪", "🧁")
+        "снэк" in name || "снек" in name -> listOf("🍿", "🥨", "🥜")
+        "напит" in name || "вода" in name -> listOf("🧃", "🥤", "💧")
+        "мяс" in name || "колбас" in name -> listOf("🥩", "🍗", "🌭")
+        "рыб" in name -> listOf("🐟", "🦐", "🥫")
+        "консерв" in name -> listOf("🥫", "🫙", "🍲")
+        "круп" in name || "макарон" in name -> listOf("🍚", "🍝", "🌾")
+        "чай" in name || "кофе" in name -> listOf("☕", "🫖", "🍵")
+        "быт" in name || "хими" in name -> listOf("🧴", "🧽", "🧼")
+        else -> listOf("🛍️", "📦", "✨")
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Text(symbols[0], fontSize = 35.sp)
+        Text(symbols[1], fontSize = 44.sp)
+        Text(symbols[2], fontSize = 34.sp)
     }
 }
