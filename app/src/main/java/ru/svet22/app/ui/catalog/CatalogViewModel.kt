@@ -47,6 +47,17 @@ class CatalogViewModel(
     val error: String? get() = branchesError ?: categoriesError ?: productsError
     var search by mutableStateOf("")
         private set
+    var globalSearchMode by mutableStateOf(false)
+        private set
+
+    private fun effectiveCategoryId(): Int? = if (globalSearchMode) null else selectedCategory?.id
+
+    fun setGlobalSearchMode(enabled: Boolean) {
+        if (globalSearchMode == enabled) return
+        globalSearchMode = enabled
+        search = ""
+        selectedBranch?.let { loadProducts(it.id, effectiveCategoryId()) }
+    }
 
     private var branchesJob: Job? = null
     private var categoriesJob: Job? = null
@@ -65,13 +76,13 @@ class CatalogViewModel(
     fun selectCategory(category: Category) {
         selectedCategory = category
         search = ""
-        selectedBranch?.let { loadProducts(it.id, category.id) }
+        selectedBranch?.let { loadProducts(it.id, effectiveCategoryId()) }
     }
 
     fun clearCategory() {
         selectedCategory = null
         search = ""
-        selectedBranch?.let { loadProducts(it.id, null) }
+        selectedBranch?.let { loadProducts(it.id, effectiveCategoryId()) }
     }
 
     fun selectBranch(branch: Branch) {
@@ -80,7 +91,7 @@ class CatalogViewModel(
         preferences.edit().putInt("selected_branch_id", branch.id).apply()
         products = emptyList()
         productsError = null
-        loadProducts(branch.id, selectedCategory?.id)
+        loadProducts(branch.id, effectiveCategoryId())
     }
 
     fun loadBranches() {
@@ -158,7 +169,7 @@ class CatalogViewModel(
             try {
                 val result = repository.getProducts(branchId, categoryId)
                 if (requestId != productsRequestId || selectedBranch?.id != branchId ||
-                    selectedCategory?.id != categoryId) return@launch
+                    effectiveCategoryId() != categoryId) return@launch
                 products = result
             } catch (e: CancellationException) {
                 throw e
@@ -176,7 +187,7 @@ class CatalogViewModel(
         if (branches.isEmpty()) loadBranches()
         if (categories.isEmpty()) loadCategories()
         if (branches.isNotEmpty()) selectedBranch?.let {
-            loadProducts(it.id, selectedCategory?.id)
+            loadProducts(it.id, effectiveCategoryId())
         }
     }
 }
