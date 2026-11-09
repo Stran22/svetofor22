@@ -81,6 +81,7 @@ final class PushNotificationService
 
             try {
                 $response = $this->send(
+                    (int)$subscription['subscription_id'],
                     (int)$subscription['user_id'],
                     (string)$subscription['product_name'],
                     (string)$subscription['branch_name'],
@@ -133,7 +134,7 @@ final class PushNotificationService
              JOIN branches b ON b.id=s.branch_id
              JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id AND st.quantity>0
              WHERE s.status='active' AND p.is_active=1 AND b.is_active=1 AND d.attempt_count<10
-               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE','TARGET_INACTIVE')
+               AND COALESCE(d.last_error,'') NOT IN ('NO_SUBSCRIBED_DEVICES','FCM_DEVICE_DELIVERY_INCOMPLETE','STOCK_NO_LONGER_AVAILABLE','SUBSCRIPTION_INACTIVE','TARGET_INACTIVE')
                AND (
                     d.status='pending'
                     OR (d.status='failed' AND (d.attempted_at IS NULL OR d.attempted_at<DATE_SUB(NOW(), INTERVAL 15 MINUTE)))
@@ -151,6 +152,7 @@ final class PushNotificationService
             }
             try {
                 $response = $this->send(
+                    (int)$item['subscription_id'],
                     (int)$item['user_id'],
                     (string)$item['product_name'],
                     (string)$item['branch_name'],
@@ -281,7 +283,7 @@ final class PushNotificationService
      * Sends to registered FCM devices. Successful device sends are remembered
      * across queue retries so an intermittent failure does not resend to them.
      */
-    private function send(int $userId, string $productName, string $branchName, int $productId, int $branchId, string $eventKey): array
+    private function send(int $subscriptionId, int $userId, string $productName, string $branchName, int $productId, int $branchId, string $eventKey): array
     {
         $pdo = Database::connection();
         $tokens = $pdo->prepare('SELECT id,fcm_token FROM user_push_tokens WHERE user_id=:user_id ORDER BY id');
@@ -296,7 +298,7 @@ final class PushNotificationService
         $body = $productName . ' снова в наличии в магазине «' . $branchName . '».';
         foreach ($devices as $device) {
             $tokenId = (int)$device['id'];
-            $hash = hash('sha256', $eventKey . ':' . $tokenId);
+            $hash = hash('sha256', $subscriptionId . ':' . $eventKey . ':' . $tokenId);
             $previous = $pdo->prepare('SELECT status FROM fcm_device_deliveries WHERE event_hash=:hash LIMIT 1');
             $previous->execute(['hash' => $hash]);
             $previousStatus = $previous->fetchColumn();
