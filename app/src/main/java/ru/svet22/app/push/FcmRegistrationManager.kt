@@ -1,97 +1,143 @@
 package ru.svet22.app.push
 
 import android.content.Context
+import android.util.Log
 import com.google.firebase.messaging.FirebaseMessaging
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
- * Registers this installation and its FCM token with the device-authenticated API.
- * Network operations never run on the main thread.
+ * Registers the Android installation and its Firebase token with the legacy Svet22 API.
+ * Does not print credentials, bearer tokens, or FCM tokens to Logcat.
  */
 object FcmRegistrationManager {
-    private const val BASE_URL = "https://baza.altaj-otdyh.ru/api/v1"
+    private const val TAG = "SVET22_FCM"
+    private const val BASE_URL = "https://baza.altaj-otdyh.ru"
     private const val PREFS = "svet22_device_auth"
-    private const val DEVICE_ID = "device_id"
-    private const val ACCESS_TOKEN = "access_token"
+    private const val KEY_DEVICE_ID = "device_id"
+    private const val KEY_ACCESS_TOKEN = "access_token"
     private val executor = Executors.newSingleThreadExecutor()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+    private val jsonType = "application/json; charset=utf-8".toMediaType()
 
-    fun register(context: Context) {
+    /** Call at application startup; safe to call repeatedly. */
+    fun registerCurrentToken(context: Context) {
         val appContext = context.applicationContext
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            registerToken(appContext, token)
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful || task.result.isNullOrBlank()) {
+                Log.w(TAG, "FCM token is not available", task.exception)
+                return@addOnCompleteListener
+            }
+            registerToken(appContext, task.result!!)
         }
     }
 
+    /** Call from FirebaseMessagingService.onNewToken(token). */
     fun registerToken(context: Context, fcmToken: String) {
         if (fcmToken.isBlank()) return
         val appContext = context.applicationContext
         executor.execute {
             try {
                 val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                val deviceId = prefs.getString(DEVICE_ID, null)
-                    ?: UUID.randomUUID().toString().also {
-                        prefs.edit().putString(DEVICE_ID, it).apply()
+                var deviceId = prefs.getString(KEY_DEVICE_ID, null)
+                if (deviceId.isNullOrBlank()) {
+                    deviceId = UUID.randomUUID().toString()
+                    if (!prefs.edit().putString(KEY_DEVICE_ID, deviceId).commit()) {
+                        throw IOException("Cannot persist device ID")
                     }
-
-                fun authenticate(): String? {
-                    val (status, body) = post(
-                        "/auth/device",
-                        JSONObject().put("device_id", deviceId),
-                        null
-                    )
-                    if (status !in 200..299) return null
-                    val json = JSONObject(body)
-                    val token = json.optString("access_token").ifBlank {
-                        json.optString("token").ifBlank {
-                            json.optJSONObject("data")?.optString("access_token").orEmpty()
-                        }
+                }
+                var bearer = prefs.getString(KEY_ACCESS_TOKEN, null)
+                if (bearer.isNullOrBlank()) {
+                    bearer = authenticateDevice(deviceId)
+                    if (!prefs.edit().putString(KEY_ACCESS_TOKEN, bearer).commit()) {
+                        throw IOException("Cannot persist authorization")
                     }
-                    if (token.isBlank()) return null
-                    prefs.edit().putString(ACCESS_TOKEN, token).apply()
-                    return token
                 }
-
-                var accessToken = prefs.getString(ACCESS_TOKEN, null)
-                    ?.takeIf { it.isNotBlank() } ?: authenticate() ?: return@execute
-
-                val payload = JSONObject()
-                    .put("fcm_token", fcmToken)
-                    .put("platform", "android")
-
-                var (status, _) = post("/push/register", payload, accessToken)
-                if (status == HttpURLConnection.HTTP_UNAUTHORIZED) {
-                    prefs.edit().remove(ACCESS_TOKEN).apply()
-                    accessToken = authenticate() ?: return@execute
-                    status = post("/push/register", payload, accessToken).first
+                var response = postPushToken(fcmToken, bearer)
+                if (response == 401) {
+                    // The server may have revoked an old bearer token.
+                    bearer = authenticateDevice(deviceId)
+                    if (!prefs.edit().putString(KEY_ACCESS_TOKEN, bearer).commit()) {
+                        throw IOException("Cannot persist refreshed authorization")
+                    }
+                    response = postPushToken(fcmToken, bearer)
                 }
-                // A later startup or FCM token refresh retries transient failures.
-            } catch (_: Exception) {
-                // Never log device credentials or FCM tokens.
+                if (response in 200..299) {
+                    Log.i(TAG, "FCM token registered on server")
+                } else {
+                    Log.w(TAG, "FCM registration failed: HTTP $response")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "FCM registration failed", e)
             }
         }
     }
 
-    private fun post(path: String, payload: JSONObject, bearer: String?): Pair<Int, String> {
-        val connection = (URL(BASE_URL + path).openConnection() as HttpURLConnection)
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.setRequestProperty("Accept", "application/json")
-            if (bearer != null) connection.setRequestProperty("Authorization", "Bearer $bearer")
-            connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            return status to body
-        } finally {
-            connection.disconnect()
+    // Shared device authorization for FCM and product subscriptions.
+    // Call from a background thread (for example, Dispatchers.IO).
+    @Synchronized
+    fun getAccessToken(context: Context): String {
+        val prefs = context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        val savedToken = prefs.getString(KEY_ACCESS_TOKEN, null)
+        if (!savedToken.isNullOrBlank()) return savedToken
+
+        var deviceId = prefs.getString(KEY_DEVICE_ID, null)
+        if (deviceId.isNullOrBlank()) {
+            deviceId = UUID.randomUUID().toString()
+            if (!prefs.edit().putString(KEY_DEVICE_ID, deviceId).commit()) {
+                throw IOException("Cannot persist device ID")
+            }
+        }
+
+        val newToken = authenticateDevice(deviceId)
+        if (!prefs.edit().putString(KEY_ACCESS_TOKEN, newToken).commit()) {
+            throw IOException("Cannot persist authorization")
+        }
+        return newToken
+    }
+
+    private fun authenticateDevice(deviceId: String): String {
+        val body = JSONObject().put("device_id", deviceId).toString()
+        val request = Request.Builder()
+            .url("$BASE_URL/api/v1/auth/device")
+            .post(body.toRequestBody(jsonType))
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("Device authorization failed: HTTP ${response.code}")
+            }
+            val json = JSONObject(response.body?.string() ?: "{}")
+            // Supports both a direct API response and a {success, data} envelope.
+            val data = json.optJSONObject("data") ?: json
+            return data.optString("access_token").takeIf { it.isNotBlank() }
+                ?: throw IOException("Missing access_token in device authorization response")
+        }
+    }
+
+    private fun postPushToken(fcmToken: String, bearer: String): Int {
+        val body = JSONObject()
+            .put("fcm_token", fcmToken)
+            .put("platform", "android")
+            .toString()
+        val request = Request.Builder()
+            .url("$BASE_URL/api/v1/push/register")
+            .header("Authorization", "Bearer $bearer")
+            .post(body.toRequestBody(jsonType))
+            .build()
+        client.newCall(request).execute().use { response ->
+            return response.code
         }
     }
 }
