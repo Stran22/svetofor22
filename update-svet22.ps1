@@ -50,7 +50,7 @@ foreach ($file in $files) {
     $temp = [System.IO.Path]::GetTempFileName()
     try {
         $encodedPath = ($relative.Split('/') | ForEach-Object { [uri]::EscapeDataString($_) }) -join '/'
-        $info = Get-GitHubJson "https://api.github.com/repos/$ownerRepo/contents/$encodedPath?ref=$revision"
+        $info = Get-GitHubJson ("https://api.github.com/repos/{0}/contents/{1}?ref={2}" -f $ownerRepo, $encodedPath, $revision)
         if ($info.type -ne 'file' -or $info.encoding -ne 'base64') {
             throw "Unexpected GitHub API response for $file"
         }
