@@ -45,7 +45,7 @@ $unchanged = 0
 foreach ($entry in $entries) {
     $relative = [string]$entry.path
     $file = $relative.Substring($prefix.Length)
-    if ($relative -match '(^|/)\\.\\.(/|$)' -or $relative -match '[\\x00-\\x1f]') { throw "Unsafe repository path: $relative" }
+    if ($relative -match '(^|/)\.\.(/|$)' -or $relative -match '[\x00-\x1f]') { throw "Unsafe repository path: $relative" }
     $destination = Join-Path $project ($relative.Replace('/', '\'))
     $temp = [System.IO.Path]::GetTempFileName()
     try {
