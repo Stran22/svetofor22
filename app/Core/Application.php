@@ -12,6 +12,7 @@ use App\Controllers\OAuthController;
 use App\Controllers\PriceHistoryController;
 use App\Controllers\ReviewsController;
 use App\Controllers\SubscriptionController;
+use App\Controllers\PushTokenController;
 use App\Controllers\SystemController;
 use Throwable;
 
@@ -31,6 +32,7 @@ final class Application
         $priceHistory = new PriceHistoryController();
         $reviews = new ReviewsController();
         $subscriptions = new SubscriptionController();
+        $pushTokens = new PushTokenController();
 
         $router->get('/api/v1/health', [$system, 'health']);
         $router->get('/api/v1/branches', [$catalog, 'branches']);
@@ -43,6 +45,8 @@ final class Application
         $router->get('/api/v1/subscriptions', [$subscriptions, 'index']);
         $router->post('/api/v1/subscriptions', [$subscriptions, 'create']);
         $router->post('/api/v1/subscriptions/cancel', [$subscriptions, 'cancel']);
+        $router->post('/api/v1/push/register', [$pushTokens, 'register']);
+        $router->post('/api/v1/push/unregister', [$pushTokens, 'unregister']);
 
         $router->post('/api/v1/auth/guest', [$auth, 'guest']);
         $router->get('/api/v1/auth/me', [$auth, 'me']);
