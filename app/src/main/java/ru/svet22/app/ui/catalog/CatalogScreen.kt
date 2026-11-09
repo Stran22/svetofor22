@@ -145,15 +145,23 @@ fun CatalogScreen(
                     label = { Text(if (vm.globalSearchMode) "Название, штрихкод или артикул" else "Поиск в категории") }
                 )
             }
-            if (selected != null) {
+            if (selected != null || vm.globalSearchMode) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 ) {
-                    IconButton(onClick = vm::clearCategory) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "К разделам")
+                    IconButton(onClick = {
+                        if (vm.globalSearchMode) {
+                            searchExpanded = false
+                            vm.changeGlobalSearchMode(false)
+                            vm.clearCategory()
+                        } else {
+                            vm.clearCategory()
+                        }
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Вернуться в каталог")
                     }
-                    Text(selected.name, style = MaterialTheme.typography.titleLarge)
+                    Text(selected?.name ?: "Результаты поиска", style = MaterialTheme.typography.titleLarge)
                 }
             }
             val showError = vm.branchesError ?: vm.categoriesError ?:
