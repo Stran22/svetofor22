@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ImageNotSupported
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -107,6 +108,7 @@ fun ProductDetailScreen(
     var showLoginDialog by remember {
         mutableStateOf(false)
     }
+    var showTrackingDialog by remember(product.id) { mutableStateOf(false) }
     // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
 
     // Остатки по каждому филиалу загружаются независимо.
@@ -279,6 +281,26 @@ fun ProductDetailScreen(
 
         // ===== КОНЕЦ БЛОКА: Остатки во всех филиалах =====
 
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { showTrackingDialog = true },
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = ProductRed,
+                contentColor = Color.White
+            )
+        ) {
+            Icon(Icons.Default.NotificationsActive, contentDescription = null)
+            Spacer(Modifier.size(10.dp))
+            Text("Следить за товаром", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Уведомления о появлении товара станут доступны после подключения подписок.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(24.dp))
 
         // ===== НАЧАЛО БЛОКА: Переключатель вкладок =====
@@ -322,6 +344,25 @@ fun ProductDetailScreen(
             }
         )
         // ===== КОНЕЦ БЛОКА: Общий блок отзывов =====
+    }
+
+    if (showTrackingDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrackingDialog = false },
+            title = { Text("Отслеживание товара") },
+            text = {
+                Text("Для отслеживания товара потребуется вход в аккаунт. Подписка и уведомления пока не подключены к серверу.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTrackingDialog = false
+                    onLoginClick()
+                }) { Text("Перейти в профиль") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrackingDialog = false }) { Text("Закрыть") }
+            }
+        )
     }
 
     // ===== НАЧАЛО БЛОКА: Диалог авторизации =====
