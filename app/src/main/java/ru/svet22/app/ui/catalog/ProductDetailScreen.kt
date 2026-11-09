@@ -113,8 +113,9 @@ fun ProductDetailScreen(
         mutableStateOf(false)
     }
     var showTrackingDialog by remember(product.id) { mutableStateOf(false) }
-    val subscriptionRepository = remember(LocalContext.current) {
-        SubscriptionRepository(it.applicationContext)
+    val appContext = LocalContext.current.applicationContext
+    val subscriptionRepository = remember(appContext) {
+        SubscriptionRepository(appContext)
     }
     val trackingScope = rememberCoroutineScope()
     var trackingBusy by remember(product.id) { mutableStateOf(false) }
