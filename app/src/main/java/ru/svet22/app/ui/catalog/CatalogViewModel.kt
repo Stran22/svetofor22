@@ -3,7 +3,8 @@ package ru.svet22.app.ui.catalog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -14,8 +15,12 @@ import ru.svet22.app.data.model.Product
 import ru.svet22.app.data.repository.ProductRepository
 
 class CatalogViewModel(
-    private val repository: ProductRepository = ProductRepository()
-) : ViewModel() {
+    application: Application
+) : AndroidViewModel(application) {
+    private val repository = ProductRepository()
+    private val preferences = application.getSharedPreferences("svet22_catalog", 0)
+    private val savedBranchId = preferences.getInt("selected_branch_id", -1)
+
     var branches by mutableStateOf<List<Branch>>(emptyList())
         private set
     var categories by mutableStateOf<List<Category>>(emptyList())
@@ -72,6 +77,7 @@ class CatalogViewModel(
     fun selectBranch(branch: Branch) {
         if (selectedBranch?.id == branch.id) return
         selectedBranch = branch
+        preferences.edit().putInt("selected_branch_id", branch.id).apply()
         products = emptyList()
         productsError = null
         loadProducts(branch.id, selectedCategory?.id)
@@ -90,6 +96,7 @@ class CatalogViewModel(
                 branches = result
                 val current = selectedBranch
                 val chosen = current?.let { old -> result.find { it.id == old.id } }
+                    ?: result.find { it.id == savedBranchId }
                     ?: result.firstOrNull()
                 if (chosen == null) {
                     selectedBranch = null
