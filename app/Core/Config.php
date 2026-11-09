@@ -34,6 +34,10 @@ final class Config
                 'charset' => getenv('DB_CHARSET') ?: 'utf8mb4',
                 'timezone' => getenv('DB_TIMEZONE') ?: '+07:00',
             ],
+            'firebase' => [
+                'project_id' => getenv('FIREBASE_PROJECT_ID') ?: '',
+                'credentials_path' => getenv('FIREBASE_CREDENTIALS_PATH') ?: '',
+            ],
             'onesignal' => [
                 'app_id' => getenv('ONESIGNAL_APP_ID') ?: '',
                 'rest_api_key' => getenv('ONESIGNAL_REST_API_KEY') ?: '',
