@@ -26,7 +26,8 @@ $unchanged = 0
 foreach ($file in $files) {
     $relative = "$source/$file"
     $destination = Join-Path $project ($relative.Replace('/', '\'))
-    $url = "$repo/$relative"
+    # Unique query prevents stale cached Raw GitHub responses.
+    $url = "$repo/$relative?refresh=$([guid]::NewGuid().ToString('N'))"
     $temp = [System.IO.Path]::GetTempFileName()
     try {
         Invoke-WebRequest -Uri $url -OutFile $temp -UseBasicParsing -ErrorAction Stop
