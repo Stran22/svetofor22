@@ -716,9 +716,10 @@ private fun ProductDetailImage(
                 var connection: HttpURLConnection? = null
 
                 try {
-                    val url = URL(imageUrl)
+                    // API может вернуть как полный HTTPS-адрес, так и путь /uploads/...
+                    val url = URL(URL("https://baza.altaj-otdyh.ru/"), imageUrl.trim())
 
-                    if (url.protocol != "https") {
+                    if (url.protocol != "https" || url.host != "baza.altaj-otdyh.ru") {
                         null
                     } else {
                         connection = url.openConnection() as HttpURLConnection
