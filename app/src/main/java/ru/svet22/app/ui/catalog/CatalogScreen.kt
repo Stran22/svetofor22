@@ -253,10 +253,16 @@ private fun CategoryPhoto(url: String?, categoryName: String, modifier: Modifier
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
         value = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
             runCatching {
-                val connection = URL(url).openConnection()
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.getInputStream().use { BitmapFactory.decodeStream(it) }
+                // Поддерживаем относительные пути фотографий из API.
+                val imageUrl = URL(URL("https://baza.altaj-otdyh.ru/"), url.trim())
+                if (imageUrl.protocol != "https" || imageUrl.host != "baza.altaj-otdyh.ru") {
+                    null
+                } else {
+                    val connection = imageUrl.openConnection()
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    connection.getInputStream().use { BitmapFactory.decodeStream(it) }
+                }
             }.getOrNull()
         }
     }
