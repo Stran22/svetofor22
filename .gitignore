@@ -1,0 +1,14 @@
+/vendor/
+/.env
+/.env.*
+!/.env.example
+/backend/config/config.php
+/backend/storage/
+/backend/public/uploads/**
+!/backend/public/uploads/products/
+!/backend/public/uploads/products/.htaccess
+*.bak
+*.backup-*
+*.tmp
+*1.php
+*2.php

@@ -1,0 +1,35 @@
+{
+  "name": "stran22/svet22-backend",
+  "description": "Backend API каталога Svet22",
+  "type": "project",
+  "require": {
+    "php": "^8.5",
+    "ext-json": "*",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "phpoffice/phpspreadsheet": "^2.2",
+    "ext-fileinfo": "*",
+    "ext-mbstring": "*",
+    "ext-zip": "*",
+    "ext-xml": "*",
+    "ext-xmlreader": "*",
+    "ext-xmlwriter": "*",
+    "ext-simplexml": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Svet22\\": "backend/app/"
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true,
+    "platform": {
+      "php": "8.5.12"
+    }
+  },
+  "scripts": {
+    "lint": "find backend tests bin -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "test": "php tests/backend/run.php && php tests/backend/integration.php"
+  }
+}

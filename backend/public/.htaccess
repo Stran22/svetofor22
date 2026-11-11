@@ -1,0 +1,14 @@
+CGIPassAuth On
+SetEnv SVET_CONFIG_FILE /var/www/prorock/data/secure/svet22/config.php
+Options -Indexes
+RewriteEngine On
+
+# Не отдаём скрытые файлы и служебные каталоги.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Реальные файлы и каталоги обслуживает Apache напрямую.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
