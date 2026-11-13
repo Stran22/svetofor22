@@ -72,5 +72,11 @@ jobs:
           done
           mysql --protocol=tcp -h 127.0.0.1 -P 3306 -u "$SVET_TEST_USER" -p"$SVET_TEST_PASSWORD" svet22_test -e "INSERT INTO branches (code, name, is_active) VALUES ('test-branch', 'Test Branch', 1)"
 
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
       - name: MySQL integration tests
         run: php tests/backend/mysql_integration.php
+
+      - name: XLSX end-to-end integration tests
+        run: php tests/backend/xlsx_integration.php
