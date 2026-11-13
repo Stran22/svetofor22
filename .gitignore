@@ -12,3 +12,26 @@
 *.tmp
 *1.php
 *2.php
+
+# Android Studio / Gradle
+.gradle/
+**/.gradle/
+**/build/
+build/
+local.properties
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.ap_
+*.jks
+*.keystore
+*.hprof
+*.log
+
+# Firebase private credentials
+**/service-account*.json
+**/*firebase-adminsdk*.json
