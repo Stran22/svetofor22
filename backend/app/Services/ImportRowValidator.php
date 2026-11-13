@@ -43,31 +43,39 @@ final class ImportRowValidator
 
     public function validateMapping(array $mapping, int $columnCount): array
     {
-        $allowed = ['barcode', 'name', 'quantity', 'price'];
-        $required = ['barcode', 'name', 'quantity', 'price'];
+        $allowed = ['barcode', 'article', 'name', 'price', 'quantity', 'unit', 'category', 'manufacturer'];
+        $required = ['name', 'price', 'quantity'];
 
         foreach ($required as $field) {
-            if (!array_key_exists($field, $mapping)) {
-                throw new \InvalidArgumentException(
+            if (!array_key_exists($field, $mapping) || $mapping[$field] === '' || $mapping[$field] === null) {
+                throw new \\InvalidArgumentException(
                     'Не выбрана колонка для поля: ' . $this->label($field) . '.'
                 );
             }
+        }
+
+        if ((!array_key_exists('barcode', $mapping) || $mapping['barcode'] === '' || $mapping['barcode'] === null)
+            && (!array_key_exists('article', $mapping) || $mapping['article'] === '' || $mapping['article'] === null)) {
+            throw new \\InvalidArgumentException('Выберите хотя бы один идентификатор: штрихкод или артикул.');
         }
 
         $result = [];
         $used = [];
 
         foreach ($allowed as $field) {
-            $index = filter_var($mapping[$field] ?? null, FILTER_VALIDATE_INT);
+            if (!array_key_exists($field, $mapping) || $mapping[$field] === '' || $mapping[$field] === null) {
+                continue;
+            }
 
+            $index = filter_var($mapping[$field], FILTER_VALIDATE_INT);
             if ($index === false || $index < 0 || $index >= $columnCount) {
-                throw new \InvalidArgumentException(
+                throw new \\InvalidArgumentException(
                     'Некорректный номер колонки для поля: ' . $this->label($field) . '.'
                 );
             }
 
             if (isset($used[$index])) {
-                throw new \InvalidArgumentException(
+                throw new \\InvalidArgumentException(
                     'Одна колонка Excel не может соответствовать нескольким полям.'
                 );
             }
