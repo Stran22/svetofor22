@@ -49,7 +49,7 @@ function makeXlsx(array $row): string
 {
     $sheet = new Spreadsheet();
     $tab = $sheet->getActiveSheet();
-    $tab->fromArray([['Barcode', 'Article', 'Name', 'Price', 'Quantity'], $row]);
+    $tab->fromArray([['Barcode', 'Article', 'Name', 'Price', 'Quantity', 'Unit'], [...$row, 'pcs']]);
     $path = tempnam(sys_get_temp_dir(), 'svet22_xlsx_');
     if ($path === false) {
         throw new RuntimeException('Cannot create temporary XLSX path.');
@@ -86,7 +86,7 @@ try {
     assertImport((float) $history->fetchColumn() === 17.25, 'daily price history is updated');
 
     // Same file bytes but a different valid mapping must not be treated as duplicate.
-    $changedMapping = ['barcode' => 1, 'article' => 0, 'name' => 2, 'price' => 3, 'quantity' => 4];
+    $changedMapping = $mapping + ['unit' => 5];
     $remapped = $service->import($firstFile, 'remapped.xlsx', (int) $branchId, null, $date, $changedMapping);
     $uploadIds[] = (int) $remapped['upload_id'];
     assertImport(($remapped['duplicate'] ?? true) === false, 'changed mapping bypasses duplicate detection');
