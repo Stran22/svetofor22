@@ -93,16 +93,18 @@ final class AdminController
                 $content .= '<option value="' . (int) $branch['id'] . '">' . AdminView::e($branch['name']) . '</option>';
             }
             $content .= '</select></label><label>Файл Excel (.xlsx)<input type="file" name="xlsx_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>'
-                . '<p class="muted">Максимальный размер — 5 МБ. Требуемые столбцы: Название, Цена, Остаток. Дополнительно поддерживаются: Штрихкод, Артикул, Единица измерения, Категория, Производитель. Одинаковое содержимое в тот же филиал и день повторно не обрабатывается, даже под другим именем. Если содержимое файла отличается, товары сравниваются по значениям: неизменившиеся строки пропускаются.</p>'
+                . '<p class="muted">Максимальный размер — 5 МБ. Обязательны: Название, Цена, Остаток и хотя бы один идентификатор — Штрихкод или Артикул. Дополнительно поддерживаются: Единица измерения, Категория, Производитель. Для нестандартных выгрузок сначала настройте соответствие колонок ниже. Одинаковое содержимое в тот же филиал и день повторно не обрабатывается, даже под другим именем.</p>'
                 . '<button type="submit">Загрузить и обработать</button></form></section>';
         }
-        $mappingLinks = '<section class="card"><h2>Соответствие колонок по филиалам</h2><ul>';
-        foreach ($branches as $branchRow) {
-            $mappingLinks .= '<li><a href="/admin/import/mapping?branch_id=' . (int) $branchRow['id'] . '">Настроить: '
-                . AdminView::e($branchRow['name']) . '</a></li>';
+        if (($admin['role'] ?? '') === 'admin' && $branches) {
+            $mappingLinks = '<section class="card"><h2>Соответствие колонок по филиалам</h2><ul>';
+            foreach ($branches as $branchRow) {
+                $mappingLinks .= '<li><a href="/admin/import/mapping?branch_id=' . (int) $branchRow['id'] . '">Настроить: '
+                    . AdminView::e($branchRow['name']) . '</a></li>';
+            }
+            $mappingLinks .= '</ul></section>';
+            $content .= $mappingLinks;
         }
-        $mappingLinks .= '</ul></section>';
-        $content .= $mappingLinks;
         $this->page('Импорт Excel', $content, $admin);
     }
 
