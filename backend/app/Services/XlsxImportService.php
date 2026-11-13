@@ -63,14 +63,15 @@ final class XlsxImportService
         // Store a SHA-256 fingerprint of the file together with its effective mapping.
         // Canonical field ordering keeps the fingerprint stable across equivalent mappings.
         ksort($columns);
-        $importFingerprint = hash('sha256', $hash . ':' . json_encode($columns, JSON_THROW_ON_ERROR));
+        $mappingFingerprint = hash('sha256', json_encode($columns, JSON_THROW_ON_ERROR));
         $duplicate = $this->db->prepare(
             "SELECT id FROM upload_log
-             WHERE branch_id = ? AND recorded_date = ? AND file_sha256 = ? AND status = 'completed' AND rows_failed = 0
+             WHERE branch_id = ? AND recorded_date = ? AND file_sha256 = ? AND mapping_sha256 = ?
+               AND status = 'completed' AND rows_failed = 0
              ORDER BY id DESC LIMIT 1"
         );
         try {
-            $duplicate->execute([$branchId, $recordedDate, $importFingerprint]);
+            $duplicate->execute([$branchId, $recordedDate, $hash, $mappingFingerprint]);
             $previous = $duplicate->fetchColumn();
             if ($previous !== false) {
                 $spreadsheet->disconnectWorksheets();
@@ -79,10 +80,10 @@ final class XlsxImportService
 
             $log = $this->db->prepare(
                 "INSERT INTO upload_log
-                 (branch_id, admin_id, original_filename, file_sha256, recorded_date, status)
-                 VALUES (?, ?, ?, ?, ?, 'processing')"
+                 (branch_id, admin_id, original_filename, file_sha256, mapping_sha256, recorded_date, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'processing')"
             );
-            $log->execute([$branchId, $adminId, mb_substr(basename($originalName), 0, 255), $importFingerprint, $recordedDate]);
+            $log->execute([$branchId, $adminId, mb_substr(basename($originalName), 0, 255), $hash, $mappingFingerprint, $recordedDate]);
             $uploadId = (int) $this->db->lastInsertId();
         } catch (Throwable $e) {
             $spreadsheet->disconnectWorksheets();
