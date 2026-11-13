@@ -20,6 +20,12 @@ return [
         'password' => 'CHANGE_ME',
         'charset' => 'utf8mb4',
     ],
+    // Firebase Cloud Messaging HTTP v1. Store service-account JSON outside the web root.
+    // Keep both fields empty until push delivery is configured.
+    'firebase' => [
+        'project_id' => '',
+        'credentials_path' => '/var/www/prorock/data/secure/svet22/firebase-service-account.json',
+    ],
     'security' => [
         'token_bytes' => 32,
         'health_token' => '',
