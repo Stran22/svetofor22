@@ -48,7 +48,7 @@ final class ImportRowValidator
 
         foreach ($required as $field) {
             if (!array_key_exists($field, $mapping)) {
-                throw new \\InvalidArgumentException(
+                throw new \InvalidArgumentException(
                     'Не выбрана колонка для поля: ' . $this->label($field) . '.'
                 );
             }
@@ -61,13 +61,13 @@ final class ImportRowValidator
             $index = filter_var($mapping[$field] ?? null, FILTER_VALIDATE_INT);
 
             if ($index === false || $index < 0 || $index >= $columnCount) {
-                throw new \\InvalidArgumentException(
+                throw new \InvalidArgumentException(
                     'Некорректный номер колонки для поля: ' . $this->label($field) . '.'
                 );
             }
 
             if (isset($used[$index])) {
-                throw new \\InvalidArgumentException(
+                throw new \InvalidArgumentException(
                     'Одна колонка Excel не может соответствовать нескольким полям.'
                 );
             }
