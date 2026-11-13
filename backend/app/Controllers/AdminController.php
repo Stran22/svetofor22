@@ -96,7 +96,156 @@ final class AdminController
                 . '<p class="muted">Максимальный размер — 5 МБ. Требуемые столбцы: Название, Цена, Остаток. Дополнительно поддерживаются: Штрихкод, Артикул, Единица измерения, Категория, Производитель. Одинаковое содержимое в тот же филиал и день повторно не обрабатывается, даже под другим именем. Если содержимое файла отличается, товары сравниваются по значениям: неизменившиеся строки пропускаются.</p>'
                 . '<button type="submit">Загрузить и обработать</button></form></section>';
         }
+        $mappingLinks = '<section class="card"><h2>Соответствие колонок по филиалам</h2><ul>';
+        foreach ($branches as $branchRow) {
+            $mappingLinks .= '<li><a href="/admin/import/mapping?branch_id=' . (int) $branchRow['id'] . '">Настроить: '
+                . AdminView::e($branchRow['name']) . '</a></li>';
+        }
+        $mappingLinks .= '</ul></section>';
+        $content .= $mappingLinks;
         $this->page('Импорт Excel', $content, $admin);
+    }
+
+    public function mappingPage(Request $request): never
+    {
+        $admin = $this->auth->requireRole('admin');
+        $branches = $this->activeBranches();
+        $selectedId = filter_var($request->query()['branch_id'] ?? null, FILTER_VALIDATE_INT);
+        $selectedId = $selectedId === false ? 0 : (int) $selectedId;
+        $content = $this->flashHtml()
+            . '<section class="card"><h2>Настройка колонок Excel</h2><p class="muted">Настройка сохраняется отдельно для каждого филиала. Сначала загрузите пример выгрузки, затем укажите, где находятся нужные данные.</p>'
+            . '<form method="get" action="/admin/import/mapping"><label>Филиал<select name="branch_id" required><option value="">Выберите филиал</option>';
+        foreach ($branches as $branchRow) {
+            $selected = (int) $branchRow['id'] === $selectedId ? ' selected' : '';
+            $content .= '<option value="' . (int) $branchRow['id'] . '"' . $selected . '>' . AdminView::e($branchRow['name']) . '</option>';
+        }
+        $content .= '</select></label><button type="submit">Выбрать филиал</button></form></section>';
+
+        if ($selectedId > 0) {
+            $branchCheck = $this->db->prepare('SELECT name FROM branches WHERE id = ? AND is_active = 1 LIMIT 1');
+            $branchCheck->execute([$selectedId]);
+            $branchName = $branchCheck->fetchColumn();
+            if ($branchName !== false) {
+                $service = new XlsxImportService($this->db);
+                $saved = $service->loadMapping($selectedId);
+                $content .= '<section class="card"><h2>Пример файла: ' . AdminView::e($branchName) . '</h2>'
+                    . '<form method="post" action="/admin/import/mapping/preview" enctype="multipart/form-data">'
+                    . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
+                    . '<input type="hidden" name="branch_id" value="' . $selectedId . '">'
+                    . '<label>Файл Excel (.xlsx)<input type="file" name="xlsx_file" accept=".xlsx" required></label>'
+                    . '<button type="submit">Показать колонки файла</button></form>'
+                    . ($saved ? '<p class="muted">Для этого филиала уже сохранено соответствие колонок. Новая настройка заменит предыдущую.</p>' : '<p class="muted">Соответствие колонок ещё не настроено.</p>')
+                    . '</section>';
+            } else {
+                $content .= AdminView::alert('Филиал не найден или отключён.', true);
+            }
+        }
+        $this->page('Настройка колонок Excel', $content, $admin);
+    }
+
+    public function previewMapping(Request $request): never
+    {
+        $admin = $this->auth->requireRole('admin');
+        $data = $request->post();
+        if (!$this->auth->verifyCsrf($data['csrf_token'] ?? null)) {
+            $this->flash('Форма устарела. Обновите страницу.', true);
+            Response::redirect('/admin/import/mapping');
+        }
+        $branchId = filter_var($data['branch_id'] ?? null, FILTER_VALIDATE_INT);
+        $file = $request->file('xlsx_file');
+        if ($branchId === false || $branchId < 1 || !$file || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+            || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
+            $this->flash('Выберите филиал и корректный XLSX-файл.', true);
+            Response::redirect('/admin/import/mapping');
+        }
+
+        try {
+            $service = new XlsxImportService($this->db);
+            $preview = $service->previewColumns(
+                (string) $file['tmp_name'],
+                (string) $file['name'],
+                (int) $branchId
+            );
+            $saved = $service->loadMapping((int) $branchId) ?? [];
+            $fields = [
+                'barcode' => 'Штрихкод',
+                'article' => 'Артикул',
+                'name' => 'Название товара',
+                'price' => 'Цена',
+                'quantity' => 'Остаток',
+                'unit' => 'Единица измерения',
+                'category' => 'Категория',
+                'manufacturer' => 'Производитель',
+            ];
+            $required = ['name', 'price', 'quantity'];
+            $content = '<section class="card"><p>Выберите номер колонки для каждого поля. Штрихкод и артикул необязательны по отдельности, но нужно выбрать хотя бы один из них.</p>'
+                . '<form method="post" action="/admin/import/mapping/save">'
+                . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
+                . '<input type="hidden" name="branch_id" value="' . (int) $branchId . '">'
+                . '<input type="hidden" name="column_count" value="' . (int) $preview['column_count'] . '">';
+            foreach ($fields as $key => $label) {
+                $content .= '<label>' . AdminView::e($label) . ($key === 'barcode' || $key === 'article' ? ' <span class="muted">(одно из двух обязательно)</span>' : (in_array($key, $required, true) ? ' *' : ''))
+                    . '<select name="mapping[' . $key . ']"><option value="">— не использовать —</option>';
+                foreach ($preview['headers'] as $index => $header) {
+                    $selected = isset($saved[$key]) && (int) $saved[$key] === $index ? ' selected' : '';
+                    $caption = 'Колонка ' . ($index + 1) . ': ' . ($header !== '' ? $header : '(без заголовка)');
+                    $content .= '<option value="' . (int) $index . '"' . $selected . '>' . AdminView::e($caption) . '</option>';
+                }
+                $content .= '</select></label>';
+            }
+            $content .= '<button type="submit">Сохранить соответствие колонок</button> <a href="/admin/import/mapping?branch_id=' . (int) $branchId . '">Отмена</a></form></section>';
+
+            $sampleRows = [];
+            foreach ($preview['samples'] as $sample) {
+                $cells = [];
+                foreach ($preview['headers'] as $index => $_header) {
+                    $cells[] = AdminView::e($sample[$index] ?? '');
+                }
+                $sampleRows[] = $cells;
+            }
+            $content .= '<section class="card"><h2>Первые строки файла</h2>'
+                . AdminView::table(array_map(
+                    static fn(int $index, string $header): string => 'Колонка ' . ($index + 1) . ': ' . ($header !== '' ? $header : '—'),
+                    array_keys($preview['headers']),
+                    $preview['headers']
+                ), $sampleRows, 'В файле нет строк с данными.')
+                . '</section>';
+            $this->page('Сопоставление колонок', $content, $admin);
+        } catch (\InvalidArgumentException $e) {
+            $this->flash($e->getMessage(), true);
+            Response::redirect('/admin/import/mapping?branch_id=' . (int) $branchId);
+        } catch (Throwable $e) {
+            error_log('[svet22-mapping-preview] ' . $e::class . ': ' . $e->getMessage());
+            $this->flash('Не удалось прочитать Excel-файл. Подробности записаны в журнал сервера.', true);
+            Response::redirect('/admin/import/mapping?branch_id=' . (int) $branchId);
+        }
+    }
+
+    public function saveMapping(Request $request): never
+    {
+        $admin = $this->auth->requireRole('admin');
+        $data = $request->post();
+        if (!$this->auth->verifyCsrf($data['csrf_token'] ?? null)) {
+            $this->flash('Форма устарела.', true);
+            Response::redirect('/admin/import/mapping');
+        }
+        $branchId = filter_var($data['branch_id'] ?? null, FILTER_VALIDATE_INT);
+        $columnCount = filter_var($data['column_count'] ?? null, FILTER_VALIDATE_INT);
+        $mapping = $data['mapping'] ?? null;
+        if ($branchId === false || $branchId < 1 || $columnCount === false || $columnCount < 1
+            || $columnCount > 16384 || !is_array($mapping)) {
+            $this->flash('Данные сопоставления некорректны. Повторите настройку.', true);
+            Response::redirect('/admin/import/mapping');
+        }
+        try {
+            $service = new XlsxImportService($this->db);
+            $validated = $service->saveMapping((int) $branchId, $mapping, (int) $columnCount);
+            $this->auth->audit((int) $admin['id'], 'import.mapping.save', 'branch', (int) $branchId, $validated, $request->clientIp());
+            $this->flash('Соответствие колонок сохранено для выбранного филиала.');
+        } catch (\InvalidArgumentException $e) {
+            $this->flash($e->getMessage(), true);
+        }
+        Response::redirect('/admin/import/mapping?branch_id=' . (int) $branchId);
     }
 
     public function import(Request $request): never
