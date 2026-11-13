@@ -107,7 +107,7 @@ final class XlsxImportService
                     try {
                         $outcome = $this->upsertRow($row, $branchId, $recordedDate);
                         $this->db->exec('RELEASE SAVEPOINT import_row');
-                    } catch (\\InvalidArgumentException $e) {
+                    } catch (\InvalidArgumentException $e) {
                         $this->db->exec('ROLLBACK TO SAVEPOINT import_row');
                         $this->db->exec('RELEASE SAVEPOINT import_row');
                         throw $e;
