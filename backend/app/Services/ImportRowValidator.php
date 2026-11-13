@@ -33,12 +33,9 @@ final class ImportRowValidator
             }
         }
 
-        foreach (['name', 'price', 'quantity'] as $required) {
-            if (!isset($map[$required])) {
-                throw new \InvalidArgumentException('Не найдена обязательная колонка: ' . $this->label($required) . '.');
-            }
-        }
-        return $map;
+        // Apply the same structural checks to automatically detected and manual mappings.
+        // In particular, a file without both barcode and article must fail before any writes.
+        return $this->validateMapping($map, count($headerRow));
     }
 
     public function validateMapping(array $mapping, int $columnCount): array
