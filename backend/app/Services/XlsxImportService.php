@@ -176,6 +176,12 @@ final class XlsxImportService
 
     public function saveMapping(int $branchId, array $mapping, int $columnCount): array
     {
+        $branch = $this->db->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1 LIMIT 1');
+        $branch->execute([$branchId]);
+        if (!$branch->fetchColumn()) {
+            throw new \InvalidArgumentException('Нельзя настроить колонки для отсутствующего или отключённого филиала.');
+        }
+
         $validated = $this->validator->validateMapping($mapping, $columnCount);
         $json = json_encode($validated, JSON_THROW_ON_ERROR);
         $stmt = $this->db->prepare(
