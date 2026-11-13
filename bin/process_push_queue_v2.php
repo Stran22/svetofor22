@@ -18,6 +18,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 use Svet22\Core\Config;
 use Svet22\Core\Database;
 use Svet22\Services\FirebasePushService;
+use Svet22\Services\PushDeliveryFinalizer;
 
 $send = in_array('--send', $argv, true);
 $limit = 20;
@@ -27,55 +28,6 @@ foreach ($argv as $arg) {
     }
 }
 
-/** Finalize parent only when every per-device delivery has a terminal result. */
-function finalizeEvent(PDO $db, int $deliveryId, int $subscriptionId): void
-{
-    $stmt = $db->prepare(
-        "SELECT COUNT(*) AS total,
-                COALESCE(SUM(status = 'sent'), 0) AS sent_count,
-                COALESCE(SUM(status IN ('failed','unknown')), 0) AS unconfirmed_count,
-                COALESCE(SUM(status IN ('pending','processing')), 0) AS outstanding
-         FROM push_device_deliveries WHERE delivery_id = ?"
-    );
-    $stmt->execute([$deliveryId]);
-    $counts = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ((int) $counts['total'] === 0 || (int) $counts['outstanding'] !== 0) {
-        return;
-    }
-
-    $anySent = (int) $counts['sent_count'] > 0;
-    $partial = $anySent && (int) $counts['unconfirmed_count'] > 0;
-    $summary = $partial ? 'Some device deliveries failed or are unknown'
-        : ($anySent ? null : 'No device delivery confirmed');
-    $stmt = $db->prepare(
-        "UPDATE push_delivery_log
-         SET status = ?, last_error = ?, sent_at = CASE WHEN ? = 1 THEN NOW() ELSE sent_at END,
-             updated_at = NOW()
-         WHERE id = ? AND status = 'processing'"
-    );
-    $stmt->execute([
-        $anySent ? 'sent' : 'failed',
-        $summary,
-        $anySent ? 1 : 0,
-        $deliveryId,
-    ]);
-
-    if ($anySent) {
-        $stmt = $db->prepare(
-            "UPDATE subscriptions
-             SET status = 'notified', notified_at = NOW(), last_push_error = ?
-             WHERE id = ? AND status = 'active'"
-        );
-        $stmt->execute([$summary, $subscriptionId]);
-    } else {
-        $stmt = $db->prepare(
-            "UPDATE subscriptions
-             SET last_push_error = 'No device delivery confirmed', push_attempts = push_attempts + 1
-             WHERE id = ? AND status = 'active'"
-        );
-        $stmt->execute([$subscriptionId]);
-    }
-}
 
 try {
     Config::load();
@@ -99,6 +51,7 @@ try {
     $sent = 0;
     $failed = 0;
     $push = new FirebasePushService($db);
+    $finalizer = new PushDeliveryFinalizer($db);
 
     try {
         // Recover interrupted attempts only after obtaining the exclusive worker lock.
@@ -120,7 +73,7 @@ try {
              FOR UPDATE"
         )->fetchAll(PDO::FETCH_ASSOC);
         foreach ($orphans as $orphan) {
-            finalizeEvent($db, (int) $orphan['id'], (int) $orphan['subscription_id']);
+            $finalizer->finalize((int) $orphan['id'], (int) $orphan['subscription_id']);
         }
         $db->commit();
 
@@ -209,7 +162,7 @@ try {
                      attempt_count=attempt_count+1, updated_at=NOW() WHERE id=?"
                 );
                 $stmt->execute(['Subscription inactive, push disabled, or token removed', $id]);
-                finalizeEvent($db, $deliveryId, $subscriptionId);
+                $finalizer->finalize($deliveryId, $subscriptionId);
                 $db->commit();
                 $processed++;
                 $failed++;
@@ -263,7 +216,7 @@ try {
             $providerId = $ok && is_string($result['provider_message_id'] ?? null)
                 ? substr($result['provider_message_id'], 0, 255) : null;
             $stmt->execute([$newStatus, $ok ? null : substr((string) $error, 0, 500), $newStatus, $providerId, $id]);
-            finalizeEvent($db, $deliveryId, $subscriptionId);
+            $finalizer->finalize($deliveryId, $subscriptionId);
             $db->commit();
 
             $processed++;
