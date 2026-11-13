@@ -42,24 +42,52 @@ final class XlsxImportService
             throw new \RuntimeException('Не удалось вычислить контрольную сумму файла.');
         }
 
+        // The same bytes can represent different data after the column mapping changes.
+        // Resolve and validate the mapping before checking whether this import is a duplicate.
+        $spreadsheet = IOFactory::load($filePath);
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+            $highestColumn = $sheet->getHighestDataColumn();
+            $columnCount = Coordinate::columnIndexFromString($highestColumn);
+            $savedMapping = $mapping === null ? $this->loadMapping($branchId) : null;
+            $columns = $mapping !== null
+                ? $this->validator->validateMapping($mapping, $columnCount)
+                : ($savedMapping !== null
+                    ? $this->validator->validateMapping($savedMapping, $columnCount)
+                    : $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn)));
+        } catch (Throwable $e) {
+            $spreadsheet->disconnectWorksheets();
+            throw $e;
+        }
+
+        // Store a SHA-256 fingerprint of the file together with its effective mapping.
+        // Canonical field ordering keeps the fingerprint stable across equivalent mappings.
+        ksort($columns);
+        $importFingerprint = hash('sha256', $hash . ':' . json_encode($columns, JSON_THROW_ON_ERROR));
         $duplicate = $this->db->prepare(
             "SELECT id FROM upload_log
              WHERE branch_id = ? AND recorded_date = ? AND file_sha256 = ? AND status = 'completed' AND rows_failed = 0
              ORDER BY id DESC LIMIT 1"
         );
-        $duplicate->execute([$branchId, $recordedDate, $hash]);
-        $previous = $duplicate->fetchColumn();
-        if ($previous !== false) {
-            return ['upload_id' => (int) $previous, 'status' => 'already_imported', 'duplicate' => true];
-        }
+        try {
+            $duplicate->execute([$branchId, $recordedDate, $importFingerprint]);
+            $previous = $duplicate->fetchColumn();
+            if ($previous !== false) {
+                $spreadsheet->disconnectWorksheets();
+                return ['upload_id' => (int) $previous, 'status' => 'already_imported', 'duplicate' => true];
+            }
 
-        $log = $this->db->prepare(
-            "INSERT INTO upload_log
-             (branch_id, admin_id, original_filename, file_sha256, recorded_date, status)
-             VALUES (?, ?, ?, ?, ?, 'processing')"
-        );
-        $log->execute([$branchId, $adminId, mb_substr(basename($originalName), 0, 255), $hash, $recordedDate]);
-        $uploadId = (int) $this->db->lastInsertId();
+            $log = $this->db->prepare(
+                "INSERT INTO upload_log
+                 (branch_id, admin_id, original_filename, file_sha256, recorded_date, status)
+                 VALUES (?, ?, ?, ?, ?, 'processing')"
+            );
+            $log->execute([$branchId, $adminId, mb_substr(basename($originalName), 0, 255), $importFingerprint, $recordedDate]);
+            $uploadId = (int) $this->db->lastInsertId();
+        } catch (Throwable $e) {
+            $spreadsheet->disconnectWorksheets();
+            throw $e;
+        }
 
         $stats = [
             'rows_total' => 0,
@@ -70,18 +98,8 @@ final class XlsxImportService
         ];
 
         try {
-            $spreadsheet = IOFactory::load($filePath);
             $sheet = $spreadsheet->getActiveSheet();
             $highestRow = $sheet->getHighestDataRow();
-            $highestColumn = $sheet->getHighestDataColumn();
-            $columnCount = Coordinate::columnIndexFromString($highestColumn);
-            $savedMapping = $mapping === null ? $this->loadMapping($branchId) : null;
-            // Revalidate saved mappings against the actual uploaded file.
-            $columns = $mapping !== null
-                ? $this->validator->validateMapping($mapping, $columnCount)
-                : ($savedMapping !== null
-                    ? $this->validator->validateMapping($savedMapping, $columnCount)
-                    : $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn)));
             $seen = [];
 
             $this->db->beginTransaction();
