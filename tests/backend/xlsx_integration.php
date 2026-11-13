@@ -146,7 +146,7 @@ try {
     $db->beginTransaction();
     try {
         $beforeRollback = (int) $db->query('SELECT COUNT(*) FROM push_delivery_log')->fetchColumn();
-        $enqueued = (new \\Svet22\\Services\\RestockNotificationService($db))
+        $enqueued = (new \Svet22\Services\RestockNotificationService($db))
             ->queueTransition($productId, (int) $branchId, '0', '1');
         assertImport($enqueued === 1, 'restock event can be queued inside a transaction');
         $db->rollBack();
@@ -159,7 +159,7 @@ try {
     $db->prepare("UPDATE subscriptions SET status = 'cancelled' WHERE id = ?")->execute([$subscriptionId]);
     $db->beginTransaction();
     try {
-        $enqueued = (new \\Svet22\\Services\\RestockNotificationService($db))
+        $enqueued = (new \Svet22\Services\RestockNotificationService($db))
             ->queueTransition($productId, (int) $branchId, '0', '1');
         assertImport($enqueued === 0, 'cancelled subscription does not enqueue notification');
     } finally {
