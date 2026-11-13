@@ -31,6 +31,15 @@ function expectInvalid(callable $callback, string $message): void
 $headers = $validator->normalizeHeaders(['Штрихкод', 'Наименование', 'Цена продажи', 'Количество']);
 expect($headers === ['barcode' => 0, 'name' => 1, 'price' => 2, 'quantity' => 3], 'header aliases are normalized');
 
+expectInvalid(
+    fn() => $validator->normalizeHeaders(['Наименование', 'Цена', 'Количество']),
+    'automatic headers require barcode or article'
+);
+expectInvalid(
+    fn() => $validator->normalizeHeaders(['Штрихкод', 'Название', 'Цена']),
+    'automatic headers require quantity'
+);
+
 $barcodeMapping = $validator->validateMapping([
     'barcode' => '0', 'name' => '1', 'price' => '2', 'quantity' => '3',
     'article' => '', 'unit' => '', 'category' => '', 'manufacturer' => '',
