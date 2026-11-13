@@ -24,7 +24,8 @@ final class XlsxImportService
         string $originalName,
         int $branchId,
         ?int $adminId = null,
-        ?DateTimeImmutable $date = null
+        ?DateTimeImmutable $date = null,
+        ?array $mapping = null
     ): array {
         $date ??= new DateTimeImmutable('now', new \DateTimeZone('Asia/Barnaul'));
         $recordedDate = $date->format('Y-m-d');
@@ -73,16 +74,20 @@ final class XlsxImportService
             $sheet = $spreadsheet->getActiveSheet();
             $highestRow = $sheet->getHighestDataRow();
             $highestColumn = $sheet->getHighestDataColumn();
-            $columns = $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn));
+            $columns = $mapping !== null
+                ? $this->validator->validateMapping($mapping, Coordinate::columnIndexFromString($highestColumn))
+                : ($this->loadMapping($branchId) ?? $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn)));
             $seen = [];
 
             $this->db->beginTransaction();
             for ($line = 2; $line <= $highestRow; $line++) {
                 $cells = $this->readRow($sheet, $line, $highestColumn);
-                if (isset($columns['barcode'])) {
-                    $cells[$columns['barcode']] = (string) $sheet
-                        ->getCell(Coordinate::stringFromColumnIndex($columns['barcode'] + 1) . $line)
-                        ->getFormattedValue();
+                foreach (['barcode', 'article'] as $identifierField) {
+                    if (isset($columns[$identifierField])) {
+                        $cells[$columns[$identifierField]] = (string) $sheet
+                            ->getCell(Coordinate::stringFromColumnIndex($columns[$identifierField] + 1) . $line)
+                            ->getFormattedValue();
+                    }
                 }
                 if ($this->isEmpty($cells)) {
                     continue;
@@ -135,6 +140,63 @@ final class XlsxImportService
             $fail->execute([mb_substr($e->getMessage(), 0, 60000), $uploadId]);
             throw $e;
         }
+    }
+
+    /**
+     * Read the first row and a few sample rows without changing the database.
+     */
+    public function previewColumns(string $filePath, string $originalName, int $branchId): array
+    {
+        $this->validateUpload($filePath, $originalName, $branchId);
+        $branch = $this->db->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1');
+        $branch->execute([$branchId]);
+        if (!$branch->fetchColumn()) {
+            throw new \\InvalidArgumentException('Выбранный филиал не найден или отключён.');
+        }
+
+        $spreadsheet = IOFactory::load($filePath);
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+            $highestColumn = $sheet->getHighestDataColumn();
+            $header = $this->readRow($sheet, 1, $highestColumn);
+            $samples = [];
+            $lastRow = min($sheet->getHighestDataRow(), 6);
+            for ($row = 2; $row <= $lastRow; $row++) {
+                $samples[] = $this->readRow($sheet, $row, $highestColumn);
+            }
+            return [
+                'headers' => array_map(static fn($value): string => trim((string) $value), $header),
+                'samples' => $samples,
+                'column_count' => count($header),
+            ];
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
+    public function saveMapping(int $branchId, array $mapping, int $columnCount): array
+    {
+        $validated = $this->validator->validateMapping($mapping, $columnCount);
+        $json = json_encode($validated, JSON_THROW_ON_ERROR);
+        $stmt = $this->db->prepare(
+            'INSERT INTO excel_column_mappings (branch_id, column_mapping)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE column_mapping = VALUES(column_mapping)'
+        );
+        $stmt->execute([$branchId, $json]);
+        return $validated;
+    }
+
+    public function loadMapping(int $branchId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT column_mapping FROM excel_column_mappings WHERE branch_id = ? LIMIT 1');
+        $stmt->execute([$branchId]);
+        $json = $stmt->fetchColumn();
+        if (!is_string($json) || $json === '') {
+            return null;
+        }
+        $mapping = json_decode($json, true);
+        return is_array($mapping) ? $mapping : null;
     }
 
     private function validateUpload(string $path, string $name, int $branchId): void
