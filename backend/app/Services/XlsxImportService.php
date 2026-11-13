@@ -102,11 +102,20 @@ final class XlsxImportService
                             throw new \InvalidArgumentException('Повтор идентификатора товара в этом файле.');
                         }
                     }
+                    // A failed row must not leave partially written products or stock.
+                    $this->db->exec('SAVEPOINT import_row');
+                    try {
+                        $outcome = $this->upsertRow($row, $branchId, $recordedDate);
+                        $this->db->exec('RELEASE SAVEPOINT import_row');
+                    } catch (\\InvalidArgumentException $e) {
+                        $this->db->exec('ROLLBACK TO SAVEPOINT import_row');
+                        $this->db->exec('RELEASE SAVEPOINT import_row');
+                        throw $e;
+                    }
+                    // Reserve identifiers only after the row has been saved.
                     foreach ($keys as $key) {
                         $seen[$key] = true;
                     }
-
-                    $outcome = $this->upsertRow($row, $branchId, $recordedDate);
                     if ($outcome === 'created') {
                         $stats['rows_created']++;
                     } elseif ($outcome === 'updated') {
