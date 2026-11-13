@@ -36,6 +36,8 @@ $uploadIds = [];
 $productId = null;
 $otherProductId = null;
 $otherBarcode = null;
+$testUserId = null;
+$subscriptionId = null;
 $mapping = ['barcode' => 0, 'article' => 1, 'name' => 2, 'price' => 3, 'quantity' => 4];
 $service = new XlsxImportService($db);
 $date = new DateTimeImmutable('2099-01-02 12:00:00', new DateTimeZone('Asia/Barnaul'));
@@ -74,6 +76,18 @@ try {
     $stmt->execute([$barcode]);
     $productId = (int) $stmt->fetchColumn();
     assertImport($productId > 0, 'product was created');
+    // Subscribe a disposable test user while the stock is zero.
+    $db->exec("INSERT INTO users (display_name, is_guest) VALUES ('XLSX integration user', 0)");
+    $testUserId = (int) $db->lastInsertId();
+    $subscribe = $db->prepare(
+        "INSERT INTO subscriptions (user_id, product_id, branch_id, status) VALUES (?, ?, ?, 'active')"
+    );
+    $subscribe->execute([$testUserId, $productId, $branchId]);
+    $subscriptionId = (int) $db->lastInsertId();
+    $queued = $db->prepare('SELECT COUNT(*) FROM push_delivery_log WHERE subscription_id = ?');
+    $queued->execute([$subscriptionId]);
+    assertImport((int) $queued->fetchColumn() === 0, 'zero stock does not enqueue a notification');
+
 
     $again = $service->import($firstFile, 'renamed.xlsx', (int) $branchId, null, $date, $mapping);
     assertImport(($again['duplicate'] ?? false) === true, 'identical file and mapping is skipped');
@@ -83,6 +97,9 @@ try {
     $second = $service->import($secondFile, 'updated.xlsx', (int) $branchId, null, $date, $mapping);
     $uploadIds[] = (int) $second['upload_id'];
     assertImport(($second['rows_updated'] ?? 0) === 1, 'new price and quantity update stock');
+    $queued->execute([$subscriptionId]);
+    assertImport((int) $queued->fetchColumn() === 1, 'zero to positive enqueues one notification');
+
     $stock = $db->prepare('SELECT price, quantity FROM stock WHERE product_id = ? AND branch_id = ?');
     $stock->execute([$productId, $branchId]);
     $values = $stock->fetch();
@@ -90,6 +107,14 @@ try {
     $history = $db->prepare('SELECT price FROM price_history WHERE product_id = ? AND branch_id = ? AND recorded_date = ?');
     $history->execute([$productId, $branchId, $date->format('Y-m-d')]);
     assertImport((float) $history->fetchColumn() === 17.25, 'daily price history is updated');
+    // Price-only changes while stock remains positive must not generate another event.
+    $priceFile = makeXlsx([$barcode, $article, 'Integration product', '18.00', '4']);
+    $files[] = $priceFile;
+    $priceOnly = $service->import($priceFile, 'price-only.xlsx', (int) $branchId, null, $date, $mapping);
+    $uploadIds[] = (int) $priceOnly['upload_id'];
+    $queued->execute([$subscriptionId]);
+    assertImport((int) $queued->fetchColumn() === 1, 'price-only update does not enqueue another notification');
+
 
     // Same file bytes but a different valid mapping must not be treated as duplicate.
     $changedMapping = $mapping + ['unit' => 5];
@@ -97,6 +122,9 @@ try {
     $uploadIds[] = (int) $remapped['upload_id'];
     assertImport(($remapped['duplicate'] ?? true) === false, 'changed mapping bypasses duplicate detection');
     assertImport(($remapped['rows_failed'] ?? 0) === 0, 'remapped file processes without validation failures');
+    $queued->execute([$subscriptionId]);
+    assertImport((int) $queued->fetchColumn() === 1, 'positive to zero does not enqueue notification');
+
     
     // Invalid rows are logged while valid rows in the same file still commit.
     $invalidFile = makeXlsx([
@@ -112,6 +140,9 @@ try {
     assertImport((int) $errorStmt->fetchColumn() === 3, 'invalid row number recorded in import_errors');
     $stock->execute([$productId, $branchId]);
     assertImport((float) $stock->fetch()['price'] === 19.50, 'valid row committed despite another row failing');
+    $queued->execute([$subscriptionId]);
+    assertImport((int) $queued->fetchColumn() === 2, 'second zero to positive transition enqueues a new event');
+
 
     // A barcode belonging to a different product must not silently overwrite it.
     $otherBarcode = 'T' . bin2hex(random_bytes(12));
@@ -134,6 +165,12 @@ try {
 
 } finally {
     // Imports commit internally; remove only uniquely generated test records.
+    if ($subscriptionId !== null) {
+        $db->prepare('DELETE FROM subscriptions WHERE id = ?')->execute([$subscriptionId]);
+    }
+    if ($testUserId !== null) {
+        $db->prepare('DELETE FROM users WHERE id = ?')->execute([$testUserId]);
+    }
     if ($otherProductId !== null && $otherProductId > 0 && $otherBarcode !== null) {
         $db->prepare('DELETE FROM products WHERE id = ? AND barcode = ?')
             ->execute([$otherProductId, $otherBarcode]);
