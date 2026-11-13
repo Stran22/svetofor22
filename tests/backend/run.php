@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
-use Svet22\\Services\\ImportRowValidator;
+use Svet22\Services\\ImportRowValidator;
 
 $validator = new ImportRowValidator();
 $passed = 0;
