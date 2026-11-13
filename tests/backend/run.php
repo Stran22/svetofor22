@@ -42,6 +42,12 @@ $articleMapping = $validator->validateMapping([
 ], 4);
 expect($articleMapping === ['article' => 0, 'name' => 1, 'price' => 2, 'quantity' => 3], 'article can replace barcode');
 
+$articleRow = $validator->validate(
+    ['A-001', 'Кефир', '89,90', '12'],
+    $articleMapping
+);
+expect($articleRow['article'] === 'A-001' && $articleRow['barcode'] === null, 'article-only rows are validated');
+
 expectInvalid(
     fn() => $validator->validateMapping(['name' => 0, 'price' => 1, 'quantity' => 2], 3),
     'mapping requires barcode or article'
