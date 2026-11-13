@@ -36,6 +36,7 @@ try {
     $finalizer = new PushDeliveryFinalizer($db);
 
     foreach ([
+        ['empty', [], 'processing', 'active'],
         ['sent', ['sent'], 'sent', 'notified'],
         ['partial', ['sent', 'failed'], 'sent', 'notified'],
         ['failed', ['failed', 'unknown'], 'failed', 'active'],
@@ -63,6 +64,22 @@ try {
             throw new RuntimeException('FAIL finalization scenario: ' . $case);
         }
         echo "PASS finalization: {$case}\n";
+        if ($case === 'partial') {
+            $errorStmt = $db->prepare('SELECT last_error FROM push_delivery_log WHERE id = ?');
+            $errorStmt->execute([$deliveryId]);
+            if (!str_contains((string) $errorStmt->fetchColumn(), 'Some device deliveries failed')) {
+                throw new RuntimeException('FAIL: partial delivery warning missing.');
+            }
+            echo "PASS finalization: partial failure is recorded\n";
+        }
+        if ($case === 'sent') {
+            $finalizer->finalize($deliveryId, $subscriptionId);
+            $subscription->execute([$subscriptionId]);
+            if ($subscription->fetchColumn() !== 'notified') {
+                throw new RuntimeException('FAIL: repeated success changed subscription.');
+            }
+            echo "PASS finalization: repeated success is safe\n";
+        }
         if ($case === 'failed') {
             $attempts = $db->prepare('SELECT push_attempts FROM subscriptions WHERE id=?');
             $attempts->execute([$subscriptionId]);
