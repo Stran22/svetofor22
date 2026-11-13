@@ -49,7 +49,11 @@ function makeXlsx(array $row): string
 {
     $sheet = new Spreadsheet();
     $tab = $sheet->getActiveSheet();
-    $tab->fromArray([['Barcode', 'Article', 'Name', 'Price', 'Quantity', 'Unit'], [...$row, 'pcs']]);
+    $rows = isset($row[0]) && is_array($row[0]) ? $row : [$row];
+    $tab->fromArray([
+        ['Barcode', 'Article', 'Name', 'Price', 'Quantity', 'Unit'],
+        ...array_map(static fn(array $cells): array => [...$cells, 'pcs'], $rows),
+    ]);
     $path = tempnam(sys_get_temp_dir(), 'svet22_xlsx_');
     if ($path === false) {
         throw new RuntimeException('Cannot create temporary XLSX path.');
@@ -91,6 +95,42 @@ try {
     $uploadIds[] = (int) $remapped['upload_id'];
     assertImport(($remapped['duplicate'] ?? true) === false, 'changed mapping bypasses duplicate detection');
     assertImport(($remapped['rows_failed'] ?? 0) === 0, 'remapped file processes without validation failures');
+    
+    // Invalid rows are logged while valid rows in the same file still commit.
+    $invalidFile = makeXlsx([
+        [$barcode, $article, 'Integration product', '19.50', '3'],
+        ['BAD-' . $barcode, 'BAD-' . $article, 'Invalid price', '-5', '2'],
+    ]);
+    $files[] = $invalidFile;
+    $invalid = $service->import($invalidFile, 'invalid.xlsx', (int) $branchId, null, $date, $mapping);
+    $uploadIds[] = (int) $invalid['upload_id'];
+    assertImport(($invalid['rows_updated'] ?? 0) === 1 && ($invalid['rows_failed'] ?? 0) === 1, 'valid row succeeds and invalid price is rejected');
+    $errorStmt = $db->prepare('SELECT source_row_number FROM import_errors WHERE upload_id = ?');
+    $errorStmt->execute([$invalid['upload_id']]);
+    assertImport((int) $errorStmt->fetchColumn() === 3, 'invalid row number recorded in import_errors');
+    $stock->execute([$productId, $branchId]);
+    assertImport((float) $stock->fetch()['price'] === 19.50, 'valid row committed despite another row failing');
+
+    // A barcode belonging to a different product must not silently overwrite it.
+    $otherBarcode = 'T' . bin2hex(random_bytes(12));
+    $otherArticle = 'TEST-' . bin2hex(random_bytes(8));
+    $otherFile = makeXlsx([$otherBarcode, $otherArticle, 'Other product', '10.00', '1']);
+    $files[] = $otherFile;
+    $other = $service->import($otherFile, 'other.xlsx', (int) $branchId, null, $date, $mapping);
+    $uploadIds[] = (int) $other['upload_id'];
+    assertImport(($other['rows_created'] ?? 0) === 1, 'second product created for identity conflict test');
+    $otherStmt = $db->prepare('SELECT id FROM products WHERE barcode = ?');
+    $otherStmt->execute([$otherBarcode]);
+    $otherProductId = (int) $otherStmt->fetchColumn();
+    $conflictFile = makeXlsx([$barcode, $otherArticle, 'Conflicting product', '12.00', '2']);
+    $files[] = $conflictFile;
+    $conflict = $service->import($conflictFile, 'conflict.xlsx', (int) $branchId, null, $date, $mapping);
+    $uploadIds[] = (int) $conflict['upload_id'];
+    assertImport(($conflict['rows_failed'] ?? 0) === 1 && ($conflict['rows_created'] ?? 0) === 0, 'barcode/article collision rejected');
+    $stock->execute([$productId, $branchId]);
+    assertImport((float) $stock->fetch()['price'] === 19.50, 'identity collision leaves original stock unchanged');
+    $db->prepare('DELETE FROM products WHERE id = ? AND barcode = ?')->execute([$otherProductId, $otherBarcode]);
+
 } finally {
     // Imports commit internally; remove only uniquely generated test records.
     if ($productId !== null && $productId > 0) {
