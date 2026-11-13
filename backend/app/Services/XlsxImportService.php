@@ -151,7 +151,7 @@ final class XlsxImportService
         $branch = $this->db->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1');
         $branch->execute([$branchId]);
         if (!$branch->fetchColumn()) {
-            throw new \\InvalidArgumentException('Выбранный филиал не найден или отключён.');
+            throw new \InvalidArgumentException('Выбранный филиал не найден или отключён.');
         }
 
         $spreadsheet = IOFactory::load($filePath);
