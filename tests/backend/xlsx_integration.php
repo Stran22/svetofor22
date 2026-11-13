@@ -34,6 +34,8 @@ $article = 'TEST-' . bin2hex(random_bytes(8));
 $files = [];
 $uploadIds = [];
 $productId = null;
+$otherProductId = null;
+$otherBarcode = null;
 $mapping = ['barcode' => 0, 'article' => 1, 'name' => 2, 'price' => 3, 'quantity' => 4];
 $service = new XlsxImportService($db);
 $date = new DateTimeImmutable('2099-01-02 12:00:00', new DateTimeZone('Asia/Barnaul'));
@@ -129,10 +131,13 @@ try {
     assertImport(($conflict['rows_failed'] ?? 0) === 1 && ($conflict['rows_created'] ?? 0) === 0, 'barcode/article collision rejected');
     $stock->execute([$productId, $branchId]);
     assertImport((float) $stock->fetch()['price'] === 19.50, 'identity collision leaves original stock unchanged');
-    $db->prepare('DELETE FROM products WHERE id = ? AND barcode = ?')->execute([$otherProductId, $otherBarcode]);
 
 } finally {
     // Imports commit internally; remove only uniquely generated test records.
+    if ($otherProductId !== null && $otherProductId > 0 && $otherBarcode !== null) {
+        $db->prepare('DELETE FROM products WHERE id = ? AND barcode = ?')
+            ->execute([$otherProductId, $otherBarcode]);
+    }
     if ($productId !== null && $productId > 0) {
         $db->prepare('DELETE FROM products WHERE id = ? AND barcode = ?')->execute([$productId, $barcode]);
     }
