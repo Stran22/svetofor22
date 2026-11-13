@@ -59,6 +59,9 @@ try {
     $router->get('/admin', [$admin, 'dashboard']);
     $router->get('/admin/import', [$admin, 'importPage']);
     $router->post('/admin/import', [$admin, 'import']);
+    $router->get('/admin/import/mapping', [$admin, 'mappingPage']);
+    $router->post('/admin/import/mapping/preview', [$admin, 'previewMapping']);
+    $router->post('/admin/import/mapping/save', [$admin, 'saveMapping']);
     $router->get('/admin/imports', [$admin, 'imports']);
     $router->get('/admin/imports/{id}', [$admin, 'importDetail']);
     $router->get('/admin/reviews', [$adminReviews, 'index']);
