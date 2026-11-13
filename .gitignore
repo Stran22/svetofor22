@@ -1,0 +1,42 @@
+﻿/vendor/
+/.env
+/.phpunit.cache/
+/storage/logs/*
+/storage/uploads/*
+!/storage/logs/.gitkeep
+!/storage/uploads/.gitkeep
+.idea/
+.vscode/
+*.log
+
+# Local Android SDK and VK ID credentials
+**/local.properties
+
+# Android Studio and Gradle
+/android/.gradle/
+/android/app/build/
+/android/build/
+
+# Android Studio / Gradle
+.gradle/
+**/.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.ap_
+*.jks
+*.keystore
+*.hprof
+*.log
+
+# Firebase credentials
+**/google-services.json
+**/service-account*.json
+**/*firebase-adminsdk*.json
+*.bak
