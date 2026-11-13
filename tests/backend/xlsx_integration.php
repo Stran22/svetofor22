@@ -142,6 +142,30 @@ try {
     assertImport((float) $stock->fetch()['price'] === 19.50, 'valid row committed despite another row failing');
     $queued->execute([$subscriptionId]);
     assertImport((int) $queued->fetchColumn() === 2, 'second zero to positive transition enqueues a new event');
+    // Queue events must be atomic with stock changes, and cancelled subscriptions get none.
+    $db->beginTransaction();
+    try {
+        $beforeRollback = (int) $db->query('SELECT COUNT(*) FROM push_delivery_log')->fetchColumn();
+        $enqueued = (new \\Svet22\\Services\\RestockNotificationService($db))
+            ->queueTransition($productId, (int) $branchId, '0', '1');
+        assertImport($enqueued === 1, 'restock event can be queued inside a transaction');
+        $db->rollBack();
+        assertImport((int) $db->query('SELECT COUNT(*) FROM push_delivery_log')->fetchColumn() === $beforeRollback, 'rollback removes queued notification');
+    } finally {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+    }
+    $db->prepare("UPDATE subscriptions SET status = 'cancelled' WHERE id = ?")->execute([$subscriptionId]);
+    $db->beginTransaction();
+    try {
+        $enqueued = (new \\Svet22\\Services\\RestockNotificationService($db))
+            ->queueTransition($productId, (int) $branchId, '0', '1');
+        assertImport($enqueued === 0, 'cancelled subscription does not enqueue notification');
+    } finally {
+        $db->rollBack();
+    }
+
 
 
     // A barcode belonging to a different product must not silently overwrite it.
