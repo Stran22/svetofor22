@@ -31,3 +31,46 @@ jobs:
 
       - name: Unit tests
         run: composer test
+
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test_root_only
+          MYSQL_DATABASE: svet22_test
+          MYSQL_USER: svet22_tester
+          MYSQL_PASSWORD: test_only_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest_root_only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      SVET_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=svet22_test;charset=utf8mb4
+      SVET_TEST_USER: svet22_tester
+      SVET_TEST_PASSWORD: test_only_password
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: pdo_mysql, mbstring
+          coverage: none
+
+      - name: Apply schema and migrations to isolated database
+        run: |
+          for file in database/migrations/*.sql; do
+            echo "Applying $file"
+            mysql --protocol=tcp -h 127.0.0.1 -P 3306 -u "$SVET_TEST_USER" -p"$SVET_TEST_PASSWORD" svet22_test < "$file"
+          done
+          mysql --protocol=tcp -h 127.0.0.1 -P 3306 -u "$SVET_TEST_USER" -p"$SVET_TEST_PASSWORD" svet22_test -e "INSERT INTO branches (code, name, is_active) VALUES ('test-branch', 'Test Branch', 1)"
+
+      - name: MySQL integration tests
+        run: php tests/backend/mysql_integration.php
