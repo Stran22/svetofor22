@@ -9,8 +9,11 @@ final class ImportRowValidator
         'Штрихкод' => 'barcode',
         'Артикул' => 'article',
         'Название' => 'name',
+        'Наименование' => 'name',
         'Цена' => 'price',
+        'Цена продажи' => 'price',
         'Остаток' => 'quantity',
+        'Количество' => 'quantity',
         'Единица измерения' => 'unit',
         'Категория' => 'category',
         'Производитель' => 'manufacturer',
@@ -36,6 +39,44 @@ final class ImportRowValidator
             }
         }
         return $map;
+    }
+
+    public function validateMapping(array $mapping, int $columnCount): array
+    {
+        $allowed = ['barcode', 'name', 'quantity', 'price'];
+        $required = ['barcode', 'name', 'quantity', 'price'];
+
+        foreach ($required as $field) {
+            if (!array_key_exists($field, $mapping)) {
+                throw new \\InvalidArgumentException(
+                    'Не выбрана колонка для поля: ' . $this->label($field) . '.'
+                );
+            }
+        }
+
+        $result = [];
+        $used = [];
+
+        foreach ($allowed as $field) {
+            $index = filter_var($mapping[$field] ?? null, FILTER_VALIDATE_INT);
+
+            if ($index === false || $index < 0 || $index >= $columnCount) {
+                throw new \\InvalidArgumentException(
+                    'Некорректный номер колонки для поля: ' . $this->label($field) . '.'
+                );
+            }
+
+            if (isset($used[$index])) {
+                throw new \\InvalidArgumentException(
+                    'Одна колонка Excel не может соответствовать нескольким полям.'
+                );
+            }
+
+            $used[$index] = true;
+            $result[$field] = $index;
+        }
+
+        return $result;
     }
 
     public function validate(array $cells, array $columns): array

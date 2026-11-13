@@ -270,7 +270,7 @@ final class AdminController
     public function productEdit(Request $request, array $params): never
     {
         $admin = $this->auth->requireRole('admin');
-        $stmt = $this->db->prepare('SELECT id, barcode, article, name, category_id, manufacturer, unit, is_active, image_url FROM products WHERE id = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT id, barcode, article, name, category_id, manufacturer, unit, is_active, image_url, description FROM products WHERE id = ? LIMIT 1');
         $stmt->execute([$params['id']]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$product) {
@@ -296,6 +296,7 @@ final class AdminController
         }
         $content .= '</select></label><label>Производитель<input name="manufacturer" maxlength="190" value="' . AdminView::e($product['manufacturer']) . '"></label>'
             . '<label>Единица измерения<input name="unit" maxlength="32" value="' . AdminView::e($product['unit']) . '"></label>'
+            . '<label>Описание товара<textarea name="description" rows="6" maxlength="10000">' . AdminView::e($product['description'] ?? '') . '</textarea></label>'
             . '<label><input type="checkbox" name="is_active" value="1" style="display:inline;width:auto" ' . ((int) $product['is_active'] === 1 ? 'checked' : '') . '> Товар активен</label>'
             . '<h2>Цена и остаток по филиалам</h2><p class="muted">Оставьте оба поля пустыми, если не нужно менять данные филиала.</p>';
         foreach ($branches as $branch) {
@@ -360,9 +361,11 @@ final class AdminController
         $article = trim((string) ($data['article'] ?? ''));
         $manufacturer = trim((string) ($data['manufacturer'] ?? ''));
         $unit = trim((string) ($data['unit'] ?? ''));
+        $description = trim((string) ($data['description'] ?? ''));
         $categoryRaw = (string) ($data['category_id'] ?? '');
         if ($name === '' || mb_strlen($name) > 500 || strlen($barcode) > 64 || strlen($article) > 100
-            || mb_strlen($manufacturer) > 190 || mb_strlen($unit) > 32) {
+            || mb_strlen($manufacturer) > 190 || mb_strlen($unit) > 32
+            || mb_strlen($description) > 10000) {
             $this->flash('Проверьте название и длину дополнительных полей товара.', true);
             Response::redirect('/admin/products/' . (int) $params['id']);
         }
@@ -388,6 +391,7 @@ final class AdminController
             'category_id' => $categoryId,
             'manufacturer' => $manufacturer !== '' ? $manufacturer : null,
             'unit' => $unit !== '' ? $unit : null,
+            'description' => $description !== '' ? $description : null,
             'is_active' => isset($data['is_active']) ? 1 : 0,
         ];
         $changes = [];
