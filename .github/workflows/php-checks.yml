@@ -1,0 +1,33 @@
+name: PHP checks
+
+on:
+  push:
+    branches:
+      - main
+      - feature/excel-column-mapping
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, fileinfo, pdo_mysql, zip, xml, xmlreader, xmlwriter, simplexml, gd
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: PHP syntax check
+        run: composer lint
+
+      - name: Unit tests
+        run: composer test
