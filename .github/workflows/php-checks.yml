@@ -80,3 +80,6 @@ jobs:
 
       - name: XLSX end-to-end integration tests
         run: php tests/backend/xlsx_integration.php
+
+      - name: Push finalization integration tests
+        run: php tests/backend/push_finalization_integration.php
