@@ -74,9 +74,14 @@ final class XlsxImportService
             $sheet = $spreadsheet->getActiveSheet();
             $highestRow = $sheet->getHighestDataRow();
             $highestColumn = $sheet->getHighestDataColumn();
+            $columnCount = Coordinate::columnIndexFromString($highestColumn);
+            $savedMapping = $mapping === null ? $this->loadMapping($branchId) : null;
+            // Revalidate saved mappings against the actual uploaded file.
             $columns = $mapping !== null
-                ? $this->validator->validateMapping($mapping, Coordinate::columnIndexFromString($highestColumn))
-                : ($this->loadMapping($branchId) ?? $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn)));
+                ? $this->validator->validateMapping($mapping, $columnCount)
+                : ($savedMapping !== null
+                    ? $this->validator->validateMapping($savedMapping, $columnCount)
+                    : $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn)));
             $seen = [];
 
             $this->db->beginTransaction();
@@ -107,7 +112,7 @@ final class XlsxImportService
                     try {
                         $outcome = $this->upsertRow($row, $branchId, $recordedDate);
                         $this->db->exec('RELEASE SAVEPOINT import_row');
-                    } catch (\InvalidArgumentException $e) {
+                    } catch (Throwable $e) {
                         $this->db->exec('ROLLBACK TO SAVEPOINT import_row');
                         $this->db->exec('RELEASE SAVEPOINT import_row');
                         throw $e;
