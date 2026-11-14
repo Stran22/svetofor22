@@ -207,6 +207,80 @@ final class XlsxImportService
         }
     }
 
+    /**
+     * Dry-run validation: no writes, audit entries or notifications.
+     * Use exactly the same mapping and identifier checks as import().
+     */
+    public function previewImport(string $filePath, string $originalName, int $branchId): array
+    {
+        $this->validateUpload($filePath, $originalName, $branchId);
+        $branch = $this->db->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1');
+        $branch->execute([$branchId]);
+        if (!$branch->fetchColumn()) {
+            throw new \InvalidArgumentException('Филиал не найден или отключён.');
+        }
+        $spreadsheet = IOFactory::load($filePath);
+        try {
+            $sheet = $spreadsheet->getActiveSheet();
+            $highestColumn = $sheet->getHighestDataColumn();
+            $columnCount = Coordinate::columnIndexFromString($highestColumn);
+            $saved = $this->loadMapping($branchId);
+            $columns = $saved !== null
+                ? $this->validator->validateMapping($saved, $columnCount)
+                : $this->validator->normalizeHeaders($this->readRow($sheet, 1, $highestColumn));
+            $headers = $this->readRow($sheet, 1, $highestColumn);
+            $total = 0;
+            $valid = 0;
+            $failed = 0;
+            $errors = [];
+            $samples = [];
+            $seen = [];
+            for ($line = 2, $last = $sheet->getHighestDataRow(); $line <= $last; $line++) {
+                $cells = $this->readRow($sheet, $line, $highestColumn);
+                foreach (['barcode', 'article'] as $field) {
+                    if (isset($columns[$field])) {
+                        $cells[$columns[$field]] = (string) $sheet
+                            ->getCell(Coordinate::stringFromColumnIndex($columns[$field] + 1) . $line)
+                            ->getFormattedValue();
+                    }
+                }
+                if ($this->isEmpty($cells)) {
+                    continue;
+                }
+                $total++;
+                try {
+                    $row = $this->validator->validate($cells, $columns);
+                    foreach ($this->identityKeys($row) as $key) {
+                        if (isset($seen[$key])) {
+                            throw new \InvalidArgumentException('Повтор идентификатора товара в файле.');
+                        }
+                    }
+                    foreach ($this->identityKeys($row) as $key) {
+                        $seen[$key] = true;
+                    }
+                    $valid++;
+                    if (count($samples) < 5) {
+                        $samples[] = ['line' => $line, 'name' => $row['name'],
+                            'price' => $row['price'], 'quantity' => $row['quantity']];
+                    }
+                } catch (\InvalidArgumentException $e) {
+                    $failed++;
+                    if (count($errors) < 20) {
+                        $errors[] = ['line' => $line, 'message' => $e->getMessage()];
+                    }
+                }
+            }
+            return [
+                'headers' => $headers, 'mapping' => $columns,
+                'rows_total' => $total, 'rows_valid' => $valid,
+                'rows_failed' => $failed, 'errors' => $errors, 'samples' => $samples,
+                'sha256' => hash_file('sha256', $filePath),
+            ];
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
     public function saveMapping(int $branchId, array $mapping, int $columnCount): array
     {
         $branch = $this->db->prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1 LIMIT 1');
