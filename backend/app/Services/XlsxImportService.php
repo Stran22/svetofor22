@@ -235,6 +235,7 @@ final class XlsxImportService
             $errors = [];
             $samples = [];
             $seen = [];
+            $cataloguePreflight = new ExcelImportPreflight($this->db);
             for ($line = 2, $last = $sheet->getHighestDataRow(); $line <= $last; $line++) {
                 $cells = $this->readRow($sheet, $line, $highestColumn);
                 foreach (['barcode', 'article'] as $field) {
@@ -254,6 +255,10 @@ final class XlsxImportService
                         if (isset($seen[$key])) {
                             throw new \InvalidArgumentException('Повтор идентификатора товара в файле.');
                         }
+                    }
+                    $conflict = $cataloguePreflight->checkProductIdentity($row);
+                    if ($conflict !== null) {
+                        throw new \InvalidArgumentException($conflict);
                     }
                     foreach ($this->identityKeys($row) as $key) {
                         $seen[$key] = true;
