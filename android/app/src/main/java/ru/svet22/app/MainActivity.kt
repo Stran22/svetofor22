@@ -1,283 +1,221 @@
+
 package ru.svet22.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.content.Intent
+import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.messaging.FirebaseMessaging
+import com.vk.id.VKID
+import com.vk.id.auth.VKIDAuthCallback
+import com.vk.id.VKIDAuthFail
+import com.vk.id.auth.VKIDAuthParams
+import com.vk.id.auth.AuthCodeData
+import com.vk.id.AccessToken
+import ru.svet22.app.auth.OAuthPkce
+import ru.svet22.app.auth.VkLoginRepository
+import ru.svet22.app.auth.ReviewAuthRepository
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
-import retrofit2.http.Query
-
-private const val API_BASE_URL = "https://baza.altaj-otdyh.ru/api/v1/"
-
-data class ApiEnvelope<T>(
-    val success: Boolean,
-    val data: T?,
-    val meta: Any?
-)
-
-data class Branch(
-    val id: Int,
-    val code: String,
-    val name: String,
-    val address: String?
-)
-
-data class Product(
-    val id: Int,
-    val name: String,
-    val manufacturer: String?,
-    val unit: String?,
-    val branch_id: Int?,
-    val price: String?,
-    val quantity: String?
-)
-
-interface SvetApi {
-    @GET("branches")
-    suspend fun branches(): ApiEnvelope<List<Branch>>
-
-    @GET("products")
-    suspend fun products(
-        @Query("branch_id") branchId: Int,
-        @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 50
-    ): ApiEnvelope<List<Product>>
-}
-
-private object ApiClient {
-    val api: SvetApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(API_BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(SvetApi::class.java)
-    }
-}
-
-class CatalogViewModel : ViewModel() {
-    var branches by mutableStateOf<List<Branch>>(emptyList())
-        private set
-    var products by mutableStateOf<List<Product>>(emptyList())
-        private set
-    var selectedBranch by mutableStateOf<Branch?>(null)
-        private set
-    var loading by mutableStateOf(false)
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
-    var search by mutableStateOf("")
-        private set
-
-    init {
-        loadBranches()
-    }
-
-    fun updateSearch(value: String) {
-        search = value
-    }
-
-    fun selectBranch(branch: Branch) {
-        selectedBranch = branch
-        loadProducts(branch.id)
-    }
-
-    fun loadBranches() {
-        viewModelScope.launch {
-            loading = true
-            error = null
-            try {
-                val result = ApiClient.api.branches()
-                branches = result.data.orEmpty()
-                if (selectedBranch == null && branches.isNotEmpty()) {
-                    selectBranch(branches.first())
-                }
-            } catch (e: Exception) {
-                error = "Не удалось загрузить филиалы. Проверьте подключение к интернету."
-            } finally {
-                loading = false
-            }
-        }
-    }
-
-    private fun loadProducts(branchId: Int) {
-        viewModelScope.launch {
-            loading = true
-            error = null
-            try {
-                products = ApiClient.api.products(branchId).data.orEmpty()
-            } catch (e: Exception) {
-                error = "Не удалось загрузить каталог. Попробуйте ещё раз."
-            } finally {
-                loading = false
-            }
-        }
-    }
-
-    fun retry() {
-        val branch = selectedBranch
-        if (branch == null) loadBranches() else loadProducts(branch.id)
-    }
-}
+import ru.svet22.app.navigation.AppNavigation
+import ru.svet22.app.push.FcmRegistrationManager
 
 class MainActivity : ComponentActivity() {
+    private val notificationTarget = mutableStateOf<Pair<Int, Int>?>(null)
+    private val vkStatus = mutableStateOf("Проверяем авторизацию…")
+    private val isSocialAuthenticated = mutableStateOf(false)
+    private var pendingVkAttempt: OAuthPkce.Challenge? = null
+
+    private val vkCallback = object : VKIDAuthCallback {
+        override fun onAuth(accessToken: AccessToken) {
+            pendingVkAttempt = null
+            vkStatus.value = "Не удалось завершить безопасный вход. Попробуйте снова."
+        }
+
+        override fun onAuthCode(data: AuthCodeData, isCompletion: Boolean) {
+            if (pendingVkAttempt == null || data.code.isBlank() || data.deviceId.isBlank()) {
+                pendingVkAttempt = null
+                vkStatus.value = "VK ID вернул неполные данные. Попробуйте снова."
+                return
+            }
+            // Exchange credentials on the backend, never in the Android app.
+            val attempt = pendingVkAttempt ?: return
+            pendingVkAttempt = null
+            vkStatus.value = "Проверяем вход на сервере…"
+            lifecycleScope.launch {
+                try {
+                    val verified = VkLoginRepository.complete(
+                        applicationContext, data.code, data.deviceId, attempt
+                    )
+                    if (verified) isSocialAuthenticated.value = true
+                    vkStatus.value = if (verified) {
+                        "Вход через VK ID выполнен. Теперь можно оставлять отзывы."
+                    } else {
+                        "Сервер не подтвердил вход через VK ID."
+                    }
+                } catch (e: Exception) {
+                    Log.w("SVET22_VK", "VK ID server verification failed: ${e.javaClass.simpleName}")
+                    vkStatus.value = "Не удалось подтвердить вход. Попробуйте ещё раз."
+                }
+            }
+        }
+
+        override fun onFail(fail: VKIDAuthFail) {
+            pendingVkAttempt = null
+            vkStatus.value = if (fail is VKIDAuthFail.Canceled) {
+                "Вход отменён."
+            } else {
+                "Не удалось выполнить вход через VK ID."
+            }
+        }
+    }
+
+    private fun logoutVkAccount() {
+        vkStatus.value = "Выходим из аккаунта…"
+        lifecycleScope.launch {
+            try {
+                ReviewAuthRepository.logout(applicationContext)
+                isSocialAuthenticated.value = false
+                vkStatus.value = "Вы вышли из аккаунта. Для отзывов войдите через VK ID."
+            } catch (e: Exception) {
+                Log.w("SVET22_VK", "Logout failed: ${e.javaClass.simpleName}")
+                vkStatus.value = "Не удалось выйти. Проверьте подключение к интернету."
+            }
+        }
+    }
+
+    private fun startVkLogin() {
+        if (pendingVkAttempt != null) return
+        val attempt = OAuthPkce.create()
+        pendingVkAttempt = attempt
+        vkStatus.value = "Открываем VK ID…"
+        try {
+            val params = VKIDAuthParams.Builder().apply {
+                codeChallenge = attempt.challenge
+                state = attempt.state
+            }.build()
+            VKID.instance.authorize(this, vkCallback, params)
+        } catch (e: Exception) {
+            pendingVkAttempt = null
+            Log.e("SVET22_VK", "Unable to start VK ID authorization", e)
+            vkStatus.value = "Не удалось открыть VK ID."
+        }
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null) return
+        val extras = intent.extras
+        // Firebase notification payloads can deliver data extras as Strings,
+        // while our own notification PendingIntent uses Int extras.
+        fun positiveId(key: String): Int? {
+            val value = extras?.get(key) ?: return null
+            return when (value) {
+                is Int -> value
+                is Long -> value.toInt()
+                is String -> value.trim().toIntOrNull()
+                else -> null
+            }?.takeIf { it > 0 }
+        }
+        val productId = positiveId("product_id")
+        val branchId = positiveId("branch_id")
+        Log.i("SVET22_PUSH", "Notification opened: productIdPresent=${productId != null}, branchIdPresent=${branchId != null}, keys=${extras?.keySet()?.joinToString() ?: "none"}")
+        if (productId != null && branchId != null) {
+            notificationTarget.value = productId to branchId
+            intent.removeExtra("product_id")
+            intent.removeExtra("branch_id")
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+
+    // Системное окно запроса разрешения на уведомления
+    private val notificationPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            // Android сохраняет решение пользователя.
+            // Дополнительных действий здесь пока не требуется.
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleNotificationIntent(intent)
+        lifecycleScope.launch {
+            try {
+                isSocialAuthenticated.value = ReviewAuthRepository.isAuthenticated(applicationContext)
+                vkStatus.value = if (isSocialAuthenticated.value) "Вы вошли через VK ID." else "Для отзывов войдите через VK ID."
+            } catch (_: Exception) {
+                vkStatus.value = "Не удалось проверить авторизацию."
+            }
+        }
+        // ===== НАЧАЛО БЛОКА: Регистрация Firebase на сервере =====
+
+        FcmRegistrationManager.registerCurrentToken(this)
+
+// ===== КОНЕЦ БЛОКА: Регистрация Firebase на сервере =====
+
+        FirebaseMessaging.getInstance().token
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful && !task.result.isNullOrBlank()) {
+                    android.util.Log.i("SVET22_FCM", "FCM token received successfully")
+                } else {
+                    android.util.Log.e("SVET22_FCM", "FCM token request failed", task.exception)
+                }
+            }
+
+        // ===== НАЧАЛО БЛОКА: Основная тема приложения =====
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    CatalogScreen()
+                Surface(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // ===== НАЧАЛО БЛОКА: Запуск навигации =====
+                    AppNavigation(
+                        notificationTarget = notificationTarget.value,
+                        onNotificationHandled = { notificationTarget.value = null },
+                        onVkLoginClick = { startVkLogin() },
+                        onLogoutClick = { logoutVkAccount() },
+                        vkLoginStatus = vkStatus.value,
+                        isSocialAuthenticated = isSocialAuthenticated.value
+                    )
+                    // ===== КОНЕЦ БЛОКА: Запуск навигации =====
                 }
             }
         }
-    }
-}
+        // ===== КОНЕЦ БЛОКА: Основная тема приложения =====
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CatalogScreen(vm: CatalogViewModel = viewModel()) {
-    var branchMenuExpanded by remember { mutableStateOf(false) }
-    val visibleProducts = vm.products.filter {
-        it.name.contains(vm.search, ignoreCase = true)
+        requestNotificationPermission()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Светофор")
-                        Text(
-                            text = vm.selectedBranch?.name ?: "Выбор магазина",
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                },
-                actions = {
-                    Button(onClick = { branchMenuExpanded = true }) {
-                        Text("Магазин")
-                    }
-                    DropdownMenu(
-                        expanded = branchMenuExpanded,
-                        onDismissRequest = { branchMenuExpanded = false }
-                    ) {
-                        vm.branches.forEach { branch ->
-                            DropdownMenuItem(
-                                text = { Text(branch.name) },
-                                onClick = {
-                                    branchMenuExpanded = false
-                                    vm.selectBranch(branch)
-                                }
-                            )
-                        }
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = vm.search,
-                onValueChange = vm::updateSearch,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Поиск товаров") },
-                leadingIcon = { androidx.compose.material3.Icon(Icons.Default.Search, contentDescription = null) }
-            )
-            Spacer(Modifier.height(12.dp))
+    // Запрашиваем разрешение только на Android 13+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
-            if (vm.loading && vm.products.isEmpty()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else if (vm.error != null) {
-                Text(vm.error!!, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = vm::retry) { Text("Повторить") }
-            } else if (visibleProducts.isEmpty()) {
-                Text(
-                    if (vm.products.isEmpty()) "В этом магазине пока нет товаров."
-                    else "По вашему запросу ничего не найдено."
-                )
-            } else {
-                Text(
-                    text = "Товары магазина",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(visibleProducts, key = { it.id }) { product ->
-                        ProductRow(product)
-                    }
-                }
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    permission
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(permission)
             }
         }
-    }
-}
-
-@Composable
-private fun ProductRow(product: Product) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { /* Карточка товара подключается на следующем этапе. */ }
-            .padding(vertical = 10.dp)
-    ) {
-        Text(product.name, style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(product.unit ?: "")
-            Text(
-                text = product.price?.let { "$it ₽" } ?: "Цена не указана",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-        Text(
-            text = product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Divider(modifier = Modifier.padding(top = 8.dp))
     }
 }
