@@ -1,0 +1,39 @@
+name: Excel import safety checks
+
+on:
+  push:
+    branches:
+      - feature/excel-column-mapping
+  pull_request:
+
+jobs:
+  excel-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo, pdo_mysql, zip, xml, xmlreader, xmlwriter, simplexml
+          coverage: none
+      - name: PHP syntax checks
+        run: |
+          find backend/app backend/bootstrap -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Excel validator smoke test
+        run: |
+          php -r '
+            require "backend/app/Services/ImportRowValidator.php";
+            $validator = new \Svet22\Services\ImportRowValidator();
+            $map = $validator->normalizeHeaders(["Артикул", "Название", "Цена", "Остаток"]);
+            if ($map !== ["article"=>0, "name"=>1, "price"=>2, "quantity"=>3]) {
+                fwrite(STDERR, "Unexpected Excel column mapping\n");
+                exit(1);
+            }
+            $row = $validator->validate(["A-100", "Товар", "123.45", "7"], $map);
+            if ($row["price"] !== "123.45" || $row["quantity"] !== "7.000") {
+                fwrite(STDERR, "Unexpected normalized values\n");
+                exit(1);
+            }
+            echo "Excel validator smoke test passed\n";
+          '
