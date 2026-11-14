@@ -9,6 +9,19 @@ on:
 jobs:
   excel-import:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpass
+          MYSQL_DATABASE: svet_import_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptestpass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
     steps:
       - uses: actions/checkout@v4
       - name: Set up PHP
@@ -22,3 +35,16 @@ jobs:
           find backend/app backend/bootstrap -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Excel import validation tests
         run: php tests/excel_import_validation.php
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Create isolated test database schema
+        run: |
+          for migration in 001_initial_schema.sql 003_firebase_push.sql 004_push_device_deliveries.sql 005_excel_column_mappings.sql 006_upload_log_mapping_hash.sql; do
+            mysql -h 127.0.0.1 -u root -ptestpass svet_import_test < "database/migrations/$migration"
+          done
+      - name: Full-cycle MySQL Excel import integration test
+        env:
+          TEST_MYSQL_DSN: mysql:host=127.0.0.1;dbname=svet_import_test;charset=utf8mb4
+          TEST_MYSQL_USER: root
+          TEST_MYSQL_PASSWORD: testpass
+        run: php tests/excel_import_mysql_integration.php
