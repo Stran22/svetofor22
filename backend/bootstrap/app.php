@@ -58,7 +58,8 @@ try {
     $router->post('/admin/logout', [$admin, 'logout']);
     $router->get('/admin', [$admin, 'dashboard']);
     $router->get('/admin/import', [$admin, 'importPage']);
-    $router->post('/admin/import', [$admin, 'import']);
+    $router->post('/admin/import/preview', [$admin, 'previewImport']);
+    $router->post('/admin/import/confirm', [$admin, 'import']);
     $router->get('/admin/import/mapping', [$admin, 'mappingPage']);
     $router->post('/admin/import/mapping/preview', [$admin, 'previewMapping']);
     $router->post('/admin/import/mapping/save', [$admin, 'saveMapping']);
