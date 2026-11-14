@@ -270,6 +270,20 @@ final class AdminController
             $preview = (new XlsxImportService($this->db))->previewImport(
                 (string) $file['tmp_name'], (string) $file['name'], (int) $branchId
             );
+            // Bind confirmation to a successful preview in this admin session.
+            $this->auth->start();
+            unset($_SESSION['excel_import_preview']);
+            if ((int) $preview['rows_failed'] === 0 && (int) $preview['rows_valid'] > 0) {
+                $mapping = $preview['mapping'];
+                ksort($mapping);
+                $_SESSION['excel_import_preview'] = [
+                    'admin_id' => (int) $admin['id'],
+                    'branch_id' => (int) $branchId,
+                    'file_sha256' => (string) $preview['sha256'],
+                    'mapping_sha256' => hash('sha256', json_encode($mapping, JSON_THROW_ON_ERROR)),
+                    'expires_at' => time() + 900,
+                ];
+            }
             $branchStmt = $this->db->prepare('SELECT name FROM branches WHERE id = ?');
             $branchStmt->execute([(int) $branchId]);
             $branchName = (string) $branchStmt->fetchColumn();
@@ -370,10 +384,31 @@ final class AdminController
             $this->flash('Файл отличается от проверенного. Повторите предпросмотр.', true);
             Response::redirect('/admin/import');
         }
+        // A hidden form field is not proof of a prior preview.
+        $this->auth->start();
+        $approval = $_SESSION['excel_import_preview'] ?? null;
+        unset($_SESSION['excel_import_preview']); // single use, including failed attempts
+        if (!is_array($approval)
+            || (int) ($approval['admin_id'] ?? 0) !== (int) $admin['id']
+            || (int) ($approval['branch_id'] ?? 0) !== (int) $branchId
+            || (int) ($approval['expires_at'] ?? 0) < time()
+            || !is_string($approval['file_sha256'] ?? null)
+            || !hash_equals($approval['file_sha256'], $actual)) {
+            $this->flash('Подтверждение истекло или не было выполнено. Проверьте файл заново.', true);
+            Response::redirect('/admin/import');
+        }
         try {
             $check = (new XlsxImportService($this->db))->previewImport(
                 (string) $file['tmp_name'], (string) $file['name'], (int) $branchId
             );
+            $effectiveMapping = $check['mapping'];
+            ksort($effectiveMapping);
+            $currentMappingHash = hash('sha256', json_encode($effectiveMapping, JSON_THROW_ON_ERROR));
+            if (!is_string($approval['mapping_sha256'] ?? null)
+                || !hash_equals($approval['mapping_sha256'], $currentMappingHash)) {
+                $this->flash('Сопоставление колонок изменилось. Проверьте файл заново.', true);
+                Response::redirect('/admin/import');
+            }
             if ($check['rows_failed'] > 0 || $check['rows_valid'] === 0) {
                 $this->flash('В файле обнаружены ошибки. Повторите проверку.', true);
                 Response::redirect('/admin/import');
