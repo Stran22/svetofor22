@@ -86,7 +86,7 @@ final class AdminController
             $content .= AdminView::alert('Нет активных филиалов. Сначала добавьте филиал в разделе «Филиалы».', true);
         } else {
             $content .= '<section class="card"><p>Выберите филиал, к которому относится загружаемый файл. Для каждого филиала используется отдельная выгрузка.</p>'
-                . '<form method="post" action="/admin/import" enctype="multipart/form-data">'
+                . '<form method="post" action="/admin/import/preview" enctype="multipart/form-data">'
                 . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
                 . '<label>Филиал<select name="branch_id" required><option value="">Выберите филиал</option>';
             foreach ($branches as $branch) {
@@ -94,7 +94,7 @@ final class AdminController
             }
             $content .= '</select></label><label>Файл Excel (.xlsx)<input type="file" name="xlsx_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>'
                 . '<p class="muted">Максимальный размер — 5 МБ. Обязательны: Название, Цена, Остаток и хотя бы один идентификатор — Штрихкод или Артикул. Дополнительно поддерживаются: Единица измерения, Категория, Производитель. Для нестандартных выгрузок сначала настройте соответствие колонок ниже. Одинаковое содержимое в тот же филиал и день повторно не обрабатывается, даже под другим именем.</p>'
-                . '<button type="submit">Загрузить и обработать</button></form></section>';
+                . '<button type="submit">Проверить файл</button></form></section>';
         }
         if (($admin['role'] ?? '') === 'admin' && $branches) {
             $mappingLinks = '<section class="card"><h2>Соответствие колонок по филиалам</h2><ul>';
@@ -250,6 +250,80 @@ final class AdminController
         Response::redirect('/admin/import/mapping?branch_id=' . (int) $branchId);
     }
 
+    public function previewImport(Request $request): never
+    {
+        $admin = $this->currentAdmin();
+        $data = $request->post();
+        if (!$this->auth->verifyCsrf($data['csrf_token'] ?? null)) {
+            $this->flash('Форма устарела.', true);
+            Response::redirect('/admin/import');
+        }
+        $branchId = filter_var($data['branch_id'] ?? null, FILTER_VALIDATE_INT);
+        $file = $request->file('xlsx_file');
+        if ($branchId === false || $branchId < 1 || !$file
+            || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
+            || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
+            $this->flash('Выберите филиал и корректный XLSX-файл.', true);
+            Response::redirect('/admin/import');
+        }
+        try {
+            $preview = (new XlsxImportService($this->db))->previewImport(
+                (string) $file['tmp_name'], (string) $file['name'], (int) $branchId
+            );
+            $branchStmt = $this->db->prepare('SELECT name FROM branches WHERE id = ?');
+            $branchStmt->execute([(int) $branchId]);
+            $branchName = (string) $branchStmt->fetchColumn();
+            $content = '<section class="card"><h2>Проверка Excel без изменения базы</h2>'
+                . '<p>Филиал: <strong>' . AdminView::e($branchName) . '</strong></p>'
+                . '<p>Файл: ' . AdminView::e((string) $file['name']) . '</p>'
+                . '<p>Всего строк: ' . (int) $preview['rows_total']
+                . '; корректных: ' . (int) $preview['rows_valid']
+                . '; ошибок: ' . (int) $preview['rows_failed'] . '.</p>';
+            $mappingRows = [];
+            foreach ($preview['mapping'] as $field => $index) {
+                $mappingRows[] = [AdminView::e($field), AdminView::e((string) ($preview['headers'][$index] ?? ''))];
+            }
+            $content .= '<h3>Распознанные колонки</h3>'
+                . AdminView::table(['Поле', 'Колонка Excel'], $mappingRows, 'Нет колонок');
+            $sampleRows = [];
+            foreach ($preview['samples'] as $sample) {
+                $sampleRows[] = [(string) $sample['line'], AdminView::e($sample['name']),
+                    AdminView::e($sample['price']), AdminView::e($sample['quantity'])];
+            }
+            $content .= '<h3>Первые товары</h3>'
+                . AdminView::table(['Строка', 'Название', 'Цена', 'Остаток'], $sampleRows, 'Нет товаров');
+            if ($preview['rows_failed'] > 0) {
+                $errorRows = [];
+                foreach ($preview['errors'] as $error) {
+                    $errorRows[] = [(string) $error['line'], AdminView::e($error['message'])];
+                }
+                $content .= '<h3>Ошибки (первые 20)</h3>'
+                    . AdminView::table(['Строка', 'Ошибка'], $errorRows, '');
+                $content .= AdminView::alert('Исправьте ошибки перед импортом.', true);
+            } elseif ($preview['rows_valid'] > 0) {
+                // Require a fresh upload of the identical file. No persistent temporary files.
+                $content .= '<p class="muted">Проверка прошла успешно. Для подтверждения выберите тот же файл ещё раз. Сервер проверит его контрольную сумму.</p>'
+                    . '<form method="post" action="/admin/import/confirm" enctype="multipart/form-data">'
+                    . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
+                    . '<input type="hidden" name="branch_id" value="' . (int) $branchId . '">'
+                    . '<input type="hidden" name="expected_sha256" value="' . AdminView::e($preview['sha256']) . '">'
+                    . '<label>Тот же Excel-файл<input type="file" name="xlsx_file" accept=".xlsx" required></label>'
+                    . '<button type="submit">Подтвердить и импортировать</button></form>';
+            } else {
+                $content .= AdminView::alert('В файле нет товаров для импорта.', true);
+            }
+            $content .= '<p><a href="/admin/import">Вернуться к выбору файла</a></p></section>';
+            $this->page('Предпросмотр импорта', $content, $admin);
+        } catch (\InvalidArgumentException $e) {
+            $this->flash($e->getMessage(), true);
+            Response::redirect('/admin/import');
+        } catch (Throwable $e) {
+            error_log('[svet22-import-preview] ' . $e::class . ': ' . $e->getMessage());
+            $this->flash('Не удалось проверить файл. Подробности в журнале сервера.', true);
+            Response::redirect('/admin/import');
+        }
+    }
+
     public function import(Request $request): never
     {
         $admin = $this->currentAdmin();
@@ -286,6 +360,26 @@ final class AdminController
         }
         if ((int) $file['size'] > 5 * 1024 * 1024) {
             $this->flash('Размер файла не должен превышать 5 МБ.', true);
+            Response::redirect('/admin/import');
+        }
+
+        $expected = (string) ($data['expected_sha256'] ?? '');
+        $actual = hash_file('sha256', (string) $file['tmp_name']);
+        if (!preg_match('/^[a-f0-9]{64}$/', $expected) || !is_string($actual)
+            || !hash_equals($expected, $actual)) {
+            $this->flash('Файл отличается от проверенного. Повторите предпросмотр.', true);
+            Response::redirect('/admin/import');
+        }
+        try {
+            $check = (new XlsxImportService($this->db))->previewImport(
+                (string) $file['tmp_name'], (string) $file['name'], (int) $branchId
+            );
+            if ($check['rows_failed'] > 0 || $check['rows_valid'] === 0) {
+                $this->flash('В файле обнаружены ошибки. Повторите проверку.', true);
+                Response::redirect('/admin/import');
+            }
+        } catch (Throwable $e) {
+            $this->flash('Проверка файла не прошла. Повторите предпросмотр.', true);
             Response::redirect('/admin/import');
         }
 
