@@ -42,6 +42,24 @@ jobs:
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Restore Gradle Wrapper JAR'
             git push origin HEAD:feature/excel-column-mapping
           fi
+      - name: Restore Firebase config from Actions secret
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "::error::Missing Actions secret GOOGLE_SERVICES_JSON_BASE64. Encode android/app/google-services.json as Base64 and add it to repository Actions secrets."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          python3 - <<'PY'
+          import json
+          with open("android/app/google-services.json", encoding="utf-8") as f:
+              config = json.load(f)
+          clients = config.get("client", [])
+          if not any(c.get("client_info", {}).get("android_client_info", {}).get("package_name") == "ru.svet22.app" for c in clients):
+              raise SystemExit("Firebase config has no client for ru.svet22.app")
+          print("Firebase configuration restored for ru.svet22.app")
+          PY
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
