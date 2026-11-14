@@ -253,6 +253,9 @@ final class AdminController
     public function previewImport(Request $request): never
     {
         $admin = $this->currentAdmin();
+        // Starting a new preview invalidates any earlier confirmation.
+        $this->auth->start();
+        unset($_SESSION['excel_import_preview']);
         $data = $request->post();
         if (!$this->auth->verifyCsrf($data['csrf_token'] ?? null)) {
             $this->flash('Форма устарела.', true);
