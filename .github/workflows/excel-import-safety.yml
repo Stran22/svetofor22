@@ -37,6 +37,8 @@ jobs:
         run: php tests/excel_import_validation.php
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
       - name: Create isolated test database schema
         run: |
           for migration in 001_initial_schema.sql 003_firebase_push.sql 004_push_device_deliveries.sql 005_excel_column_mappings.sql 006_upload_log_mapping_hash.sql; do
