@@ -16,6 +16,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.svet22.app.data.model.ContestDetail
@@ -59,7 +60,7 @@ fun ContestScreen(id: Int, isAuthenticated: Boolean, onLogin: () -> Unit) {
         loading = true
         error = null
         try {
-            val token = if (isAuthenticated) FcmRegistrationManager.getAccessToken(context) else null
+            val token = if (isAuthenticated) withContext(Dispatchers.IO) { FcmRegistrationManager.getAccessToken(context) } else null
             contest = repository.detail(id, token)
         } catch (e: Exception) {
             error = e.message ?: "Не удалось загрузить конкурс"
@@ -107,7 +108,7 @@ fun ContestScreen(id: Int, isAuthenticated: Boolean, onLogin: () -> Unit) {
                     error = null
                     scope.launch {
                         try {
-                            val token = FcmRegistrationManager.getAccessToken(context)
+                            val token = withContext(Dispatchers.IO) { FcmRegistrationManager.getAccessToken(context) }
                             if (token.isNullOrBlank()) error("Необходимо войти через VK")
                             else {
                                 repository.join(id, token)
