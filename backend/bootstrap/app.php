@@ -40,6 +40,11 @@ try {
     $router->get('/api/v1/categories', [$api, 'categories']);
     $router->get('/api/v1/products', [$api, 'products']);
     $router->get('/api/v1/featured-products', [new \Svet22\Controllers\FeaturedProductsController($db), 'api']);
+    $contests = new \Svet22\Controllers\ContestController($db);
+    $router->get('/api/v1/home-promotions', [$contests, 'home']);
+    $router->get('/api/v1/contests', [$contests, 'index']);
+    $router->get('/api/v1/contests/{id}', [$contests, 'show']);
+    $router->post('/api/v1/contests/{id}/join', [$contests, 'join']);
     $router->post('/api/v1/analytics/search', [new \Svet22\Controllers\SearchAnalyticsController($db), 'record']);
     $router->get('/api/v1/products/{id}', [$api, 'product']);
     $router->get('/api/v1/products/{id}/reviews', [$reviews, 'index']);
