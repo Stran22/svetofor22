@@ -68,6 +68,7 @@ fun HomeScreen(
     onOpenProduct: (Product) -> Unit
 ) {
     var branchMenuExpanded by remember { mutableStateOf(false) }
+    var showAllFeatured by remember { mutableStateOf(false) }
     val featured = remember(vm.products) { vm.products.filter { it.price?.toDoubleOrNull() != null }.take(12) }
     val categories = remember(vm.categories) { vm.categories.filter { it.parentId == null }.take(12) }
 
@@ -160,34 +161,41 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(27.dp))
-            SectionHeading("Категории товаров", "Все категории", onOpenCatalog)
-            Spacer(Modifier.height(13.dp))
-            if (categories.isEmpty()) {
-                Text(
-                    if (vm.loadingCategories) "Загружаем категории…" else "Категории пока не добавлены",
-                    modifier = Modifier.padding(horizontal = 18.dp), color = Muted
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    categories.forEach { category ->
-                        Card(
-                            onClick = onOpenCatalog,
-                            modifier = Modifier.width(124.dp).height(108.dp),
-                            shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White)
+            Spacer(Modifier.height(22.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    .background(Color(0xFFF2F3F5), RoundedCornerShape(22.dp))
+                    .padding(horizontal = 10.dp, vertical = 17.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Супер выгода", color = Red, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, modifier = Modifier.weight(1f))
+                    if (vm.featuredProducts.size > 6) {
+                        Text(
+                            if (showAllFeatured) "Свернуть" else "Смотреть все ›",
+                            modifier = Modifier.clickable { showAllFeatured = !showAllFeatured },
+                            color = Muted, fontSize = 12.sp
+                        )
+                    }
+                }
+                Spacer(Modifier.height(13.dp))
+                val offers = if (showAllFeatured) vm.featuredProducts else vm.featuredProducts.take(6)
+                if (offers.isEmpty()) {
+                    Text(
+                        if (vm.loadingFeatured) "Загружаем предложения…" else "Скоро здесь появятся специальные предложения",
+                        color = Muted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 12.dp)
+                    )
+                } else {
+                    offers.chunked(3).forEach { rowProducts ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(12.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(categorySymbol(category.name), fontSize = 28.sp)
-                                Text(category.name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 2, lineHeight = 15.sp, overflow = TextOverflow.Ellipsis)
+                            rowProducts.forEach { product ->
+                                FeaturedTile(product, onClick = { onOpenProduct(product) }, modifier = Modifier.weight(1f))
                             }
+                            repeat(3 - rowProducts.size) { Spacer(Modifier.weight(1f)) }
                         }
+                        Spacer(Modifier.height(12.dp))
                     }
                 }
             }
@@ -218,6 +226,38 @@ fun HomeScreen(
                 ) {
                     featured.forEach { product ->
                         ProductCard(product, onClick = { onOpenProduct(product) })
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(27.dp))
+            SectionHeading("Категории товаров", "Все категории", onOpenCatalog)
+            Spacer(Modifier.height(13.dp))
+            if (categories.isEmpty()) {
+                Text(
+                    if (vm.loadingCategories) "Загружаем категории…" else "Категории пока не добавлены",
+                    modifier = Modifier.padding(horizontal = 18.dp), color = Muted
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    categories.forEach { category ->
+                        Card(
+                            onClick = onOpenCatalog,
+                            modifier = Modifier.width(124.dp).height(108.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(12.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(categorySymbol(category.name), fontSize = 28.sp)
+                                Text(category.name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 2, lineHeight = 15.sp, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
                     }
                 }
             }
@@ -321,5 +361,37 @@ private fun categorySymbol(name: String): String {
         "чай" in n || "кофе" in n -> "☕"
         "быт" in n || "хими" in n -> "🧴"
         else -> "🛍️"
+    }
+}
+
+@Composable
+private fun FeaturedTile(product: Product, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.clickable(onClick = onClick)) {
+        Box(
+            modifier = Modifier.fillMaxWidth().height(104.dp)
+                .background(Color.White, RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            ProductPhoto(product.imageUrl)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            product.name, fontSize = 11.sp, lineHeight = 13.sp,
+            color = Dark, minLines = 2, maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.height(6.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Yellow, shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                (product.price ?: "—") + " ₽",
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 9.dp),
+                fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
+                maxLines = 1, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                color = Dark
+            )
+        }
     }
 }
