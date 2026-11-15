@@ -80,6 +80,7 @@ try {
     $router->get('/admin/contests/new', [$adminContests, 'edit']);
     $router->get('/admin/contests/{id}/edit', [$adminContests, 'edit']);
     $router->post('/admin/contests/save', [$adminContests, 'save']);
+    $router->post('/admin/contests/{id}/image/{kind}', [new \Svet22\Controllers\AdminContestImageController($db), 'upload']);
     $router->get('/admin/contests/{id}/participants', [$adminContests, 'participants']);
     $router->get('/admin/featured', [new \Svet22\Controllers\FeaturedProductsController($db), 'index']);
     $router->post('/admin/featured/{id}', [new \Svet22\Controllers\FeaturedProductsController($db), 'save']);
