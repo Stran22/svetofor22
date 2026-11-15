@@ -83,7 +83,7 @@ class CatalogViewModel(
         if (normalized.length !in 2..100) return
         val branchId = selectedBranch?.id
         searchAnalyticsJob = viewModelScope.launch {
-            delay(1200)
+            delay(2000)
             SearchAnalyticsRepository.record(getApplication(), normalized, branchId)
         }
     }
