@@ -28,6 +28,7 @@ try {
     $db = Database::connection();
     $api = new ApiController($db);
     $admin = new AdminController($db);
+    $adminCategories = new \Svet22\Controllers\AdminCategoriesController($db);
     $adminReviews = new AdminReviewsController($db);
     $reviews = new ReviewController($db);
     $push = new PushController($db);
@@ -71,9 +72,11 @@ try {
     $router->get('/admin/products/{id}', [$admin, 'productEdit']);
     $router->post('/admin/products/{id}', [$admin, 'updateProduct']);
     $router->post('/admin/products/{id}/photo', [new \Svet22\Controllers\AdminProductImageController($db), 'upload']);
-    $router->get('/admin/categories', [$admin, 'categories']);
-    $router->post('/admin/categories', [$admin, 'createCategory']);
-    $router->post('/admin/categories/{id}/toggle', [$admin, 'toggleCategory']);
+    $router->get('/admin/categories', [$adminCategories, 'index']);
+    $router->post('/admin/categories', [$adminCategories, 'create']);
+    $router->post('/admin/categories/{id}/toggle', [$adminCategories, 'toggle']);
+    $router->get('/admin/categories/{id}/edit', [$adminCategories, 'edit']);
+    $router->post('/admin/categories/{id}/edit', [$adminCategories, 'update']);
     $router->get('/admin/branches', [$admin, 'branches']);
     $router->post('/admin/branches', [$admin, 'createBranch']);
     $router->post('/admin/branches/{id}/toggle', [$admin, 'toggleBranch']);
