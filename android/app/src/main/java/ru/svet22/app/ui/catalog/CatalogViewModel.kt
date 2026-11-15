@@ -8,11 +8,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ru.svet22.app.data.model.Branch
 import ru.svet22.app.data.model.Category
 import ru.svet22.app.data.model.Product
 import ru.svet22.app.data.repository.ProductRepository
+import ru.svet22.app.data.repository.SearchAnalyticsRepository
 
 class CatalogViewModel(
     application: Application
@@ -55,6 +57,7 @@ class CatalogViewModel(
     fun changeGlobalSearchMode(enabled: Boolean) {
         if (globalSearchMode == enabled) return
         globalSearchMode = enabled
+        searchAnalyticsJob?.cancel()
         search = ""
         selectedBranch?.let { loadProducts(it.id, effectiveCategoryId()) }
     }
@@ -71,10 +74,23 @@ class CatalogViewModel(
         loadCategories()
     }
 
-    fun updateSearch(value: String) { search = value }
+    private var searchAnalyticsJob: Job? = null
+
+    fun updateSearch(value: String) {
+        search = value
+        searchAnalyticsJob?.cancel()
+        val normalized = value.trim().replace(Regex("\\s+"), " ")
+        if (normalized.length !in 2..100) return
+        val branchId = selectedBranch?.id
+        searchAnalyticsJob = viewModelScope.launch {
+            delay(1200)
+            SearchAnalyticsRepository.record(getApplication(), normalized, branchId)
+        }
+    }
 
     fun selectCategory(category: Category) {
         selectedCategory = category
+        searchAnalyticsJob?.cancel()
         search = ""
         // Only leaf categories contain products. Parent categories show their children.
         if (categories.any { it.parentId == category.id }) {
@@ -96,12 +112,14 @@ class CatalogViewModel(
 
     fun clearCategory() {
         selectedCategory = null
+        searchAnalyticsJob?.cancel()
         search = ""
         selectedBranch?.let { loadProducts(it.id, effectiveCategoryId()) }
     }
 
     fun selectBranch(branch: Branch) {
         if (selectedBranch?.id == branch.id) return
+        searchAnalyticsJob?.cancel()
         selectedBranch = branch
         preferences.edit().putInt("selected_branch_id", branch.id).apply()
         products = emptyList()
