@@ -84,6 +84,37 @@ final class AdminSubscriptionsController
         }
         $content .= '</select></label><label>Товар, артикул или штрихкод<input type="search" name="q" maxlength="100" value="' . $e($search) . '"></label>'
             . '<button type="submit">Показать</button></form></section>';
+        // Спрос считаем только по активным подпискам, независимо от фильтра статуса списка.
+        $demandWhere = ["s.status = 'active'"];
+        $demandParams = [];
+        if ($branchId > 0) {
+            $demandWhere[] = 's.branch_id = ?';
+            $demandParams[] = $branchId;
+        }
+        if ($search !== '') {
+            $demandWhere[] = '(p.name LIKE ? OR p.article LIKE ? OR p.barcode LIKE ?)';
+            $like = '%' . $search . '%';
+            array_push($demandParams, $like, $like, $like);
+        }
+        $demandSql = 'SELECT p.name AS product_name, b.name AS branch_name, COUNT(*) AS waiting_count'
+            . $base . ' WHERE ' . implode(' AND ', $demandWhere)
+            . ' GROUP BY s.product_id, s.branch_id, p.name, b.name'
+            . ' ORDER BY waiting_count DESC, p.name ASC, b.name ASC LIMIT 50';
+        $demandStmt = $this->db->prepare($demandSql);
+        $demandStmt->execute($demandParams);
+        $demandRows = [];
+        foreach ($demandStmt->fetchAll(PDO::FETCH_ASSOC) as $demandRow) {
+            $demandRows[] = [
+                $demandRow['product_name'],
+                $demandRow['branch_name'],
+                (int) $demandRow['waiting_count'],
+            ];
+        }
+        $content .= '<section class="card"><h2>Самые ожидаемые товары</h2>'
+            . '<p class="muted">Количество активных подписок на товар в конкретном магазине. '
+            . 'Учитывается выбранный филиал и поиск по товару; статус в фильтре списка на эту сводку не влияет.</p>'
+            . AdminView::table(['Товар', 'Магазин', 'Ожидают'], $demandRows, 'Активных ожиданий нет.')
+            . '</section>';
         $tableRows = [];
         foreach ($rows as $row) {
             $tableRows[] = [
