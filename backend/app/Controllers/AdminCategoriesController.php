@@ -143,6 +143,8 @@ final class AdminCategoriesController
         $html = '';
         foreach ($rows as $row) {
             $id = (int)$row['id'];
+            // В списке родителей показываем только категории верхнего уровня.
+            if ($row['parent_id'] !== null) continue;
             if ($id === $exclude || ($exclude !== null && $this->isDescendant($id, $exclude))) continue;
             $html .= '<option value="' . $id . '"' . ($selected === $id ? ' selected' : '') . '>'
                 . AdminView::e($row['name']) . ' (ID ' . $id . ')</option>';
