@@ -258,7 +258,7 @@ final class XlsxImportService
                     }
                     $categoryConflict = $cataloguePreflight->checkCategory($row['category']);
                     if ($categoryConflict !== null) {
-                        throw new \\InvalidArgumentException($categoryConflict);
+                        throw new \InvalidArgumentException($categoryConflict);
                     }
                     $conflict = $cataloguePreflight->checkProductIdentity($row);
                     if ($conflict !== null) {
@@ -479,11 +479,11 @@ final class XlsxImportService
             return (int) $ids[0];
         }
         if (count($ids) > 1) {
-            throw new \\InvalidArgumentException(
+            throw new \InvalidArgumentException(
                 'Категория «' . $name . '» встречается несколько раз. Уточните категорию в Excel.'
             );
         }
-        throw new \\InvalidArgumentException(
+        throw new \InvalidArgumentException(
             'Категория «' . $name . '» не найдена среди активных категорий. Сначала создайте её в админке.'
         );
     }
