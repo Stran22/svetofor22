@@ -32,6 +32,34 @@ final class AdminCategoriesController
             if ($result === 0) $result = (int)$a['id'] <=> (int)$b['id'];
             return $direction === 'desc' ? -$result : $result;
         });
+        // Сортировка применяется к соседним узлам, а не разрушает дерево.
+        $childrenByParent = [];
+        $knownIds = [];
+        foreach ($categories as $category) $knownIds[(int)$category['id']] = true;
+        foreach ($categories as $category) {
+            $parent = $category['parent_id'] === null ? 0 : (int)$category['parent_id'];
+            if ($parent !== 0 && !isset($knownIds[$parent])) $parent = 0;
+            $childrenByParent[$parent][] = $category;
+        }
+        $tree = [];
+        $visited = [];
+        $walk = function (int $parent, int $depth) use (&$walk, &$tree, &$visited, $childrenByParent): void {
+            foreach ($childrenByParent[$parent] ?? [] as $node) {
+                $id = (int)$node['id'];
+                if (isset($visited[$id])) continue;
+                $visited[$id] = true;
+                $node['_depth'] = $depth;
+                $tree[] = $node;
+                $walk($id, $depth + 1);
+            }
+        };
+        $walk(0, 0);
+        foreach ($categories as $category) {
+            if (isset($visited[(int)$category['id']])) continue;
+            $walk((int)$category['id'], 0);
+            $category['_depth'] = 0;
+            $tree[] = $category;
+        }
         $csrf = AdminView::e($this->auth->csrfToken());
         $content = '<section class="card"><p>Разделы и подразделы каталога. Отключение не удаляет товары.</p></section>';
         if ($admin['role'] === 'admin') {
@@ -45,7 +73,7 @@ final class AdminCategoriesController
                 . '<button type="submit">Добавить</button></form></section>';
         }
         $rows = [];
-        foreach ($categories as $category) {
+        foreach ($tree as $category) {
             $id = (int) $category['id'];
             $edit = $admin['role'] === 'admin'
                 ? '<a href="/admin/categories/' . $id . '/edit">Редактировать</a> '
@@ -58,14 +86,17 @@ final class AdminCategoriesController
                 : '—';
             $rows[] = [
                 $id,
-                AdminView::e($category['name']),
+                '<span style="display:inline-block;padding-left:' . (min((int)$category['_depth'], 12) * 22) . 'px">'
+                    . ((int)$category['_depth'] === 0 ? '📁 <strong>' : '↳ 📂 ')
+                    . AdminView::e($category['name'])
+                    . ((int)$category['_depth'] === 0 ? '</strong>' : '') . '</span>',
                 $category['parent_id'] === null ? '—' : (int)$category['parent_id'],
                 (int)$category['sort_order'],
                 (int)$category['is_active'] ? 'Активна' : 'Отключена',
                 $edit,
             ];
         }
-        $content .= '<section class="card"><strong>Сортировка списка:</strong> '
+        $content .= '<section class="card"><strong>Дерево категорий — сортировка внутри каждого уровня:</strong> '
             . '<a href="/admin/categories?sort=id&amp;dir=asc">ID ↑</a> · '
             . '<a href="/admin/categories?sort=id&amp;dir=desc">ID ↓</a> · '
             . '<a href="/admin/categories?sort=name&amp;dir=asc">Название А–Я</a> · '
