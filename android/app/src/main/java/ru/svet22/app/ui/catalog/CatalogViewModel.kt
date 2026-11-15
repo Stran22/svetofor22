@@ -27,6 +27,10 @@ class CatalogViewModel(
         private set
     var categories by mutableStateOf<List<Category>>(emptyList())
         private set
+    var featuredProducts by mutableStateOf<List<Product>>(emptyList())
+        private set
+    var loadingFeatured by mutableStateOf(false)
+        private set
     var products by mutableStateOf<List<Product>>(emptyList())
         private set
     var selectedBranch by mutableStateOf<Branch?>(null)
@@ -124,9 +128,30 @@ class CatalogViewModel(
         preferences.edit().putInt("selected_branch_id", branch.id).apply()
         products = emptyList()
         productsError = null
+        loadFeaturedProducts(branch.id)
         if (globalSearchMode || selectedCategory == null ||
             categories.none { it.parentId == selectedCategory?.id }) {
             loadProducts(branch.id, effectiveCategoryId())
+        }
+    }
+
+    private var featuredJob: Job? = null
+
+    private fun loadFeaturedProducts(branchId: Int) {
+        featuredJob?.cancel()
+        featuredProducts = emptyList()
+        featuredJob = viewModelScope.launch {
+            loadingFeatured = true
+            try {
+                val result = repository.getFeaturedProducts(branchId)
+                if (selectedBranch?.id == branchId) featuredProducts = result
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The catalog must continue to work if promotions are unavailable.
+            } finally {
+                if (selectedBranch?.id == branchId) loadingFeatured = false
+            }
         }
     }
 
