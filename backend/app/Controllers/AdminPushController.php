@@ -107,7 +107,7 @@ final class AdminPushController
         $tableRows = [];
         foreach ($rows as $row) {
             $devices = (int) $row['devices_total'];
-            $deviceText = $devices === 0 ? 'Нет записей' :
+            $deviceText = $devices === 0 ? '—' :
                 'Всего ' . $devices . '; отправлено ' . (int) $row['devices_sent']
                 . '; ошибок ' . (int) $row['devices_failed']
                 . '; неизвестно ' . (int) $row['devices_unknown'];
