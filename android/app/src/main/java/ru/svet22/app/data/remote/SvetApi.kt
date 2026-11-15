@@ -47,6 +47,9 @@ interface SvetApi {
         @Query("category_id") categoryId: Int? = null
     ): ApiEnvelope<List<Product>>
 
+    @GET("featured-products")
+    suspend fun featuredProducts(@Query("branch_id") branchId: Int): ApiEnvelope<List<Product>>
+
     @GET("products/{id}/reviews")
     suspend fun productReviews(
         @Path("id") productId: Int,
