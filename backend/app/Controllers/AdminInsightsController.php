@@ -53,18 +53,34 @@ final class AdminInsightsController
         $stock->execute($branchId ? [$branchId] : []);
         $stockStats = $stock->fetch(PDO::FETCH_ASSOC);
 
+        // Рейтинг по уникальным покупателям, а не количеству строк подписок.
+        // При выборе всех филиалов считаем одного покупателя один раз на товар.
         $topStmt = $this->db->prepare(
-            'SELECT p.name, b.name AS branch_name, COUNT(*) AS interest,'
-            . ' COALESCE(st.quantity,0) AS quantity'
+            'SELECT p.id AS product_id,p.name,COUNT(DISTINCT s.user_id) AS interest,'
+            . ' COUNT(DISTINCT s.branch_id) AS branches_count'
             . ' FROM subscriptions s JOIN products p ON p.id=s.product_id'
-            . ' JOIN branches b ON b.id=s.branch_id'
-            . ' LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id'
-            . " WHERE s.status='active'" . ($branchId ? ' AND s.branch_id=?' : '')
-            . ' GROUP BY s.product_id,s.branch_id,p.name,b.name,st.quantity'
-            . ' ORDER BY interest DESC,p.name ASC LIMIT 8'
+            . " WHERE s.status='active' AND p.is_active=1"
+            . ($branchId ? ' AND s.branch_id=?' : '')
+            . ' GROUP BY p.id,p.name ORDER BY interest DESC,p.name ASC LIMIT 10'
         );
         $topStmt->execute($branchId ? [$branchId] : []);
         $top = $topStmt->fetchAll(PDO::FETCH_ASSOC);
+        $topDetails = [];
+        if ($top) {
+            $ids = array_map(static fn($r) => (int) $r['product_id'], $top);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $detailStmt = $this->db->prepare(
+                'SELECT s.product_id,b.name AS branch_name,COUNT(DISTINCT s.user_id) AS people'
+                . ' FROM subscriptions s JOIN branches b ON b.id=s.branch_id'
+                . " WHERE s.status='active' AND s.product_id IN (" . $placeholders . ')'
+                . ($branchId ? ' AND s.branch_id=?' : '')
+                . ' GROUP BY s.product_id,s.branch_id,b.name ORDER BY people DESC,b.name'
+            );
+            $detailStmt->execute($branchId ? array_merge($ids, [$branchId]) : $ids);
+            foreach ($detailStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $topDetails[(int) $r['product_id']][] = $r;
+            }
+        }
 
         // Спрос на отсутствующие товары: только действующие подписки и фактический нулевой остаток.
         $demandStmt = $this->db->prepare(
@@ -107,7 +123,7 @@ final class AdminInsightsController
         );
         $branchRows = $branchStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $style = '<style>.insight-hero{background:linear-gradient(115deg,#123d72,#176f83);color:#fff;border-radius:16px;padding:25px;margin-bottom:18px}.insight-hero h2{font-size:25px;margin:4px 0}.insight-hero p{margin:5px 0;color:#dceef5}.insight-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:16px 0}.insight-kpi{border:1px solid #dce6f1;background:#fff;border-radius:13px;padding:18px}.insight-kpi strong{display:block;font-size:29px;color:#123d72}.insight-kpi span{font-size:13px;color:#64748b}.insight-chart{display:flex;align-items:end;gap:3px;height:175px;border-bottom:1px solid #d5dfec;padding-top:10px}.insight-bar{background:#2877b8;flex:1;min-width:2px;border-radius:4px 4px 0 0}.insight-bar:hover{background:#13a5a1}.insight-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.insight-filters label{min-width:160px;margin:0}.insight-filters select{margin:3px 0 0}.insight-progress{background:#e7eef5;border-radius:8px;height:9px;overflow:hidden}.insight-progress span{display:block;background:#2084b9;height:100%}.insight-note{font-size:13px;color:#687789}.insight-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}@media(max-width:600px){.insight-two{grid-template-columns:1fr}}.insight-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px;margin-top:15px}.insight-branch{border:1px solid #dce6f1;border-radius:14px;padding:19px;background:linear-gradient(180deg,#fff,#f7fbff)}.insight-branch h3{font-size:17px;margin:0 0 14px;color:#123d72}.insight-branch-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.insight-branch-number{font-size:25px;font-weight:700;color:#173f70;display:block}.insight-branch-label{font-size:12px;color:#64748b}.insight-branch-wait{margin-top:14px;border-top:1px solid #e4ebf4;padding-top:12px}.insight-branch-wait strong{font-size:21px;color:#0f7280}.insight-branch-meter{display:flex;height:10px;border-radius:8px;background:#e9eef5;overflow:hidden;margin:12px 0 7px}.insight-branch-meter .available{background:#19a381}.insight-branch-meter .unavailable{background:#e6a048}.insight-branch-caption{font-size:12px;color:#64748b}</style>';
+        $style = '<style>.insight-hero{background:linear-gradient(115deg,#123d72,#176f83);color:#fff;border-radius:16px;padding:25px;margin-bottom:18px}.insight-hero h2{font-size:25px;margin:4px 0}.insight-hero p{margin:5px 0;color:#dceef5}.insight-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:16px 0}.insight-kpi{border:1px solid #dce6f1;background:#fff;border-radius:13px;padding:18px}.insight-kpi strong{display:block;font-size:29px;color:#123d72}.insight-kpi span{font-size:13px;color:#64748b}.insight-chart{display:flex;align-items:end;gap:3px;height:175px;border-bottom:1px solid #d5dfec;padding-top:10px}.insight-bar{background:#2877b8;flex:1;min-width:2px;border-radius:4px 4px 0 0}.insight-bar:hover{background:#13a5a1}.insight-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.insight-filters label{min-width:160px;margin:0}.insight-filters select{margin:3px 0 0}.insight-progress{background:#e7eef5;border-radius:8px;height:9px;overflow:hidden}.insight-progress span{display:block;background:#2084b9;height:100%}.insight-note{font-size:13px;color:#687789}.insight-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}@media(max-width:600px){.insight-two{grid-template-columns:1fr}}.insight-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px;margin-top:15px}.insight-branch{border:1px solid #dce6f1;border-radius:14px;padding:19px;background:linear-gradient(180deg,#fff,#f7fbff)}.insight-branch h3{font-size:17px;margin:0 0 14px;color:#123d72}.insight-branch-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.insight-branch-number{font-size:25px;font-weight:700;color:#173f70;display:block}.insight-branch-label{font-size:12px;color:#64748b}.insight-branch-wait{margin-top:14px;border-top:1px solid #e4ebf4;padding-top:12px}.insight-branch-wait strong{font-size:21px;color:#0f7280}.insight-branch-meter{display:flex;height:10px;border-radius:8px;background:#e9eef5;overflow:hidden;margin:12px 0 7px}.insight-branch-meter .available{background:#19a381}.insight-branch-meter .unavailable{background:#e6a048}.insight-branch-caption{font-size:12px;color:#64748b}.insight-rank{padding:10px 0 12px;border-bottom:1px solid #edf1f7}.insight-rank:last-of-type{border-bottom:0}.insight-rank-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}.insight-rank-name{display:flex;align-items:center;gap:9px;min-width:0;overflow-wrap:anywhere}.insight-rank-index{display:inline-flex;align-items:center;justify-content:center;flex:none;width:25px;height:25px;background:#eaf3fc;color:#164d7c;border-radius:7px;font-size:12px}.insight-rank-head strong{white-space:nowrap;color:#123d72}.insight-rank-detail{font-size:12px;color:#687789;margin-top:7px;line-height:1.5}</style>';
         $content = $style
             . '<div class="insight-hero"><div style="font-size:12px;letter-spacing:1px">СВЕТОФОР · АНАЛИТИКА</div>'
             . '<h2>Панель руководителя</h2><p>Интерес покупателей, подписки и доступность товаров — по реальным данным системы.</p></div>'
@@ -141,14 +157,28 @@ final class AdminInsightsController
             $content .= '<p class="muted">Пока нет активных подписок на товары.</p>';
         } else {
             $max = max(1, (int) $top[0]['interest']);
+            $rank = 0;
             foreach ($top as $r) {
-                $percent = round(100 * (int) $r['interest'] / $max);
-                $content .= '<div style="margin-bottom:15px"><div style="display:flex;justify-content:space-between;gap:12px"><span>'
-                    . $e($r['name']) . '<small class="muted"> · ' . $e($r['branch_name']) . '</small></span>'
-                    . '<strong>' . (int) $r['interest'] . '</strong></div>'
-                    . '<div class="insight-progress"><span style="width:' . $percent . '%"></span></div>'
-                    . '<small class="insight-note">Остаток: ' . $e($r['quantity']) . '</small></div>';
+                ++$rank;
+                $productId = (int) $r['product_id'];
+                $people = (int) $r['interest'];
+                $percent = round(100 * $people / $max, 1);
+                $content .= '<div class="insight-rank">'
+                    . '<div class="insight-rank-head"><span class="insight-rank-name"><b class="insight-rank-index">' . $rank . '</b>'
+                    . $e($r['name']) . '</span><strong>' . $people . ' чел.</strong></div>'
+                    . '<div class="insight-progress"><span style="width:' . $percent . '%"></span></div>';
+                if (!$branchId && isset($topDetails[$productId])) {
+                    $labels = [];
+                    foreach ($topDetails[$productId] as $detail) {
+                        $labels[] = $e($detail['branch_name']) . ': ' . (int) $detail['people'];
+                    }
+                    $content .= '<div class="insight-rank-detail">' . implode(' <span aria-hidden="true">·</span> ', $labels) . '</div>';
+                }
+                $content .= '</div>';
             }
+            $content .= '<p class="insight-note">Рейтинг по уникальным покупателям с активной подпиской на товар.'
+                . ($branchId ? ' Показан выбранный филиал.' : ' Разбивка по филиалам может суммарно превышать общий показатель: один человек может ждать товар в нескольких магазинах.')
+                . '</p>';
         }
         $content .= '</section></div><section class="card"><h2>Сигналы спроса: товары без остатка</h2>'
             . '<p class="insight-note">Товары, которые сейчас отсутствуют, но на их поступление подписаны покупатели. Это не прогноз продаж.</p>';
