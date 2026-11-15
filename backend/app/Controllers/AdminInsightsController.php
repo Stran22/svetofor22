@@ -66,6 +66,19 @@ final class AdminInsightsController
         $topStmt->execute($branchId ? [$branchId] : []);
         $top = $topStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Спрос на отсутствующие товары: только действующие подписки и фактический нулевой остаток.
+        $demandStmt = $this->db->prepare(
+            'SELECT p.name,b.name AS branch_name,COUNT(DISTINCT s.user_id) AS people'
+            . ' FROM subscriptions s JOIN products p ON p.id=s.product_id'
+            . ' JOIN branches b ON b.id=s.branch_id'
+            . ' LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id'
+            . " WHERE s.status='active' AND p.is_active=1 AND COALESCE(st.quantity,0)<=0"
+            . ($branchId ? ' AND s.branch_id=?' : '')
+            . ' GROUP BY s.product_id,s.branch_id,p.name,b.name ORDER BY people DESC,p.name LIMIT 6'
+        );
+        $demandStmt->execute($branchId ? [$branchId] : []);
+        $missingDemand = $demandStmt->fetchAll(PDO::FETCH_ASSOC);
+
         $dailyStmt = $this->db->prepare(
             'SELECT DATE(created_at) AS day, COUNT(*) AS amount FROM subscriptions'
             . ' WHERE created_at >= ?' . ($branchId ? ' AND branch_id=?' : '')
@@ -137,7 +150,18 @@ final class AdminInsightsController
                     . '<small class="insight-note">Остаток: ' . $e($r['quantity']) . '</small></div>';
             }
         }
-        $content .= '</section></div><section class="card"><h2>Сравнение филиалов</h2>';
+        $content .= '</section></div><section class="card"><h2>Сигналы спроса: товары без остатка</h2>'
+            . '<p class="insight-note">Товары, которые сейчас отсутствуют, но на их поступление подписаны покупатели. Это не прогноз продаж.</p>';
+        if (!$missingDemand) {
+            $content .= '<p class="muted">Сейчас нет активных подписок на отсутствующие товары.</p>';
+        } else {
+            $alertRows = [];
+            foreach ($missingDemand as $r) {
+                $alertRows[] = [$e($r['name']), $e($r['branch_name']), (int) $r['people'] . ' чел.'];
+            }
+            $content .= AdminView::table(['Товар', 'Филиал', 'Ожидают'], $alertRows);
+        }
+        $content .= '</section><section class="card"><h2>Сравнение филиалов</h2>';
         $rows = [];
         foreach ($branchRows as $b) {
             if ($branchId && (int) $b['id'] !== $branchId) {
