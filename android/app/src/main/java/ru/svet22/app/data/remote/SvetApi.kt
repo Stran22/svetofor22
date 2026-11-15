@@ -18,6 +18,22 @@ import ru.svet22.app.data.model.CreateSubscriptionRequest
 import ru.svet22.app.data.model.CancelSubscriptionRequest
 
 interface SvetApi {
+    @GET("home-promotions")
+    suspend fun homePromotions(): ApiEnvelope<ru.svet22.app.data.model.HomePromotions>
+
+    @GET("contests/{id}")
+    suspend fun contestDetail(
+        @Path("id") id: Int,
+        @Header("Authorization") bearer: String?
+    ): ApiEnvelope<ru.svet22.app.data.model.ContestDetail>
+
+    @POST("contests/{id}/join")
+    suspend fun joinContest(
+        @Path("id") id: Int,
+        @Header("Authorization") bearer: String,
+        @Body body: ru.svet22.app.data.model.ContestJoinRequest
+    ): ApiEnvelope<ru.svet22.app.data.model.ContestJoinResult>
+
     @GET("subscriptions")
     suspend fun subscriptions(@Header("Authorization") bearer: String): ApiEnvelope<SubscriptionsResponse>
 
