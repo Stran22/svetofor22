@@ -530,37 +530,111 @@ final class AdminController
     public function products(Request $request): never
     {
         $admin = $this->currentAdmin();
-        $q = trim((string) ($request->query()['q'] ?? ''));
-        $sql = 'SELECT p.id, p.name, p.barcode, p.article, c.name AS category_name,
-                       (SELECT COUNT(*) FROM stock s WHERE s.product_id = p.id) AS branches_count
-                FROM products p LEFT JOIN categories c ON c.id = p.category_id
-                WHERE p.is_active = 1';
+        $query = $request->query();
+        $q = mb_substr(trim((string)($query['q'] ?? '')), 0, 100);
+        $categoryId = filter_var($query['category_id'] ?? 0, FILTER_VALIDATE_INT);
+        $categoryId = $categoryId === false || $categoryId < 0 ? 0 : (int)$categoryId;
+        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT);
+        $page = $page === false || $page < 1 ? 1 : (int)$page;
+        $perPage = 50;
+
+        $categories = $this->db->query('SELECT id, parent_id, name FROM categories ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
+        $children = [];
+        $categoryNames = [];
+        foreach ($categories as $category) {
+            $id = (int)$category['id'];
+            $categoryNames[$id] = (string)$category['name'];
+            $parent = $category['parent_id'] === null ? 0 : (int)$category['parent_id'];
+            $children[$parent][] = $id;
+        }
+        if ($categoryId !== 0 && !isset($categoryNames[$categoryId])) $categoryId = 0;
+
+        $where = ['p.is_active = 1'];
         $params = [];
         if ($q !== '') {
-            $sql .= ' AND (p.name LIKE ? OR p.barcode LIKE ? OR p.article LIKE ?)';
-            $needle = '%' . mb_substr($q, 0, 100) . '%';
-            $params = [$needle, $needle, $needle];
+            $where[] = '(p.name LIKE ? OR p.barcode LIKE ? OR p.article LIKE ?)';
+            $needle = '%' . $q . '%';
+            array_push($params, $needle, $needle, $needle);
         }
-        $sql .= ' ORDER BY p.name LIMIT 100';
+        if ($categoryId !== 0) {
+            $ids = [];
+            $pending = [$categoryId];
+            while ($pending) {
+                $id = array_pop($pending);
+                if (isset($ids[$id])) continue;
+                $ids[$id] = true;
+                foreach ($children[$id] ?? [] as $child) $pending[] = $child;
+            }
+            $where[] = 'p.category_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+            array_push($params, ...array_keys($ids));
+        }
+        $filterSql = ' FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE ' . implode(' AND ', $where);
+        $count = $this->db->prepare('SELECT COUNT(*)' . $filterSql);
+        $count->execute($params);
+        $total = (int)$count->fetchColumn();
+        $pages = max(1, (int)ceil($total / $perPage));
+        $page = min($page, $pages);
+
+        $sql = 'SELECT p.id, p.name, p.barcode, p.article, c.name AS category_name,
+                       (SELECT COUNT(*) FROM stock s WHERE s.product_id = p.id) AS branches_count'
+            . $filterSql . ' ORDER BY p.name, p.id LIMIT ? OFFSET ?';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
+        $index = 1;
+        foreach ($params as $value) $stmt->bindValue($index++, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        $stmt->bindValue($index++, $perPage, PDO::PARAM_INT);
+        $stmt->bindValue($index, ($page - 1) * $perPage, PDO::PARAM_INT);
+        $stmt->execute();
+
         $rows = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $rows[] = [
-                $admin['role'] === 'admin' ? '<a href="/admin/products/' . (int) $row['id'] . '">#' . (int) $row['id'] . '</a>' : (int) $row['id'],
+                $admin['role'] === 'admin' ? '<a href="/admin/products/' . (int)$row['id'] . '">#' . (int)$row['id'] . '</a>' : (int)$row['id'],
                 AdminView::e($row['name']),
                 AdminView::e($row['barcode']),
                 AdminView::e($row['article']),
                 AdminView::e($row['category_name']),
-                (int) $row['branches_count'],
+                (int)$row['branches_count'],
             ];
         }
-        $content = '<section class="card"><form method="get" action="/admin/products"><label>Поиск по названию, штрихкоду или артикулу'
-            . '<input name="q" value="' . AdminView::e($q) . '" placeholder="Например, молоко или 460..."></label><button>Найти</button></form></section>'
+
+        $content = '<section class="card"><form method="get" action="/admin/products">'
+            . '<label>Поиск по названию, штрихкоду или артикулу<input name="q" value="' . AdminView::e($q) . '" placeholder="Например, молоко или 460..."></label>'
+            . '<label>Категория (включая подкатегории)<select name="category_id"><option value="0">Все категории</option>';
+        $seen = [];
+        $appendOptions = function (int $parent, int $depth) use (&$appendOptions, &$content, &$seen, $children, $categoryNames, $categoryId): void {
+            foreach ($children[$parent] ?? [] as $id) {
+                if (isset($seen[$id])) continue;
+                $seen[$id] = true;
+                $content .= '<option value="' . $id . '"' . ($id === $categoryId ? ' selected' : '') . '>'
+                    . AdminView::e(str_repeat('— ', min($depth, 12)) . $categoryNames[$id]) . '</option>';
+                $appendOptions($id, $depth + 1);
+            }
+        };
+        $appendOptions(0, 0);
+        foreach (array_keys($categoryNames) as $id) {
+            if (isset($seen[$id])) continue;
+            $content .= '<option value="' . $id . '"' . ($id === $categoryId ? ' selected' : '') . '>'
+                . AdminView::e($categoryNames[$id]) . '</option>';
+            $seen[$id] = true;
+        }
+        $content .= '</select></label><button type="submit">Найти</button> <a href="/admin/products">Сбросить</a></form>'
+            . '<p class="muted">Найдено товаров: ' . $total . '. Страница ' . $page . ' из ' . $pages . '.</p></section>'
             . AdminView::table(['ID', 'Название', 'Штрихкод', 'Артикул', 'Категория', 'Филиалов с остатками'], $rows, 'Товары не найдены.');
+
+        $url = static function (int $target) use ($q, $categoryId): string {
+            return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
+        };
+        if ($pages > 1) {
+            $content .= '<section class="card"><nav aria-label="Страницы товаров">';
+            if ($page > 1) $content .= '<a href="' . AdminView::e($url($page - 1)) . '">← Предыдущая</a> ';
+            for ($n = max(1, $page - 2); $n <= min($pages, $page + 2); $n++) {
+                $content .= $n === $page ? ' <strong>[' . $n . ']</strong> ' : ' <a href="' . AdminView::e($url($n)) . '">' . $n . '</a> ';
+            }
+            if ($page < $pages) $content .= ' <a href="' . AdminView::e($url($page + 1)) . '">Следующая →</a>';
+            $content .= '</nav></section>';
+        }
         $this->page('Товары', $content, $admin);
     }
-
 
     public function productEdit(Request $request, array $params): never
     {
