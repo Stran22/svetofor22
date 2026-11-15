@@ -591,7 +591,7 @@ final class AdminController
         }
         $content .= '</select></label><label>Производитель<input name="manufacturer" maxlength="190" value="' . AdminView::e($product['manufacturer']) . '"></label>'
             . '<label>Единица измерения<input name="unit" maxlength="32" value="' . AdminView::e($product['unit']) . '"></label>'
-            . '<label>Описание товара<textarea name="description" rows="6" maxlength="10000">' . AdminView::e($product['description'] ?? '') . '</textarea></label>'
+            . '<label>Описание товара<textarea name="description" rows="10" maxlength="10000" style="display:block;width:100%;min-height:240px;box-sizing:border-box;resize:vertical;margin-top:8px;line-height:1.6;padding:12px;font:inherit">' . AdminView::e($product['description'] ?? '') . '</textarea></label>'
             . '<label><input type="checkbox" name="is_active" value="1" style="display:inline;width:auto" ' . ((int) $product['is_active'] === 1 ? 'checked' : '') . '> Товар активен</label>'
             . '<h2>Цена и остаток по филиалам</h2><p class="muted">Оставьте оба поля пустыми, если не нужно менять данные филиала.</p>';
         foreach ($branches as $branch) {
