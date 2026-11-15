@@ -39,6 +39,7 @@ try {
     $router->get('/api/v1/branches', [$api, 'branches']);
     $router->get('/api/v1/categories', [$api, 'categories']);
     $router->get('/api/v1/products', [$api, 'products']);
+    $router->post('/api/v1/analytics/search', [new \Svet22\Controllers\SearchAnalyticsController($db), 'record']);
     $router->get('/api/v1/products/{id}', [$api, 'product']);
     $router->get('/api/v1/products/{id}/reviews', [$reviews, 'index']);
     $router->post('/api/v1/products/{id}/reviews', [$reviews, 'create']);
