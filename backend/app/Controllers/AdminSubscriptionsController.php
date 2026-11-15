@@ -91,7 +91,12 @@ final class AdminSubscriptionsController
                 (int) $row['user_id'],
                 $row['product_name'],
                 $row['branch_name'],
-                $row['status'],
+                match ($row['status']) {
+                    'active' => 'Активна',
+                    'notified' => 'Уведомлён',
+                    'cancelled' => 'Отменена',
+                    default => 'Неизвестный статус',
+                },
                 $row['created_at'],
                 $row['notified_at'] ?? '—',
             ];
