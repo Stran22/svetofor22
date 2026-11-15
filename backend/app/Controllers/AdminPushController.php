@@ -145,11 +145,12 @@ final class AdminPushController
         Response::html(AdminView::layout('Push-уведомления', $content, $admin));
     }
 
-    public function detail(Request $request, string $id): never
+    public function detail(Request $request, array $params): never
     {
+        $id = (int) ($params['id'] ?? 0);
         $admin = $this->auth->requireUser();
         $admin['csrf'] = $this->auth->csrfToken();
-        if (!ctype_digit($id) || (int) $id < 1) {
+        if ($id < 1) {
             Response::html(AdminView::layout('Уведомление не найдено', '<section class="card"><p>Некорректный ID уведомления.</p><p><a href="/admin/push">← К истории</a></p></section>', $admin), 404);
         }
 
