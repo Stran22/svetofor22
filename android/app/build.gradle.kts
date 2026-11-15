@@ -33,6 +33,13 @@ android {
         ))
     }
 
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
