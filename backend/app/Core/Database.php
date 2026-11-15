@@ -36,6 +36,8 @@ final class Database
             PDO::ATTR_STRINGIFY_FETCHES => false,
         ]);
 
+        self::$connection->exec("SET time_zone = '+07:00'");
+
         return self::$connection;
     }
 
