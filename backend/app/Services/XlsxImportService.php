@@ -256,6 +256,10 @@ final class XlsxImportService
                             throw new \InvalidArgumentException('Повтор идентификатора товара в файле.');
                         }
                     }
+                    $categoryConflict = $cataloguePreflight->checkCategory($row['category']);
+                    if ($categoryConflict !== null) {
+                        throw new \\InvalidArgumentException($categoryConflict);
+                    }
                     $conflict = $cataloguePreflight->checkProductIdentity($row);
                     if ($conflict !== null) {
                         throw new \InvalidArgumentException($conflict);
@@ -467,28 +471,21 @@ final class XlsxImportService
     private function categoryId(string $name): int
     {
         $find = $this->db->prepare(
-            'SELECT id FROM categories WHERE parent_id IS NULL AND name = ? LIMIT 1'
+            'SELECT id FROM categories WHERE name = ? AND is_active = 1 ORDER BY id LIMIT 2'
         );
         $find->execute([$name]);
-        $id = $find->fetchColumn();
-        if ($id !== false) {
-            return (int) $id;
+        $ids = $find->fetchAll(PDO::FETCH_COLUMN);
+        if (count($ids) === 1) {
+            return (int) $ids[0];
         }
-
-        $slug = $this->slug($name);
-        $check = $this->db->prepare(
-            'SELECT id FROM categories WHERE parent_id IS NULL AND slug = ? LIMIT 1'
-        );
-        $check->execute([$slug]);
-        if ($check->fetchColumn()) {
-            $slug .= '-' . substr(hash('sha256', $name), 0, 8);
+        if (count($ids) > 1) {
+            throw new \\InvalidArgumentException(
+                'Категория «' . $name . '» встречается несколько раз. Уточните категорию в Excel.'
+            );
         }
-
-        $insert = $this->db->prepare(
-            'INSERT INTO categories (parent_id, name, slug) VALUES (NULL, ?, ?)'
+        throw new \\InvalidArgumentException(
+            'Категория «' . $name . '» не найдена среди активных категорий. Сначала создайте её в админке.'
         );
-        $insert->execute([$name, $slug]);
-        return (int) $this->db->lastInsertId();
     }
 
     private function slug(string $value): string
