@@ -75,6 +75,12 @@ try {
     $router->get('/admin/imports/{id}', [$admin, 'importDetail']);
     $router->get('/admin/reviews', [$adminReviews, 'index']);
     $router->post('/admin/reviews/{id}/moderate', [$adminReviews, 'moderate']);
+    $adminContests = new \Svet22\Controllers\AdminContestsController($db);
+    $router->get('/admin/contests', [$adminContests, 'index']);
+    $router->get('/admin/contests/new', [$adminContests, 'edit']);
+    $router->get('/admin/contests/{id}/edit', [$adminContests, 'edit']);
+    $router->post('/admin/contests/save', [$adminContests, 'save']);
+    $router->get('/admin/contests/{id}/participants', [$adminContests, 'participants']);
     $router->get('/admin/featured', [new \Svet22\Controllers\FeaturedProductsController($db), 'index']);
     $router->post('/admin/featured/{id}', [new \Svet22\Controllers\FeaturedProductsController($db), 'save']);
     $router->get('/admin/products', [$admin, 'products']);
