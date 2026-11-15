@@ -95,6 +95,23 @@ final class AdminInsightsController
         $demandStmt->execute($branchId ? [$branchId] : []);
         $missingDemand = $demandStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $searchStmt = $this->db->prepare(
+            'SELECT query_text,COUNT(*) AS searches,'
+            . ' SUM(results_count=0) AS no_results'
+            . ' FROM search_events WHERE created_at>=?'
+            . ($branchId ? ' AND branch_id=?' : '')
+            . ' GROUP BY query_text ORDER BY searches DESC,query_text LIMIT 10'
+        );
+        $searchStmt->execute($branchId ? [$since, $branchId] : [$since]);
+        $popularSearches = $searchStmt->fetchAll(PDO::FETCH_ASSOC);
+        $searchTotalsStmt = $this->db->prepare(
+            'SELECT COUNT(*) AS total,COALESCE(SUM(results_count=0),0) AS empty_searches'
+            . ' FROM search_events WHERE created_at>=?'
+            . ($branchId ? ' AND branch_id=?' : '')
+        );
+        $searchTotalsStmt->execute($branchId ? [$since, $branchId] : [$since]);
+        $searchTotals = $searchTotalsStmt->fetch(PDO::FETCH_ASSOC);
+
         $dailyStmt = $this->db->prepare(
             'SELECT DATE(created_at) AS day, COUNT(*) AS amount FROM subscriptions'
             . ' WHERE created_at >= ?' . ($branchId ? ' AND branch_id=?' : '')
@@ -190,6 +207,22 @@ final class AdminInsightsController
                 $alertRows[] = [$e($r['name']), $e($r['branch_name']), (int) $r['people'] . ' чел.'];
             }
             $content .= AdminView::table(['Товар', 'Филиал', 'Ожидают'], $alertRows);
+        }
+        $content .= '</section><section class="card"><h2>Что ищут покупатели</h2>'
+            . '<p class="insight-note">Поисковые запросы приложения за выбранный период. '
+            . 'Запросы без результатов помогают заметить интерес к отсутствующему в каталоге ассортименту.</p>'
+            . '<div class="insight-kpis">'
+            . $this->kpi('Всего поисков', (int) $searchTotals['total'], 'За выбранный период')
+            . $this->kpi('Без результатов', (int) $searchTotals['empty_searches'], 'Запросы с нулевой выдачей')
+            . '</div>';
+        if (!$popularSearches) {
+            $content .= '<p class="muted">Поисковых событий пока нет. Статистика появится после подключения отправки событий из Android-приложения.</p>';
+        } else {
+            $searchRows = [];
+            foreach ($popularSearches as $r) {
+                $searchRows[] = [$e($r['query_text']), (int) $r['searches'], (int) $r['no_results']];
+            }
+            $content .= AdminView::table(['Запрос', 'Поисков', 'Без результатов'], $searchRows);
         }
         $content .= '</section><section class="card"><h2>Сравнение филиалов</h2>'
             . '<p class="insight-note">Срез по текущим остаткам и активным подпискам. Для просмотра одного магазина используйте фильтр выше.</p>'
