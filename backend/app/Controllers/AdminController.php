@@ -585,16 +585,41 @@ final class AdminController
         $stmt->bindValue($index, ($page - 1) * $perPage, PDO::PARAM_INT);
         $stmt->execute();
 
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $branches = $this->db->query('SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
+        $stockByProduct = [];
+        if ($products && $branches) {
+            $productIds = array_map(static fn(array $product): int => (int)$product['id'], $products);
+            $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+            $stockStmt = $this->db->prepare('SELECT product_id, branch_id, price, quantity FROM stock WHERE product_id IN (' . $placeholders . ')');
+            $stockStmt->execute($productIds);
+            foreach ($stockStmt->fetchAll(PDO::FETCH_ASSOC) as $stockRow) {
+                $stockByProduct[(int)$stockRow['product_id']][(int)$stockRow['branch_id']] = $stockRow;
+            }
+        }
+
         $rows = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $rows[] = [
+        foreach ($products as $row) {
+            $cells = [
                 $admin['role'] === 'admin' ? '<a href="/admin/products/' . (int)$row['id'] . '">#' . (int)$row['id'] . '</a>' : (int)$row['id'],
                 AdminView::e($row['name']),
                 AdminView::e($row['barcode']),
                 AdminView::e($row['article']),
                 AdminView::e($row['category_name']),
-                (int)$row['branches_count'],
             ];
+            foreach ($branches as $branch) {
+                $stock = $stockByProduct[(int)$row['id']][(int)$branch['id']] ?? null;
+                if ($stock === null) {
+                    $cells[] = '<span class="muted">Нет данных</span>';
+                    continue;
+                }
+                $price = number_format((float)$stock['price'], 2, ',', ' ');
+                $quantity = rtrim(rtrim(number_format((float)$stock['quantity'], 3, '.', ''), '0'), '.');
+                $cells[] = '<strong>' . AdminView::e($price) . ' ₽</strong>'
+                    . '<div class="muted">Остаток: ' . AdminView::e($quantity) . '</div>'
+                    . ((float)$stock['quantity'] <= 0 ? '<div>Нет в наличии</div>' : '');
+            }
+            $rows[] = $cells;
         }
 
         $content = '<section class="card"><form method="get" action="/admin/products">'
@@ -619,7 +644,10 @@ final class AdminController
         }
         $content .= '</select></label><button type="submit">Найти</button> <a href="/admin/products">Сбросить</a></form>'
             . '<p class="muted">Найдено товаров: ' . $total . '. Страница ' . $page . ' из ' . $pages . '.</p></section>'
-            . AdminView::table(['ID', 'Название', 'Штрихкод', 'Артикул', 'Категория', 'Филиалов с остатками'], $rows, 'Товары не найдены.');
+            . '<p class="muted">Цены и остатки показаны по каждому активному филиалу. Если столбцы не помещаются, прокрутите таблицу по горизонтали.</p>'
+            . '<div style="overflow-x:auto;max-width:100%">'
+            . AdminView::table(array_merge(['ID', 'Название', 'Штрихкод', 'Артикул', 'Категория'], array_map(static fn(array $branch): string => (string)$branch['name'], $branches)), $rows, 'Товары не найдены.')
+            . '</div>';
 
         $url = static function (int $target) use ($q, $categoryId): string {
             return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
