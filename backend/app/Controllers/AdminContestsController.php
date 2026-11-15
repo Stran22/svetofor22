@@ -54,8 +54,6 @@ final class AdminContestsController
             'description'=>['Описание','textarea',20000],
             'rules'=>['Правила участия','textarea',20000],
             'prize_description'=>['Призы','textarea',20000],
-            'banner_url'=>['URL баннера (600×200 WebP)','url',1000],
-            'detail_image_url'=>['URL изображения (800×450 WebP)','url',1000],
             'starts_at'=>['Начало','datetime-local',30],
             'ends_at'=>['Окончание','datetime-local',30],
         ];
@@ -72,8 +70,29 @@ final class AdminContestsController
                 : '<input type="'.$type.'" name="'.$key.'" maxlength="'.$max.'" value="'.AdminView::e($value).'" '.(in_array($key,['title','starts_at','ends_at'],true)?'required':'').'>';
             $html.='</label>';
         }
+        // URLs уже загруженных файлов сохраняются при редактировании конкурса.
+        foreach (['banner_url','detail_image_url'] as $imageField) {
+            $html.='<input type="hidden" name="'.$imageField.'" value="'.AdminView::e($item[$imageField] ?? '').'">';
+        }
         $html.='<label><input type="checkbox" name="is_published" value="1" style="display:inline;width:auto"'.((int)$item['is_published']?' checked':'').'> Опубликовать</label>'
             .'<button type="submit">Сохранить конкурс</button></form></section>';
+        if ($id > 0) {
+            foreach (['banner'=>['banner_url','Баннер главной страницы','600×200'],
+                      'detail'=>['detail_image_url','Изображение конкурса','800×450']] as $kind=>$spec) {
+                [$field,$label,$size]=$spec;
+                $url=(string)($item[$field] ?? '');
+                $html.='<section class="card"><h2>'.AdminView::e($label).' ('.$size.' WebP)</h2>';
+                if ($url!=='') {
+                    $html.='<p><img src="'.AdminView::e($url).'" alt="'.AdminView::e($label).'" style="max-width:100%;height:auto;max-height:260px;border-radius:8px"></p>';
+                }
+                $html.='<form method="post" enctype="multipart/form-data" action="/admin/contests/'.$id.'/image/'.$kind.'">'
+                    .'<input type="hidden" name="csrf_token" value="'.AdminView::e($this->auth->csrfToken()).'">'
+                    .'<label>Выберите JPG, PNG или WebP (до 5 МБ)<input type="file" name="contest_image" accept="image/jpeg,image/png,image/webp" required></label>'
+                    .'<button type="submit">Загрузить изображение</button></form></section>';
+            }
+        } else {
+            $html.='<p class="muted">Сначала сохраните конкурс как черновик, затем откройте его для загрузки изображений.</p>';
+        }
         $this->adminLayout($id?'Редактировать конкурс':'Новый конкурс',$html,$admin);
     }
 
@@ -99,7 +118,7 @@ final class AdminContestsController
             Response::html('Проверьте название, текст и даты конкурса.',422);
         }
         foreach ([$banner,$image] as $url) {
-            if ($url!=='' && (strlen($url)>1000 || !filter_var($url,FILTER_VALIDATE_URL) || !str_starts_with($url,'https://'))) {
+            if ($url!=='' && (strlen($url)>1000 || !(preg_match('#^/uploads/contests/[0-9]+-(?:banner|detail)-[a-f0-9]{16}\\.webp$#D', $url) || (filter_var($url,FILTER_VALIDATE_URL) && str_starts_with($url,'https://'))))) {
                 Response::html('Ссылки на изображения должны начинаться с https://',422);
             }
         }
