@@ -594,8 +594,11 @@ final class AdminController
         $stockJoin = str_starts_with($sort, 'quantity_')
             ? ' LEFT JOIN stock sort_stock ON sort_stock.product_id = p.id AND sort_stock.branch_id = ' . $sortBranchId
             : '';
+        $sortFilterSql = $stockJoin === '' ? $filterSql : str_replace(
+            ' WHERE ', $stockJoin . ' WHERE ', $filterSql
+        );
         $sql = 'SELECT p.id, p.name, p.barcode, p.article, c.name AS category_name'
-            . $filterSql . $stockJoin . ' ORDER BY ' . $allowedSorts[$sort] . ' LIMIT ? OFFSET ?';
+            . $sortFilterSql . ' ORDER BY ' . $allowedSorts[$sort] . ' LIMIT ? OFFSET ?';
         $stmt = $this->db->prepare($sql);
         $index = 1;
         foreach ($params as $value) $stmt->bindValue($index++, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
