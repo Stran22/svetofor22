@@ -81,6 +81,7 @@ try {
     $router->get('/admin/branches', [$admin, 'branches']);
     $router->post('/admin/branches', [$admin, 'createBranch']);
     $router->post('/admin/branches/{id}/toggle', [$admin, 'toggleBranch']);
+    $router->get('/admin/subscribers', [new \Svet22\Controllers\AdminSubscriptionsController($db), 'index']);
     $router->get('/admin/users', [$admin, 'users']);
     $router->post('/admin/users', [$admin, 'createUser']);
     $router->post('/admin/users/{id}/toggle', [$admin, 'toggleUser']);
