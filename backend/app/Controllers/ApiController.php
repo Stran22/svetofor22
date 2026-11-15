@@ -162,7 +162,7 @@ final class ApiController
         $sql =
             'SELECT p.id, p.barcode, p.article, p.name,
                     p.category_id, p.manufacturer, p.unit,
-                    p.image_url, s.branch_id, s.price,
+                    p.description, p.image_url, s.branch_id, s.price,
                     s.quantity, s.imported_on
              FROM products p
              LEFT JOIN stock s ON s.product_id = p.id
