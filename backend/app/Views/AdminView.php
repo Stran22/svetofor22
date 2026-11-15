@@ -21,7 +21,7 @@ final class AdminView
             . '<form method="post" action="/admin/logout" class="inline"><input type="hidden" name="csrf_token" value="' . self::e($admin['csrf'] ?? '') . '"><button class="link" type="submit">Выйти</button></form>'
             . '</div></header><div class="shell"><aside class="nav">'
             . '<a href="/admin">Обзор</a><a href="/admin/import">Импорт Excel</a><a href="/admin/imports">История загрузок</a>'
-            . '<a href="/admin/products">Товары</a><a href="/admin/categories">Категории</a><a href="/admin/branches">Филиалы</a>'
+            . '<a href="/admin/products">Товары</a><a href="/admin/featured">Супер выгода</a><a href="/admin/categories">Категории</a><a href="/admin/branches">Филиалы</a>'
             . '<a href="/admin/subscribers">Подписчики</a><a href="/admin/push">Push-уведомления</a>'
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/reviews">Отзывы</a>' : '')
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/users">Пользователи</a>' : '')
