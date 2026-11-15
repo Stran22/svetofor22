@@ -25,7 +25,7 @@ final class AdminView
             . '<a href="/admin/subscribers">Подписчики</a><a href="/admin/push">Push-уведомления</a>'
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/reviews">Отзывы</a>' : '')
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/users">Пользователи</a>' : '')
-            . '</aside><main><h1>' . self::e($title) . '</h1>' . $content . '</main></div></body></html>';
+            . '</aside><main>' . ($title === 'Панель руководителя' ? '' : '<h1>' . self::e($title) . '</h1>') . $content . '</main></div></body></html>';
     }
 
     public static function login(string $csrf, string $error = ''): string
