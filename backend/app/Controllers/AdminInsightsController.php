@@ -107,7 +107,7 @@ final class AdminInsightsController
         );
         $branchRows = $branchStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $style = '<style>.insight-hero{background:linear-gradient(115deg,#123d72,#176f83);color:#fff;border-radius:16px;padding:25px;margin-bottom:18px}.insight-hero h2{font-size:25px;margin:4px 0}.insight-hero p{margin:5px 0;color:#dceef5}.insight-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:16px 0}.insight-kpi{border:1px solid #dce6f1;background:#fff;border-radius:13px;padding:18px}.insight-kpi strong{display:block;font-size:29px;color:#123d72}.insight-kpi span{font-size:13px;color:#64748b}.insight-chart{display:flex;align-items:end;gap:3px;height:175px;border-bottom:1px solid #d5dfec;padding-top:10px}.insight-bar{background:#2877b8;flex:1;min-width:2px;border-radius:4px 4px 0 0}.insight-bar:hover{background:#13a5a1}.insight-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.insight-filters label{min-width:160px;margin:0}.insight-filters select{margin:3px 0 0}.insight-progress{background:#e7eef5;border-radius:8px;height:9px;overflow:hidden}.insight-progress span{display:block;background:#2084b9;height:100%}.insight-note{font-size:13px;color:#687789}.insight-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}@media(max-width:600px){.insight-two{grid-template-columns:1fr}}</style>';
+        $style = '<style>.insight-hero{background:linear-gradient(115deg,#123d72,#176f83);color:#fff;border-radius:16px;padding:25px;margin-bottom:18px}.insight-hero h2{font-size:25px;margin:4px 0}.insight-hero p{margin:5px 0;color:#dceef5}.insight-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:16px 0}.insight-kpi{border:1px solid #dce6f1;background:#fff;border-radius:13px;padding:18px}.insight-kpi strong{display:block;font-size:29px;color:#123d72}.insight-kpi span{font-size:13px;color:#64748b}.insight-chart{display:flex;align-items:end;gap:3px;height:175px;border-bottom:1px solid #d5dfec;padding-top:10px}.insight-bar{background:#2877b8;flex:1;min-width:2px;border-radius:4px 4px 0 0}.insight-bar:hover{background:#13a5a1}.insight-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.insight-filters label{min-width:160px;margin:0}.insight-filters select{margin:3px 0 0}.insight-progress{background:#e7eef5;border-radius:8px;height:9px;overflow:hidden}.insight-progress span{display:block;background:#2084b9;height:100%}.insight-note{font-size:13px;color:#687789}.insight-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}@media(max-width:600px){.insight-two{grid-template-columns:1fr}}.insight-branches{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px;margin-top:15px}.insight-branch{border:1px solid #dce6f1;border-radius:14px;padding:19px;background:linear-gradient(180deg,#fff,#f7fbff)}.insight-branch h3{font-size:17px;margin:0 0 14px;color:#123d72}.insight-branch-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.insight-branch-number{font-size:25px;font-weight:700;color:#173f70;display:block}.insight-branch-label{font-size:12px;color:#64748b}.insight-branch-wait{margin-top:14px;border-top:1px solid #e4ebf4;padding-top:12px}.insight-branch-wait strong{font-size:21px;color:#0f7280}.insight-branch-meter{display:flex;height:10px;border-radius:8px;background:#e9eef5;overflow:hidden;margin:12px 0 7px}.insight-branch-meter .available{background:#19a381}.insight-branch-meter .unavailable{background:#e6a048}.insight-branch-caption{font-size:12px;color:#64748b}</style>';
         $content = $style
             . '<div class="insight-hero"><div style="font-size:12px;letter-spacing:1px">СВЕТОФОР · АНАЛИТИКА</div>'
             . '<h2>Панель руководителя</h2><p>Интерес покупателей, подписки и доступность товаров — по реальным данным системы.</p></div>'
@@ -161,16 +161,40 @@ final class AdminInsightsController
             }
             $content .= AdminView::table(['Товар', 'Филиал', 'Ожидают'], $alertRows);
         }
-        $content .= '</section><section class="card"><h2>Сравнение филиалов</h2>';
-        $rows = [];
+        $content .= '</section><section class="card"><h2>Сравнение филиалов</h2>'
+            . '<p class="insight-note">Срез по текущим остаткам и активным подпискам. Для просмотра одного магазина используйте фильтр выше.</p>'
+            . '<div class="insight-branches">';
+        $shownBranches = 0;
         foreach ($branchRows as $b) {
             if ($branchId && (int) $b['id'] !== $branchId) {
                 continue;
             }
-            $rows[] = [$e($b['name']), (int) $b['available'], (int) $b['unavailable'], (int) $b['waiting']];
+            ++$shownBranches;
+            $available = (int) $b['available'];
+            $unavailable = (int) $b['unavailable'];
+            $waiting = (int) $b['waiting'];
+            $total = $available + $unavailable;
+            $availablePercent = $total > 0 ? round($available * 100 / $total, 1) : 0;
+            $unavailablePercent = $total > 0 ? 100 - $availablePercent : 0;
+            $content .= '<article class="insight-branch"><h3>' . $e($b['name']) . '</h3>'
+                . '<div class="insight-branch-counts"><div><span class="insight-branch-number">' . number_format($available, 0, ',', ' ') . '</span>'
+                . '<span class="insight-branch-label">Позиций в наличии</span></div>'
+                . '<div><span class="insight-branch-number">' . number_format($unavailable, 0, ',', ' ') . '</span>'
+                . '<span class="insight-branch-label">Позиций без остатка</span></div></div>'
+                . '<div class="insight-branch-meter" role="img" aria-label="Доля позиций в наличии: ' . $availablePercent . '%">'
+                . '<span class="available" style="width:' . $availablePercent . '%"></span>'
+                . '<span class="unavailable" style="width:' . $unavailablePercent . '%"></span></div>'
+                . '<div class="insight-branch-caption">' . ($total > 0
+                    ? 'В наличии ' . $availablePercent . '% из ' . number_format($total, 0, ',', ' ') . ' учтённых позиций'
+                    : 'Нет загруженных остатков') . '</div>'
+                . '<div class="insight-branch-wait"><span class="insight-branch-label">Активные подписки на товары</span><br>'
+                . '<strong>' . number_format($waiting, 0, ',', ' ') . '</strong></div></article>';
         }
-        $content .= AdminView::table(['Филиал', 'Позиций в наличии', 'Позиций без остатка', 'Активных подписок'], $rows)
-            . '<p class="insight-note">Подписки — сигнал интереса, а не подтверждённые продажи. '
+        if ($shownBranches === 0) {
+            $content .= '<p class="muted">Филиалы пока не добавлены.</p>';
+        }
+        $content .= '</div><p class="insight-note">Доли рассчитаны по позициям с загруженными остатками, а не по всему ассортименту. '
+            . 'Подписки — сигнал интереса, а не подтверждённые продажи. '
             . '«Принято Firebase» не означает, что уведомление прочитано. '
             . 'Просмотры, поисковые запросы и покупки пока не отслеживаются.</p></section>'
             . '<section class="card"><h2>Рабочие инструменты</h2><p>'
