@@ -13,12 +13,21 @@ final class AdminContestImageController
 {
     public function __construct(private PDO $db) {}
 
-    public function upload(Request $request, array $params): never
+    public function uploadBanner(Request $request, array $params): never
+    {
+        $this->upload($request, $params, 'banner');
+    }
+
+    public function uploadDetail(Request $request, array $params): never
+    {
+        $this->upload($request, $params, 'detail');
+    }
+
+    private function upload(Request $request, array $params, string $kind): never
     {
         $auth = new AdminAuthService($this->db);
         $admin = $auth->requireRole('admin');
         $id = filter_var($params['id'] ?? null, FILTER_VALIDATE_INT);
-        $kind = (string)($params['kind'] ?? '');
         if (!$id || $id < 1 || !in_array($kind, ['banner', 'detail'], true)) {
             Response::html('Некорректный конкурс или тип изображения.', 422);
         }
