@@ -231,14 +231,36 @@ final class AdminCategoriesController
 
     private function options(array $rows, ?int $selected, ?int $exclude = null): string
     {
+        $byParent = [];
+        $known = [];
+        foreach ($rows as $row) {
+            $known[(int)$row['id']] = true;
+        }
+        foreach ($rows as $row) {
+            $parentId = $row['parent_id'] === null ? 0 : (int)$row['parent_id'];
+            if ($parentId !== 0 && !isset($known[$parentId])) $parentId = 0;
+            $byParent[$parentId][] = $row;
+        }
+
         $html = '';
+        $visited = [];
+        $append = function (int $parentId, int $depth) use (&$append, &$html, &$visited, $byParent, $exclude, $selected): void {
+            foreach ($byParent[$parentId] ?? [] as $row) {
+                $id = (int)$row['id'];
+                if (isset($visited[$id])) continue;
+                $visited[$id] = true;
+                if ($id !== $exclude && !($exclude !== null && $this->isDescendant($id, $exclude))) {
+                    $prefix = str_repeat('— ', min($depth, 12));
+                    $html .= '<option value="' . $id . '"' . ($selected === $id ? ' selected' : '') . '>'
+                        . AdminView::e($prefix . $row['name']) . ' (ID ' . $id . ')</option>';
+                }
+                $append($id, $depth + 1);
+            }
+        };
+        $append(0, 0);
         foreach ($rows as $row) {
             $id = (int)$row['id'];
-            // В списке родителей показываем только категории верхнего уровня.
-            if ($row['parent_id'] !== null) continue;
-            if ($id === $exclude || ($exclude !== null && $this->isDescendant($id, $exclude))) continue;
-            $html .= '<option value="' . $id . '"' . ($selected === $id ? ' selected' : '') . '>'
-                . AdminView::e($row['name']) . ' (ID ' . $id . ')</option>';
+            if (!isset($visited[$id])) $append($id, 0);
         }
         return $html;
     }
