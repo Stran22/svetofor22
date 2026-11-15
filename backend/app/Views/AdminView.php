@@ -22,6 +22,7 @@ final class AdminView
             . '</div></header><div class="shell"><aside class="nav">'
             . '<a href="/admin">Обзор</a><a href="/admin/import">Импорт Excel</a><a href="/admin/imports">История загрузок</a>'
             . '<a href="/admin/products">Товары</a><a href="/admin/categories">Категории</a><a href="/admin/branches">Филиалы</a>'
+            . '<a href="/admin/subscribers">Подписчики</a>'
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/reviews">Отзывы</a>' : '')
             . (($admin['role'] ?? '') === 'admin' ? '<a href="/admin/users">Пользователи</a>' : '')
             . '</aside><main><h1>' . self::e($title) . '</h1>' . $content . '</main></div></body></html>';
