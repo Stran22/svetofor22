@@ -543,8 +543,10 @@ final class AdminController
             'name_asc' => 'p.name ASC, p.id ASC', 'name_desc' => 'p.name DESC, p.id DESC',
             'category_asc' => 'c.name ASC, p.name ASC, p.id ASC',
             'category_desc' => 'c.name DESC, p.name ASC, p.id ASC',
-            'quantity_asc' => 'sort_stock.quantity ASC, p.id ASC',
-            'quantity_desc' => 'sort_stock.quantity DESC, p.id ASC',
+            'quantity_asc' => 'sort_stock.quantity IS NULL ASC, sort_stock.quantity ASC, p.id ASC',
+            'quantity_desc' => 'sort_stock.quantity IS NULL ASC, sort_stock.quantity DESC, p.id ASC',
+            'price_asc' => 'sort_stock.price IS NULL ASC, sort_stock.price ASC, p.id ASC',
+            'price_desc' => 'sort_stock.price IS NULL ASC, sort_stock.price DESC, p.id ASC',
         ];
         if (!isset($allowedSorts[$sort])) $sort = 'name_asc';
         $sortBranchId = filter_var($query['sort_branch_id'] ?? 0, FILTER_VALIDATE_INT);
@@ -552,7 +554,7 @@ final class AdminController
         $branches = $this->db->query('SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
         $branchIds = array_map(static fn(array $branch): int => (int)$branch['id'], $branches);
         if (!in_array($sortBranchId, $branchIds, true)) $sortBranchId = $branchIds[0] ?? 0;
-        if (str_starts_with($sort, 'quantity_') && $sortBranchId === 0) $sort = 'name_asc';
+        if ((str_starts_with($sort, 'quantity_') || str_starts_with($sort, 'price_')) && $sortBranchId === 0) $sort = 'name_asc';
 
         $categories = $this->db->query('SELECT id, parent_id, name FROM categories ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
         $children = [];
@@ -591,7 +593,7 @@ final class AdminController
         $pages = max(1, (int)ceil($total / $perPage));
         $page = min($page, $pages);
 
-        $stockJoin = str_starts_with($sort, 'quantity_')
+        $stockJoin = (str_starts_with($sort, 'quantity_') || str_starts_with($sort, 'price_'))
             ? ' LEFT JOIN stock sort_stock ON sort_stock.product_id = p.id AND sort_stock.branch_id = ' . $sortBranchId
             : '';
         $sortFilterSql = $stockJoin === '' ? $filterSql : str_replace(
@@ -668,11 +670,12 @@ final class AdminController
             'name_asc' => 'Название: А–Я', 'name_desc' => 'Название: Я–А',
             'category_asc' => 'Категория: А–Я', 'category_desc' => 'Категория: Я–А',
             'quantity_asc' => 'Остаток: по возрастанию', 'quantity_desc' => 'Остаток: по убыванию',
+            'price_asc' => 'Цена: от дешёвых к дорогим', 'price_desc' => 'Цена: от дорогих к дешёвым',
         ];
         foreach ($sortLabels as $key => $label) {
             $content .= '<option value="' . $key . '"' . ($sort === $key ? ' selected' : '') . '>' . AdminView::e($label) . '</option>';
         }
-        $content .= '</select></label><label>Филиал для сортировки по остатку<select name="sort_branch_id">';
+        $content .= '</select></label><label>Филиал для сортировки по цене или остатку<select name="sort_branch_id">';
         foreach ($branches as $branch) {
             $id = (int)$branch['id'];
             $content .= '<option value="' . $id . '"' . ($id === $sortBranchId ? ' selected' : '') . '>' . AdminView::e($branch['name']) . '</option>';
