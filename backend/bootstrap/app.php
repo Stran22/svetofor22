@@ -39,6 +39,7 @@ try {
     $router->get('/api/v1/branches', [$api, 'branches']);
     $router->get('/api/v1/categories', [$api, 'categories']);
     $router->get('/api/v1/products', [$api, 'products']);
+    $router->get('/api/v1/featured-products', [new \Svet22\Controllers\FeaturedProductsController($db), 'api']);
     $router->post('/api/v1/analytics/search', [new \Svet22\Controllers\SearchAnalyticsController($db), 'record']);
     $router->get('/api/v1/products/{id}', [$api, 'product']);
     $router->get('/api/v1/products/{id}/reviews', [$reviews, 'index']);
@@ -69,6 +70,8 @@ try {
     $router->get('/admin/imports/{id}', [$admin, 'importDetail']);
     $router->get('/admin/reviews', [$adminReviews, 'index']);
     $router->post('/admin/reviews/{id}/moderate', [$adminReviews, 'moderate']);
+    $router->get('/admin/featured', [new \Svet22\Controllers\FeaturedProductsController($db), 'index']);
+    $router->post('/admin/featured/{id}', [new \Svet22\Controllers\FeaturedProductsController($db), 'save']);
     $router->get('/admin/products', [$admin, 'products']);
     $router->get('/admin/products/{id}', [$admin, 'productEdit']);
     $router->post('/admin/products/{id}', [$admin, 'updateProduct']);
