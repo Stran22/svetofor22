@@ -345,13 +345,13 @@ final class AdminController
                     . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
                     . '<input type="hidden" name="branch_id" value="' . (int) $branchId . '">'
                     . '<input type="hidden" name="expected_sha256" value="' . AdminView::e($preview['sha256']) . '">'
-                    . '<label>Повторно выберите файл<input id="confirm-xlsx-file" type="file" name="xlsx_file" accept=".xlsx" required></label>'
-                    . '<p id="confirm-xlsx-name" class="muted">Файл ещё не выбран.</p>'
+                    . '<label>Повторно выберите файл: <strong id="confirm-xlsx-name">' . $checkedFileName . '</strong>'
+                    . '<input id="confirm-xlsx-file" type="file" name="xlsx_file" accept=".xlsx" required></label>'
                     . '<button type="submit">Подтвердить и импортировать</button></form></section>'
                     . '<script>(function(){var input=document.getElementById("confirm-xlsx-file");'
                     . 'var output=document.getElementById("confirm-xlsx-name");'
                     . 'if(input&&output){input.addEventListener("change",function(){'
-                    . 'output.textContent=input.files&&input.files.length?"Выбран файл: "+input.files[0].name:"Файл ещё не выбран.";'
+                    . 'output.textContent=input.files&&input.files.length?input.files[0].name:' . json_encode((string) $file['name'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';'
                     . '});}})();</script>';
             } else {
                 $content .= AdminView::alert('В файле нет товаров для импорта.', true);
