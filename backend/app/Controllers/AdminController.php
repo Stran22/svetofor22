@@ -330,14 +330,29 @@ final class AdminController
                     . AdminView::table(['Строка', 'Ошибка'], $errorRows, '');
                 $content .= AdminView::alert('Исправьте ошибки перед импортом.', true);
             } elseif ($preview['rows_valid'] > 0) {
-                // Require a fresh upload of the identical file. No persistent temporary files.
-                $content .= '<p class="muted">Проверка прошла успешно. Для подтверждения выберите тот же файл ещё раз. Сервер проверит его контрольную сумму.</p>'
+                // Require a fresh upload of the identical file. Show both the checked
+                // filename and the newly selected filename before the final action.
+                $checkedFileName = AdminView::e((string) $file['name']);
+                $content .= '<section class="card" style="border:1px solid #2e8b57">'
+                    . '<h3>Проверьте файл перед импортом</h3>'
+                    . '<p><strong>Проверенный файл:</strong> <span>' . $checkedFileName . '</span></p>'
+                    . '<p><strong>Филиал:</strong> ' . AdminView::e($branchName) . '</p>'
+                    . '<p><strong>Строк:</strong> ' . (int) $preview['rows_total']
+                    . ' · <strong>Корректных:</strong> ' . (int) $preview['rows_valid']
+                    . ' · <strong>Ошибок:</strong> ' . (int) $preview['rows_failed'] . '</p>'
+                    . '<p class="muted">Выберите этот же файл повторно. Перед импортом сервер сравнит контрольную сумму с проверенной.</p>'
                     . '<form method="post" action="/admin/import/confirm" enctype="multipart/form-data">'
                     . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
                     . '<input type="hidden" name="branch_id" value="' . (int) $branchId . '">'
                     . '<input type="hidden" name="expected_sha256" value="' . AdminView::e($preview['sha256']) . '">'
-                    . '<label>Тот же Excel-файл<input type="file" name="xlsx_file" accept=".xlsx" required></label>'
-                    . '<button type="submit">Подтвердить и импортировать</button></form>';
+                    . '<label>Повторно выберите файл<input id="confirm-xlsx-file" type="file" name="xlsx_file" accept=".xlsx" required></label>'
+                    . '<p id="confirm-xlsx-name" class="muted">Файл ещё не выбран.</p>'
+                    . '<button type="submit">Подтвердить и импортировать</button></form></section>'
+                    . '<script>(function(){var input=document.getElementById("confirm-xlsx-file");'
+                    . 'var output=document.getElementById("confirm-xlsx-name");'
+                    . 'if(input&&output){input.addEventListener("change",function(){'
+                    . 'output.textContent=input.files&&input.files.length?"Выбран файл: "+input.files[0].name:"Файл ещё не выбран.";'
+                    . '});}})();</script>';
             } else {
                 $content .= AdminView::alert('В файле нет товаров для импорта.', true);
             }
