@@ -1,8 +1,12 @@
-
 package ru.svet22.app.ui.home
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,283 +14,312 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import ru.svet22.app.data.model.Product
+import ru.svet22.app.ui.catalog.CatalogViewModel
+import java.net.URL
 
-// ===== НАЧАЛО БЛОКА: Цвета главной страницы =====
-private val SvetRed = Color(0xFFE53935)
-private val SvetYellow = Color(0xFFFFD600)
-private val SvetDark = Color(0xFF252525)
-private val SvetGray = Color(0xFF757575)
-private val SvetBackground = Color(0xFFF7F7F7)
-// ===== КОНЕЦ БЛОКА: Цвета главной страницы =====
+private val Red = Color(0xFFE53935)
+private val Yellow = Color(0xFFFFD600)
+private val Dark = Color(0xFF222222)
+private val Muted = Color(0xFF757575)
+private val Background = Color(0xFFF7F7F7)
 
-// ===== НАЧАЛО БЛОКА: Главная страница приложения =====
 @Composable
 fun HomeScreen(
+    vm: CatalogViewModel,
     onOpenCatalog: () -> Unit,
-    onOpenOverview: () -> Unit
+    onOpenOverview: () -> Unit,
+    onOpenProduct: (Product) -> Unit
 ) {
+    var branchMenuExpanded by remember { mutableStateOf(false) }
+    val featured = remember(vm.products) { vm.products.filter { it.price?.toDoubleOrNull() != null }.take(12) }
+    val categories = remember(vm.categories) { vm.categories.filter { it.parentId == null }.take(12) }
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(SvetBackground)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 16.dp)
+        modifier = Modifier.fillMaxSize().background(Background).verticalScroll(rememberScrollState())
     ) {
-        // ===== НАЧАЛО БЛОКА: Верхняя панель =====
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().background(Color.White).padding(start = 18.dp, end = 12.dp, top = 18.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "СВЕТОФОР",
-                    color = SvetRed,
-                    fontSize = 25.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = "Каталог товаров",
-                    color = SvetGray,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
-            Surface(
-                color = SvetYellow,
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(
-                    text = "БИЙСК",
-                    modifier = Modifier.padding(
-                        horizontal = 14.dp,
-                        vertical = 9.dp
-                    ),
-                    color = SvetDark,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-        }
-        // ===== КОНЕЦ БЛОКА: Верхняя панель =====
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // ===== НАЧАЛО БЛОКА: Приветственный баннер =====
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = SvetRed
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(22.dp)
-            ) {
-                Text(
-                    text = "ПОКУПКИ СТАЛИ ПРОЩЕ",
-                    color = SvetYellow,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Всё нужное\nрядом с вами",
-                    color = Color.White,
-                    fontSize = 29.sp,
-                    lineHeight = 35.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "Смотрите ассортимент, цены и наличие товаров в магазинах.",
-                    color = Color.White.copy(alpha = 0.92f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = onOpenCatalog,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SvetYellow,
-                        contentColor = SvetDark
-                    ),
-                    shape = RoundedCornerShape(14.dp)
+            Box(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = vm.branches.isNotEmpty()) { branchMenuExpanded = true },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Перейти в каталог",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Icon(Icons.Default.Storefront, contentDescription = null, tint = Red, modifier = Modifier.size(25.dp))
+                    Spacer(Modifier.width(9.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Ваш магазин", color = Muted, fontSize = 12.sp)
+                        Text(
+                            vm.selectedBranch?.name ?: "Выберите филиал",
+                            color = Dark, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                        vm.selectedBranch?.address?.let {
+                            Text(it, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Выбрать филиал", tint = Red)
+                }
+                DropdownMenu(expanded = branchMenuExpanded, onDismissRequest = { branchMenuExpanded = false }) {
+                    vm.branches.forEach { branch ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(branch.name, fontWeight = FontWeight.SemiBold)
+                                    branch.address?.let { Text(it, fontSize = 12.sp, color = Muted) }
+                                }
+                            },
+                            onClick = { branchMenuExpanded = false; vm.selectBranch(branch) }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Surface(color = Background, shape = RoundedCornerShape(16.dp)) {
+                IconButton(onClick = onOpenCatalog) {
+                    Icon(Icons.Default.Search, contentDescription = "Поиск товаров", tint = Dark)
                 }
             }
         }
-        // ===== КОНЕЦ БЛОКА: Приветственный баннер =====
 
-        Spacer(modifier = Modifier.height(26.dp))
-
-        // ===== НАЧАЛО БЛОКА: Заголовок раздела =====
-        Text(
-            text = "Что вас интересует?",
-            color = SvetDark,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-        // ===== КОНЕЦ БЛОКА: Заголовок раздела =====
-
-        // ===== НАЧАЛО БЛОКА: Карточки переходов =====
-        HomeActionCard(
-            title = "Каталог товаров",
-            description = "Ассортимент, цены и остатки в магазинах",
-            accentColor = SvetYellow,
-            onClick = onOpenCatalog
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        HomeActionCard(
-            title = "Обзор товаров",
-            description = "Популярные товары и интересные новинки",
-            accentColor = SvetRed,
-            onClick = onOpenOverview
-        )
-        // ===== КОНЕЦ БЛОКА: Карточки переходов =====
-
-        Spacer(modifier = Modifier.height(26.dp))
-
-        // ===== НАЧАЛО БЛОКА: Информационный блок =====
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.White
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp)
+        Column(modifier = Modifier.padding(top = 18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Выбирайте удобный магазин",
-                    color = SvetDark,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(7.dp))
-
-                Text(
-                    text = "Проверяйте наличие и стоимость товаров отдельно для каждого филиала.",
-                    color = SvetGray,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("СВЕТОФОР", color = Red, fontWeight = FontWeight.ExtraBold, fontSize = 29.sp)
+                Spacer(Modifier.weight(1f))
+                Surface(color = Yellow, shape = RoundedCornerShape(12.dp)) {
+                    Text("БИЙСК", modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                }
             }
-        }
-        // ===== КОНЕЦ БЛОКА: Информационный блок =====
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ===== НАЧАЛО БЛОКА: Нижняя подпись =====
-        Text(
-            text = "Светофор · Бийск",
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            color = SvetGray,
-            fontSize = 12.sp
-        )
-        // ===== КОНЕЦ БЛОКА: Нижняя подпись =====
-    }
-}
-// ===== КОНЕЦ БЛОКА: Главная страница приложения =====
-
-// ===== НАЧАЛО БЛОКА: Универсальная карточка перехода =====
-@Composable
-private fun HomeActionCard(
-    title: String,
-    description: String,
-    accentColor: Color,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Surface(
-                color = accentColor,
-                shape = RoundedCornerShape(13.dp)
+            Spacer(Modifier.height(14.dp))
+            Card(
+                onClick = onOpenCatalog,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Red)
             ) {
-                Spacer(
-                    modifier = Modifier
-                        .padding(5.dp)
-                        .height(30.dp)
-                        .background(
-                            accentColor,
-                            RoundedCornerShape(8.dp)
-                        )
-                )
+                Column(modifier = Modifier.padding(22.dp)) {
+                    Surface(color = Yellow, shape = RoundedCornerShape(8.dp)) {
+                        Text("ЦЕНЫ И НАЛИЧИЕ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = Dark, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text("Всё нужное\nрядом с вами", color = Color.White, fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(10.dp))
+                    Text("Выбирайте товары и проверяйте остатки в своём магазине", color = Color.White.copy(alpha = 0.95f), fontSize = 14.sp)
+                    Spacer(Modifier.height(20.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(color = Yellow, shape = RoundedCornerShape(13.dp)) {
+                            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Смотреть каталог", color = Dark, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(8.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Dark, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Text("🛍️", fontSize = 47.sp)
+                    }
+                }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(Modifier.height(27.dp))
+            SectionHeading("Категории товаров", "Все категории", onOpenCatalog)
+            Spacer(Modifier.height(13.dp))
+            if (categories.isEmpty()) {
                 Text(
-                    text = title,
-                    color = SvetDark,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
+                    if (vm.loadingCategories) "Загружаем категории…" else "Категории пока не добавлены",
+                    modifier = Modifier.padding(horizontal = 18.dp), color = Muted
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = description,
-                    color = SvetGray,
-                    style = MaterialTheme.typography.bodySmall
-                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    categories.forEach { category ->
+                        Card(
+                            onClick = onOpenCatalog,
+                            modifier = Modifier.width(124.dp).height(108.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(12.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(categorySymbol(category.name), fontSize = 28.sp)
+                                Text(category.name, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 2, lineHeight = 15.sp, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
             }
 
+            Spacer(Modifier.height(27.dp))
+            SectionHeading("Товары в вашем магазине", "Весь каталог", onOpenCatalog)
+            Spacer(Modifier.height(5.dp))
             Text(
-                text = "›",
-                color = SvetRed,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold
+                vm.selectedBranch?.name ?: "Выберите филиал, чтобы увидеть цены",
+                modifier = Modifier.padding(horizontal = 18.dp), color = Muted, fontSize = 12.sp
+            )
+            Spacer(Modifier.height(13.dp))
+            if (featured.isEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    Text(
+                        if (vm.loadingProducts || vm.loadingBranches) "Загружаем товары…" else "Пока нет товаров с указанной ценой. Откройте каталог.",
+                        modifier = Modifier.padding(18.dp), color = Muted
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    featured.forEach { product ->
+                        ProductCard(product, onClick = { onOpenProduct(product) })
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(26.dp))
+            Card(
+                onClick = onOpenOverview,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Yellow)
+            ) {
+                Row(modifier = Modifier.padding(19.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Больше интересного", fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, color = Dark)
+                        Spacer(Modifier.height(5.dp))
+                        Text("Посмотрите обзор ассортимента", color = Dark, fontSize = 13.sp)
+                    }
+                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Dark)
+                }
+            }
+            Spacer(Modifier.height(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun SectionHeading(title: String, action: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, modifier = Modifier.weight(1f), color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+        Text(action, modifier = Modifier.clickable(onClick = onClick), color = Red, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+        Spacer(Modifier.width(3.dp))
+        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Red, modifier = Modifier.size(16.dp).clickable(onClick = onClick))
+    }
+}
+
+@Composable
+private fun ProductCard(product: Product, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(168.dp),
+        shape = RoundedCornerShape(19.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(128.dp).background(Background, RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                ProductPhoto(product.imageUrl)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(product.name, fontSize = 13.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(9.dp))
+            Surface(color = Yellow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "${product.price} ₽",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                    color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp
+                )
+            }
+            Spacer(Modifier.height(7.dp))
+            Text(
+                product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
+                color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
-// ===== КОНЕЦ БЛОКА: Универсальная карточка перехода =====
+
+@Composable
+private fun ProductPhoto(url: String?) {
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
+        value = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = URL(URL("https://baza.altaj-otdyh.ru/"), url.trim()).openConnection()
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
+                connection.getInputStream().use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
+        }
+    }
+    if (bitmap == null) {
+        Text("🛒", fontSize = 43.sp)
+    } else {
+        Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(8.dp))
+    }
+}
+
+private fun categorySymbol(name: String): String {
+    val n = name.lowercase()
+    return when {
+        "молоч" in n || "сыр" in n -> "🥛"
+        "мяс" in n || "колбас" in n -> "🥩"
+        "хлеб" in n -> "🍞"
+        "овощ" in n || "фрукт" in n -> "🍎"
+        "напит" in n || "вода" in n -> "🧃"
+        "кондитер" in n || "слад" in n -> "🍫"
+        "чай" in n || "кофе" in n -> "☕"
+        "быт" in n || "хими" in n -> "🧴"
+        else -> "🛍️"
+    }
+}
