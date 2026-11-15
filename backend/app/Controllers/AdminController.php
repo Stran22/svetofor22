@@ -115,7 +115,7 @@ final class AdminController
         $selectedId = filter_var($request->query()['branch_id'] ?? null, FILTER_VALIDATE_INT);
         $selectedId = $selectedId === false ? 0 : (int) $selectedId;
         $content = $this->flashHtml()
-            . '<section class="card"><h2>Настройка колонок Excel</h2><p class="muted">Настройка сохраняется отдельно для каждого филиала. Сначала загрузите пример выгрузки, затем укажите, где находятся нужные данные.</p>'
+            . '<section class="card"><h2>Настройка колонок Excel</h2><p class="muted">Зачем это нужно? В разных выгрузках 1С одни и те же данные могут называться по-разному. Один раз выберите столбцы своего Excel для этого филиала — при следующих загрузках программа будет понимать их автоматически. Настройка не меняет товары и остатки.</p>'
             . '<form method="get" action="/admin/import/mapping"><label>Филиал<select name="branch_id" required><option value="">Выберите филиал</option>';
         foreach ($branches as $branchRow) {
             $selected = (int) $branchRow['id'] === $selectedId ? ' selected' : '';
@@ -136,7 +136,7 @@ final class AdminController
                     . '<input type="hidden" name="branch_id" value="' . $selectedId . '">'
                     . '<label>Файл Excel (.xlsx)<input type="file" name="xlsx_file" accept=".xlsx" required></label>'
                     . '<button type="submit">Показать колонки файла</button></form>'
-                    . ($saved ? '<p class="muted">Для этого филиала уже сохранено соответствие колонок. Новая настройка заменит предыдущую.</p>' : '<p class="muted">Соответствие колонок ещё не настроено.</p>')
+                    . ($saved ? '<p class="muted">Для филиала уже есть настройка. Если изменился формат Excel или обнаружена ошибка, загрузите файл и сохраните исправленное соответствие.</p>' : '<p class="muted">Соответствие колонок ещё не настроено.</p>')
                     . '</section>';
             } else {
                 $content .= AdminView::alert('Филиал не найден или отключён.', true);
@@ -170,23 +170,34 @@ final class AdminController
             );
             $saved = $service->loadMapping((int) $branchId) ?? [];
             $fields = [
-                'barcode' => 'Штрихкод',
-                'article' => 'Артикул',
+                'barcode' => 'Штрихкод товара',
+                'article' => 'Артикул товара',
                 'name' => 'Название товара',
-                'price' => 'Цена',
-                'quantity' => 'Остаток',
+                'price' => 'Розничная цена',
+                'quantity' => 'Остаток в филиале',
                 'unit' => 'Единица измерения',
                 'category' => 'Категория',
                 'manufacturer' => 'Производитель',
             ];
             $required = ['name', 'price', 'quantity'];
-            $content = '<section class="card"><p>Выберите номер колонки для каждого поля. Штрихкод и артикул необязательны по отдельности, но нужно выбрать хотя бы один из них.</p>'
+            $help = [
+                'barcode' => 'Цифры под штрихкодом на упаковке (EAN/GTIN). Не путать с артикулом.',
+                'article' => 'Внутренний код товара из 1С или от поставщика. Если такого столбца нет — не используйте.',
+                'name' => 'Название, которое увидит покупатель в каталоге.',
+                'price' => 'Цена продажи товара в рублях.',
+                'quantity' => 'Сколько единиц товара сейчас есть в выбранном филиале.',
+                'unit' => 'Например: шт., кг, л.',
+                'category' => 'Например: Молочные продукты.',
+                'manufacturer' => 'Название производителя товара.',
+            ];
+            $content = '<section class="card"><h2>Что означает каждый столбец?</h2><p>Слева — поле каталога, справа — столбец вашей выгрузки Excel. Выберите правильный столбец для каждого поля. Штрихкод и артикул — разные данные: хотя бы одно из них обязательно. Если отдельного артикула в Excel нет, оставьте его пустым.</p><p class="muted">Сохранение изменяет только правила чтения Excel для этого филиала. Товары и остатки не меняются.</p>'
                 . '<form method="post" action="/admin/import/mapping/save">'
                 . '<input type="hidden" name="csrf_token" value="' . AdminView::e($this->auth->csrfToken()) . '">'
                 . '<input type="hidden" name="branch_id" value="' . (int) $branchId . '">'
                 . '<input type="hidden" name="column_count" value="' . (int) $preview['column_count'] . '">';
             foreach ($fields as $key => $label) {
-                $content .= '<label>' . AdminView::e($label) . ($key === 'barcode' || $key === 'article' ? ' <span class="muted">(одно из двух обязательно)</span>' : (in_array($key, $required, true) ? ' *' : ''))
+                $content .= '<label>' . AdminView::e($label) . ($key === 'barcode' || $key === 'article' ? ' <span class="muted">(нужен хотя бы один идентификатор)</span>' : (in_array($key, $required, true) ? ' * обязательно' : ' (необязательно)'))
+                    . '<small class="muted" style="display:block;margin:4px 0 6px">' . AdminView::e($help[$key]) . '</small>'
                     . '<select name="mapping[' . $key . ']"><option value="">— не использовать —</option>';
                 foreach ($preview['headers'] as $index => $header) {
                     $selected = isset($saved[$key]) && (int) $saved[$key] === $index ? ' selected' : '';
@@ -195,7 +206,7 @@ final class AdminController
                 }
                 $content .= '</select></label>';
             }
-            $content .= '<button type="submit">Сохранить соответствие колонок</button> <a href="/admin/import/mapping?branch_id=' . (int) $branchId . '">Отмена</a></form></section>';
+            $content .= '<p class="muted">Проверьте особенно внимательно поля «Штрихкод товара» и «Артикул товара». Если они перепутаны, импорт может неправильно объединить товары.</p><button type="submit">Сохранить настройки для филиала</button> <a href="/admin/import/mapping?branch_id=' . (int) $branchId . '">Отмена</a></form></section>';
 
             $sampleRows = [];
             foreach ($preview['samples'] as $sample) {
@@ -298,9 +309,10 @@ final class AdminController
                 . '; ошибок: ' . (int) $preview['rows_failed'] . '.</p>';
             $mappingRows = [];
             foreach ($preview['mapping'] as $field => $index) {
-                $mappingRows[] = [AdminView::e($field), AdminView::e((string) ($preview['headers'][$index] ?? ''))];
+                $fieldLabels = ['barcode' => 'Штрихкод товара', 'article' => 'Артикул товара', 'name' => 'Название товара', 'price' => 'Розничная цена', 'quantity' => 'Остаток', 'unit' => 'Единица измерения', 'category' => 'Категория', 'manufacturer' => 'Производитель'];
+                $mappingRows[] = [AdminView::e($fieldLabels[$field] ?? $field), AdminView::e((string) ($preview['headers'][$index] ?? ''))];
             }
-            $content .= '<h3>Распознанные колонки</h3>'
+            $content .= '<h3>Как Excel связан с каталогом</h3>'
                 . AdminView::table(['Поле', 'Колонка Excel'], $mappingRows, 'Нет колонок');
             $sampleRows = [];
             foreach ($preview['samples'] as $sample) {
