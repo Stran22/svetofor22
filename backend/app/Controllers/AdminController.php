@@ -739,7 +739,43 @@ final class AdminController
             Response::html('<!doctype html><meta charset="utf-8"><h1>Товар не найден</h1><a href="/admin/products">Назад</a>', 404);
         }
 
-        $categories = $this->db->query('SELECT id, name FROM categories WHERE is_active = 1 ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
+        $categories = $this->db->query('SELECT id, parent_id, name, is_active FROM categories ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
+        $categoryChildren = [];
+        $categoryById = [];
+        foreach ($categories as $category) {
+            $id = (int) $category['id'];
+            $categoryById[$id] = $category;
+            $parentId = $category['parent_id'] === null ? 0 : (int) $category['parent_id'];
+            $categoryChildren[$parentId][] = $id;
+        }
+        $categoryOptions = [];
+        $seenCategories = [];
+        $appendCategory = function (int $parentId, int $depth) use (&$appendCategory, &$categoryOptions, &$seenCategories, $categoryChildren, $categoryById, $product): void {
+            foreach ($categoryChildren[$parentId] ?? [] as $id) {
+                if (isset($seenCategories[$id])) continue;
+                $seenCategories[$id] = true;
+                $category = $categoryById[$id];
+                $isActive = (int) $category['is_active'] === 1;
+                $selected = (int) $product['category_id'] === $id;
+                if ($isActive || $selected) {
+                    $label = str_repeat('— ', min($depth, 12)) . $category['name'];
+                    if (!$isActive) $label .= ' (отключена)';
+                    $categoryOptions[] = '<option value="' . $id . '"' . ($selected ? ' selected' : '')
+                        . (!$isActive ? ' disabled' : '') . '>' . AdminView::e($label) . '</option>';
+                }
+                $appendCategory($id, $depth + 1);
+            }
+        };
+        $appendCategory(0, 0);
+        foreach (array_keys($categoryById) as $id) {
+            if (isset($seenCategories[$id])) continue;
+            $appendCategory($id, 0);
+            if (!isset($seenCategories[$id])) {
+                // A category with an orphaned parent still appears in the selector.
+                $categoryChildren[0][] = $id;
+                $appendCategory(0, 0);
+            }
+        }
         $branches = $this->db->query(
             'SELECT b.id, b.name, s.price, s.quantity
              FROM branches b LEFT JOIN stock s ON s.branch_id = b.id AND s.product_id = ' . (int) $product['id'] . '
@@ -752,10 +788,7 @@ final class AdminController
             . '<label>Штрихкод<input name="barcode" maxlength="64" value="' . AdminView::e($product['barcode']) . '"></label>'
             . '<label>Артикул<input name="article" maxlength="100" value="' . AdminView::e($product['article']) . '"></label>'
             . '<label>Категория<select name="category_id"><option value="">Без категории</option>';
-        foreach ($categories as $category) {
-            $selected = (int) $product['category_id'] === (int) $category['id'] ? ' selected' : '';
-            $content .= '<option value="' . (int) $category['id'] . '"' . $selected . '>' . AdminView::e($category['name']) . '</option>';
-        }
+        $content .= implode('', $categoryOptions);
         $content .= '</select></label><label>Производитель<input name="manufacturer" maxlength="190" value="' . AdminView::e($product['manufacturer']) . '"></label>'
             . '<label>Единица измерения<input name="unit" maxlength="32" value="' . AdminView::e($product['unit']) . '"></label>'
             . '<label>Описание товара<textarea name="description" rows="10" maxlength="10000" style="display:block;width:100%;min-height:240px;box-sizing:border-box;resize:vertical;margin-top:8px;line-height:1.6;padding:12px;font:inherit">' . AdminView::e($product['description'] ?? '') . '</textarea></label>'
