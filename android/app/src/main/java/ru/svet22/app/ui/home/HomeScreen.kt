@@ -51,6 +51,9 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.svet22.app.data.model.Product
+import ru.svet22.app.data.model.ContestSummary
+import ru.svet22.app.data.repository.ContestRepository
+import ru.svet22.app.ui.contest.ContestImage
 import ru.svet22.app.ui.catalog.CatalogViewModel
 import java.net.URL
 
@@ -65,8 +68,12 @@ fun HomeScreen(
     vm: CatalogViewModel,
     onOpenCatalog: () -> Unit,
     onOpenOverview: () -> Unit,
-    onOpenProduct: (Product) -> Unit
+    onOpenProduct: (Product) -> Unit,
+    onOpenContest: (Int) -> Unit
 ) {
+    val contests by produceState<List<ContestSummary>>(initialValue = emptyList()) {
+        value = runCatching { ContestRepository().active() }.getOrDefault(emptyList())
+    }
     var branchMenuExpanded by remember { mutableStateOf(false) }
     var showAllFeatured by remember { mutableStateOf(false) }
     val featured = remember(vm.products) { vm.products.filter { it.price?.toDoubleOrNull() != null }.take(12) }
@@ -161,6 +168,23 @@ fun HomeScreen(
                 }
             }
 
+            if (contests.isNotEmpty()) {
+                Spacer(Modifier.height(18.dp))
+                Text("Конкурсы", color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp, modifier = Modifier.padding(horizontal = 18.dp))
+                Spacer(Modifier.height(10.dp))
+                contests.forEach { contest ->
+                    Card(
+                        onClick = { onOpenContest(contest.id) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 5.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column {
+                            ContestImage(contest.bannerUrl, Modifier.fillMaxWidth().height(130.dp))
+                            Text(contest.title, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(22.dp))
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
