@@ -537,6 +537,22 @@ final class AdminController
         $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT);
         $page = $page === false || $page < 1 ? 1 : (int)$page;
         $perPage = 50;
+        $sort = (string)($query['sort'] ?? 'name_asc');
+        $allowedSorts = [
+            'id_asc' => 'p.id ASC', 'id_desc' => 'p.id DESC',
+            'name_asc' => 'p.name ASC, p.id ASC', 'name_desc' => 'p.name DESC, p.id DESC',
+            'category_asc' => 'c.name ASC, p.name ASC, p.id ASC',
+            'category_desc' => 'c.name DESC, p.name ASC, p.id ASC',
+            'quantity_asc' => 'sort_stock.quantity ASC, p.id ASC',
+            'quantity_desc' => 'sort_stock.quantity DESC, p.id ASC',
+        ];
+        if (!isset($allowedSorts[$sort])) $sort = 'name_asc';
+        $sortBranchId = filter_var($query['sort_branch_id'] ?? 0, FILTER_VALIDATE_INT);
+        $sortBranchId = $sortBranchId === false || $sortBranchId < 0 ? 0 : (int)$sortBranchId;
+        $branches = $this->db->query('SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
+        $branchIds = array_map(static fn(array $branch): int => (int)$branch['id'], $branches);
+        if (!in_array($sortBranchId, $branchIds, true)) $sortBranchId = $branchIds[0] ?? 0;
+        if (str_starts_with($sort, 'quantity_') && $sortBranchId === 0) $sort = 'name_asc';
 
         $categories = $this->db->query('SELECT id, parent_id, name FROM categories ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
         $children = [];
@@ -575,9 +591,11 @@ final class AdminController
         $pages = max(1, (int)ceil($total / $perPage));
         $page = min($page, $pages);
 
-        $sql = 'SELECT p.id, p.name, p.barcode, p.article, c.name AS category_name,
-                       (SELECT COUNT(*) FROM stock s WHERE s.product_id = p.id) AS branches_count'
-            . $filterSql . ' ORDER BY p.name, p.id LIMIT ? OFFSET ?';
+        $stockJoin = str_starts_with($sort, 'quantity_')
+            ? ' LEFT JOIN stock sort_stock ON sort_stock.product_id = p.id AND sort_stock.branch_id = ' . $sortBranchId
+            : '';
+        $sql = 'SELECT p.id, p.name, p.barcode, p.article, c.name AS category_name'
+            . $filterSql . $stockJoin . ' ORDER BY ' . $allowedSorts[$sort] . ' LIMIT ? OFFSET ?';
         $stmt = $this->db->prepare($sql);
         $index = 1;
         foreach ($params as $value) $stmt->bindValue($index++, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
@@ -586,7 +604,6 @@ final class AdminController
         $stmt->execute();
 
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $branches = $this->db->query('SELECT id, name FROM branches WHERE is_active = 1 ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
         $stockByProduct = [];
         if ($products && $branches) {
             $productIds = array_map(static fn(array $product): int => (int)$product['id'], $products);
@@ -642,15 +659,30 @@ final class AdminController
                 . AdminView::e($categoryNames[$id]) . '</option>';
             $seen[$id] = true;
         }
-        $content .= '</select></label><button type="submit">Найти</button> <a href="/admin/products">Сбросить</a></form>'
+        $content .= '</select></label><label>Сортировка<select name="sort">';
+        $sortLabels = [
+            'id_asc' => 'ID: по возрастанию', 'id_desc' => 'ID: по убыванию',
+            'name_asc' => 'Название: А–Я', 'name_desc' => 'Название: Я–А',
+            'category_asc' => 'Категория: А–Я', 'category_desc' => 'Категория: Я–А',
+            'quantity_asc' => 'Остаток: по возрастанию', 'quantity_desc' => 'Остаток: по убыванию',
+        ];
+        foreach ($sortLabels as $key => $label) {
+            $content .= '<option value="' . $key . '"' . ($sort === $key ? ' selected' : '') . '>' . AdminView::e($label) . '</option>';
+        }
+        $content .= '</select></label><label>Филиал для сортировки по остатку<select name="sort_branch_id">';
+        foreach ($branches as $branch) {
+            $id = (int)$branch['id'];
+            $content .= '<option value="' . $id . '"' . ($id === $sortBranchId ? ' selected' : '') . '>' . AdminView::e($branch['name']) . '</option>';
+        }
+        $content .= '</select></label><button type="submit">Применить</button> <a href="/admin/products">Сбросить</a></form>'
             . '<p class="muted">Найдено товаров: ' . $total . '. Страница ' . $page . ' из ' . $pages . '.</p></section>'
             . '<p class="muted">Цены и остатки показаны по каждому активному филиалу. Если столбцы не помещаются, прокрутите таблицу по горизонтали.</p>'
             . '<div style="overflow-x:auto;max-width:100%">'
             . AdminView::table(array_merge(['ID', 'Название', 'Штрихкод', 'Артикул', 'Категория'], array_map(static fn(array $branch): string => (string)$branch['name'], $branches)), $rows, 'Товары не найдены.')
             . '</div>';
 
-        $url = static function (int $target) use ($q, $categoryId): string {
-            return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
+        $url = static function (int $target) use ($q, $categoryId, $sort, $sortBranchId): string {
+            return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'sort' => $sort, 'sort_branch_id' => $sortBranchId, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
         };
         if ($pages > 1) {
             $content .= '<section class="card"><nav aria-label="Страницы товаров">';
