@@ -556,6 +556,11 @@ final class AdminController
         if (!in_array($sortBranchId, $branchIds, true)) $sortBranchId = $branchIds[0] ?? 0;
         if ((str_starts_with($sort, 'quantity_') || str_starts_with($sort, 'price_')) && $sortBranchId === 0) $sort = 'name_asc';
 
+        $availability = (string)($query['availability'] ?? 'all');
+        if (!in_array($availability, ['all', 'in_stock', 'out_of_stock', 'no_data'], true)) {
+            $availability = 'all';
+        }
+
         $categories = $this->db->query('SELECT id, parent_id, name FROM categories ORDER BY name, id')->fetchAll(PDO::FETCH_ASSOC);
         $children = [];
         $categoryNames = [];
@@ -585,6 +590,17 @@ final class AdminController
             }
             $where[] = 'p.category_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
             array_push($params, ...array_keys($ids));
+        }
+        if ($availability !== 'all' && $sortBranchId !== 0) {
+            $stockExists = 'SELECT 1 FROM stock availability_stock WHERE availability_stock.product_id = p.id'
+                . ' AND availability_stock.branch_id = ' . $sortBranchId;
+            if ($availability === 'in_stock') {
+                $where[] = 'EXISTS (' . $stockExists . ' AND availability_stock.quantity > 0)';
+            } elseif ($availability === 'out_of_stock') {
+                $where[] = 'EXISTS (' . $stockExists . ' AND availability_stock.quantity <= 0)';
+            } else {
+                $where[] = 'NOT EXISTS (' . $stockExists . ')';
+            }
         }
         $filterSql = ' FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE ' . implode(' AND ', $where);
         $count = $this->db->prepare('SELECT COUNT(*)' . $filterSql);
@@ -680,6 +696,17 @@ final class AdminController
             $id = (int)$branch['id'];
             $content .= '<option value="' . $id . '"' . ($id === $sortBranchId ? ' selected' : '') . '>' . AdminView::e($branch['name']) . '</option>';
         }
+        $content .= '</select></label><label>Наличие в выбранном филиале<select name="availability">';
+        $availabilityLabels = [
+            'all' => 'Все товары',
+            'in_stock' => 'Есть в наличии (остаток больше 0)',
+            'out_of_stock' => 'Нет в наличии (остаток 0 или меньше)',
+            'no_data' => 'Нет данных об остатке',
+        ];
+        foreach ($availabilityLabels as $key => $label) {
+            $content .= '<option value="' . $key . '"' . ($availability === $key ? ' selected' : '') . '>'
+                . AdminView::e($label) . '</option>';
+        }
         $content .= '</select></label><button type="submit">Применить</button> <a href="/admin/products">Сбросить</a></form>'
             . '<p class="muted">Найдено товаров: ' . $total . '. Страница ' . $page . ' из ' . $pages . '.</p></section>'
             . '<p class="muted">Цены и остатки показаны по каждому активному филиалу. Если столбцы не помещаются, прокрутите таблицу по горизонтали.</p>'
@@ -687,8 +714,8 @@ final class AdminController
             . AdminView::table(array_merge(['ID', 'Название', 'Штрихкод', 'Артикул', 'Категория'], array_map(static fn(array $branch): string => (string)$branch['name'], $branches)), $rows, 'Товары не найдены.')
             . '</div>';
 
-        $url = static function (int $target) use ($q, $categoryId, $sort, $sortBranchId): string {
-            return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'sort' => $sort, 'sort_branch_id' => $sortBranchId, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
+        $url = static function (int $target) use ($q, $categoryId, $sort, $sortBranchId, $availability): string {
+            return '/admin/products?' . http_build_query(['q' => $q, 'category_id' => $categoryId, 'sort' => $sort, 'sort_branch_id' => $sortBranchId, 'availability' => $availability, 'page' => $target], '', '&', PHP_QUERY_RFC3986);
         };
         if ($pages > 1) {
             $content .= '<section class="card"><nav aria-label="Страницы товаров">';
