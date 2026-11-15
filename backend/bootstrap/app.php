@@ -75,6 +75,7 @@ try {
     $router->get('/admin/categories', [$adminCategories, 'index']);
     $router->post('/admin/categories', [$adminCategories, 'create']);
     $router->post('/admin/categories/{id}/toggle', [$adminCategories, 'toggle']);
+    $router->post('/admin/categories/{id}/delete', [$adminCategories, 'delete']);
     $router->get('/admin/categories/{id}/edit', [$adminCategories, 'edit']);
     $router->post('/admin/categories/{id}/edit', [$adminCategories, 'update']);
     $router->get('/admin/branches', [$admin, 'branches']);
