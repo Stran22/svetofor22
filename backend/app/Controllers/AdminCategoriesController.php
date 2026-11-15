@@ -42,6 +42,9 @@ final class AdminCategoriesController
                   . '<form class="inline" method="post" action="/admin/categories/' . $id . '/toggle">'
                   . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
                   . '<button class="link" type="submit">' . ((int)$category['is_active'] ? 'Отключить' : 'Включить') . '</button></form>'
+                  . ' <form class="inline" method="post" action="/admin/categories/' . $id . '/delete" onsubmit="return confirm(\'Удалить категорию «' . AdminView::e($category['name']) . '»? Действие нельзя отменить.\')">'
+                  . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
+                  . '<button class="link" type="submit">Удалить</button></form>'
                 : '—';
             $rows[] = [
                 $id,
@@ -123,6 +126,47 @@ final class AdminCategoriesController
         $stmt = $this->db->prepare('UPDATE categories SET is_active = 1 - is_active WHERE id=?');
         $stmt->execute([$id]);
         $this->auth->audit((int)$admin['id'], 'category.toggle', 'category', $id, [], $request->clientIp());
+        Response::redirect('/admin/categories');
+    }
+
+    public function delete(Request $request, array $params): never
+    {
+        $admin = $this->auth->requireRole('admin');
+        $this->csrf($request->post());
+        $id = (int)$params['id'];
+        if ($id < 1) Response::html('Некорректный ID категории.', 422);
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('SELECT id, name FROM categories WHERE id=? FOR UPDATE');
+            $stmt->execute([$id]);
+            $category = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$category) {
+                $this->db->rollBack();
+                Response::html('Категория не найдена.', 404);
+            }
+
+            $stmt = $this->db->prepare('SELECT COUNT(*) FROM products WHERE category_id=?');
+            $stmt->execute([$id]);
+            $products = (int)$stmt->fetchColumn();
+
+            $stmt = $this->db->prepare('SELECT COUNT(*) FROM categories WHERE parent_id=?');
+            $stmt->execute([$id]);
+            $children = (int)$stmt->fetchColumn();
+
+            if ($products > 0 || $children > 0) {
+                $this->db->rollBack();
+                Response::html('Удаление запрещено: товаров — ' . $products . ', подкатегорий — ' . $children . '. Сначала перенесите связанные записи.', 409);
+            }
+
+            $stmt = $this->db->prepare('DELETE FROM categories WHERE id=?');
+            $stmt->execute([$id]);
+            $this->auth->audit((int)$admin['id'], 'category.delete', 'category', $id, ['name'=>$category['name']], $request->clientIp());
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
         Response::redirect('/admin/categories');
     }
 
