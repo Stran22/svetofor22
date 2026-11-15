@@ -14,6 +14,29 @@ final class ExcelImportPreflight
     public function __construct(private PDO $db) {}
 
     /**
+     * Category names in Excel must resolve to one existing active category.
+     * Import must never create a category implicitly.
+     */
+    public function checkCategory(?string $name): ?string
+    {
+        if ($name === null || trim($name) === '') {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT id FROM categories WHERE name = ? AND is_active = 1 ORDER BY id LIMIT 2'
+        );
+        $stmt->execute([trim($name)]);
+        $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (count($ids) === 0) {
+            return 'Категория «' . $name . '» не найдена среди активных категорий. Сначала создайте её в админке.';
+        }
+        if (count($ids) > 1) {
+            return 'Категория «' . $name . '» встречается несколько раз. Уточните категорию в Excel.';
+        }
+        return null;
+    }
+
+    /**
      * Returns a user-facing conflict message or null.
      * Uses the same product identity rules as XlsxImportService::upsertRow().
      *
