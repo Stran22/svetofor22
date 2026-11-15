@@ -16,6 +16,9 @@ class ProductRepository(
     suspend fun getCategories(): List<Category> =
         api.categories().requireData("категорий")
 
+    suspend fun getFeaturedProducts(branchId: Int): List<Product> =
+        api.featuredProducts(branchId).requireData("рекламной подборки")
+
     suspend fun getProducts(branchId: Int, categoryId: Int? = null): List<Product> {
         val allProducts = mutableListOf<Product>()
         var page = 1
