@@ -180,8 +180,13 @@ fun AppNavigation(
         ) {
             composable(AppRoutes.HOME) {
                 HomeScreen(
+                    vm = catalogViewModel,
                     onOpenCatalog = { navController.navigate(AppRoutes.CATALOG) },
-                    onOpenOverview = { navController.navigate(AppRoutes.OVERVIEW) }
+                    onOpenOverview = { navController.navigate(AppRoutes.OVERVIEW) },
+                    onOpenProduct = { product ->
+                        selectedProduct = product
+                        navController.navigate(AppRoutes.PRODUCT_DETAIL)
+                    }
                 )
             }
             composable(AppRoutes.CATALOG) {
