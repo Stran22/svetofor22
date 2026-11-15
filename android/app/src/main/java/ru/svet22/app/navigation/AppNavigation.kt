@@ -44,6 +44,7 @@ import ru.svet22.app.ui.catalog.CatalogScreen
 import ru.svet22.app.ui.catalog.CatalogViewModel
 import ru.svet22.app.ui.catalog.ProductDetailScreen
 import ru.svet22.app.ui.home.HomeScreen
+import ru.svet22.app.ui.contest.ContestScreen
 import ru.svet22.app.ui.overview.OverviewScreen
 import ru.svet22.app.ui.profile.ProfileScreen
 import ru.svet22.app.ui.tracked.TrackedScreen
@@ -60,6 +61,7 @@ private object AppRoutes {
     const val TRACKED = "tracked"
     const val PROFILE = "profile"
     const val PRODUCT_DETAIL = "product_detail"
+    const val CONTEST = "contest/{id}"
 }
 
 private data class BottomMenuItem(val route: String, val title: String)
@@ -114,7 +116,7 @@ fun AppNavigation(
         BottomMenuItem(AppRoutes.TRACKED, "Отслеживаемое"),
         BottomMenuItem(AppRoutes.PROFILE, "Профиль")
     )
-    val showBottomBar = currentRoute != AppRoutes.PRODUCT_DETAIL
+    val showBottomBar = currentRoute != AppRoutes.PRODUCT_DETAIL && currentRoute != AppRoutes.CONTEST
 
     Scaffold(
         bottomBar = {
@@ -183,11 +185,31 @@ fun AppNavigation(
                     vm = catalogViewModel,
                     onOpenCatalog = { navController.navigate(AppRoutes.CATALOG) },
                     onOpenOverview = { navController.navigate(AppRoutes.OVERVIEW) },
+                    onOpenContest = { id -> navController.navigate("contest/$id") },
                     onOpenProduct = { product ->
                         selectedProduct = product
                         navController.navigate(AppRoutes.PRODUCT_DETAIL)
                     }
                 )
+            }
+            composable(AppRoutes.CONTEST) { entry ->
+                val id = entry.arguments?.getString("id")?.toIntOrNull()
+                Scaffold(topBar = {
+                    TopAppBar(
+                        title = { Text("Конкурс") },
+                        navigationIcon = {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                            }
+                        }
+                    )
+                }) { padding ->
+                    if (id != null) {
+                        androidx.compose.foundation.layout.Box(Modifier.padding(padding)) {
+                            ContestScreen(id, isSocialAuthenticated, onVkLoginClick)
+                        }
+                    }
+                }
             }
             composable(AppRoutes.CATALOG) {
                 CatalogScreen(
