@@ -22,6 +22,16 @@ final class AdminCategoriesController
     {
         $admin = $this->auth->requireUser();
         $categories = $this->all();
+        $query = $request->query();
+        $sortBy = in_array($query['sort'] ?? '', ['id', 'name'], true) ? $query['sort'] : 'id';
+        $direction = ($query['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+        usort($categories, static function (array $a, array $b) use ($sortBy, $direction): int {
+            $result = $sortBy === 'name'
+                ? strcmp(mb_strtolower($a['name']), mb_strtolower($b['name']))
+                : ((int)$a['id'] <=> (int)$b['id']);
+            if ($result === 0) $result = (int)$a['id'] <=> (int)$b['id'];
+            return $direction === 'desc' ? -$result : $result;
+        });
         $csrf = AdminView::e($this->auth->csrfToken());
         $content = '<section class="card"><p>Разделы и подразделы каталога. Отключение не удаляет товары.</p></section>';
         if ($admin['role'] === 'admin') {
@@ -55,6 +65,12 @@ final class AdminCategoriesController
                 $edit,
             ];
         }
+        $content .= '<section class="card"><strong>Сортировка списка:</strong> '
+            . '<a href="/admin/categories?sort=id&amp;dir=asc">ID ↑</a> · '
+            . '<a href="/admin/categories?sort=id&amp;dir=desc">ID ↓</a> · '
+            . '<a href="/admin/categories?sort=name&amp;dir=asc">Название А–Я</a> · '
+            . '<a href="/admin/categories?sort=name&amp;dir=desc">Название Я–А</a>'
+            . ' <span class="muted">(сейчас: ' . ($sortBy === 'id' ? 'ID' : 'Название') . ', ' . ($direction === 'asc' ? 'по возрастанию' : 'по убыванию') . ')</span></section>';
         $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Действия'], $rows);
         Response::html(AdminView::layout('Категории', $content, $this->adminLayout($admin)));
     }
