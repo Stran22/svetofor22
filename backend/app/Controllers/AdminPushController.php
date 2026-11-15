@@ -112,7 +112,7 @@ final class AdminPushController
                 . '; ошибок ' . (int) $row['devices_failed']
                 . '; неизвестно ' . (int) $row['devices_unknown'];
             $tableRows[] = [
-                (int) $row['id'],
+                '<a href="/admin/push/' . (int) $row['id'] . '">#' . (int) $row['id'] . '</a>',
                 (int) $row['subscription_id'],
                 $row['product_name'],
                 $row['branch_name'],
@@ -144,4 +144,83 @@ final class AdminPushController
         $content .= '</section>';
         Response::html(AdminView::layout('Push-уведомления', $content, $admin));
     }
+
+    public function detail(Request $request, string $id): never
+    {
+        $admin = $this->auth->requireUser();
+        $admin['csrf'] = $this->auth->csrfToken();
+        if (!ctype_digit($id) || (int) $id < 1) {
+            Response::html(AdminView::layout('Уведомление не найдено', '<section class="card"><p>Некорректный ID уведомления.</p><p><a href="/admin/push">← К истории</a></p></section>', $admin), 404);
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT l.id, l.subscription_id, l.status, l.attempt_count, l.created_at, l.updated_at, l.sent_at, l.last_error,'
+            . ' s.status AS subscription_status, p.name AS product_name, b.name AS branch_name'
+            . ' FROM push_delivery_log l'
+            . ' JOIN subscriptions s ON s.id=l.subscription_id'
+            . ' JOIN products p ON p.id=s.product_id'
+            . ' JOIN branches b ON b.id=s.branch_id WHERE l.id=? LIMIT 1'
+        );
+        $stmt->execute([(int) $id]);
+        $item = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$item) {
+            Response::html(AdminView::layout('Уведомление не найдено', '<section class="card"><p>Уведомление не найдено.</p><p><a href="/admin/push">← К истории</a></p></section>', $admin), 404);
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT d.id, d.token_id, d.status, d.attempt_count, d.created_at, d.updated_at,'
+            . ' d.sent_at, d.last_error, d.provider_message_id'
+            . ' FROM push_device_deliveries d WHERE d.delivery_id=? ORDER BY d.id'
+        );
+        $stmt->execute([(int) $id]);
+        $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $labels = [
+            'pending' => 'Ожидает',
+            'processing' => 'Обрабатывается',
+            'sent' => 'Отправлено',
+            'failed' => 'Ошибка',
+            'unknown' => 'Неизвестно',
+            'active' => 'Активна',
+            'notified' => 'Уведомлён',
+            'cancelled' => 'Отменена',
+        ];
+        $e = [AdminView::class, 'e'];
+        $content = '<p><a href="/admin/push">← К истории уведомлений</a></p>'
+            . '<section class="card"><h2>Уведомление № ' . (int) $item['id'] . '</h2>'
+            . '<p><strong>Товар:</strong> ' . $e($item['product_name'])
+            . ' · <strong>Филиал:</strong> ' . $e($item['branch_name']) . '</p>'
+            . '<p><strong>Подписка:</strong> № ' . (int) $item['subscription_id']
+            . ' (' . $e($labels[$item['subscription_status']] ?? $item['subscription_status']) . ')</p>'
+            . '<p><strong>Статус:</strong> ' . $e($labels[$item['status']] ?? $item['status'])
+            . ' · <strong>Попытки:</strong> ' . (int) $item['attempt_count'] . '</p>'
+            . '<p><strong>Создано:</strong> ' . $e($item['created_at'])
+            . ' · <strong>Обновлено:</strong> ' . $e($item['updated_at'])
+            . ' · <strong>Отправлено:</strong> ' . $e($item['sent_at'] ?? '—') . '</p>'
+            . '<p><strong>Ошибка:</strong> ' . $e($item['last_error'] ?? '—') . '</p></section>';
+
+        $rows = [];
+        foreach ($devices as $device) {
+            $rows[] = [
+                (int) $device['id'],
+                $device['token_id'] === null ? '—' : (int) $device['token_id'],
+                $e($labels[$device['status']] ?? $device['status']),
+                (int) $device['attempt_count'],
+                $e($device['created_at']),
+                $e($device['updated_at']),
+                $e($device['sent_at'] ?? '—'),
+                $e($device['last_error'] ?? '—'),
+                $e($device['provider_message_id'] ?? '—'),
+            ];
+        }
+        $content .= '<section class="card"><h2>Отправки по устройствам (' . count($rows) . ')</h2>'
+            . '<p class="muted">ID устройства — внутренний номер записи токена, не сам FCM-токен. '
+            . '«Отправлено» означает принятие Firebase, а не подтверждение показа на телефоне.</p>'
+            . AdminView::table(
+                ['ID доставки', 'ID устройства', 'Статус', 'Попытки', 'Создано', 'Обновлено', 'Отправлено', 'Ошибка', 'ID сообщения Firebase'],
+                $rows,
+                '—'
+            ) . '</section>';
+        Response::html(AdminView::layout('Push № ' . (int) $item['id'], $content, $admin));
+    }
+
 }
