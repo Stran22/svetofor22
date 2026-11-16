@@ -5,7 +5,7 @@ import com.google.gson.annotations.SerializedName
 data class TrackedSubscription(
     val id: Int,
     @SerializedName("product_id") val productId: Int,
-    @SerializedName("branch_id") val branchId: Int,
+    @SerializedName("branch_id") val branchId: Int? = null,
     val status: String,
     @SerializedName("product_name") val productName: String? = null,
     @SerializedName("branch_name") val branchName: String? = null
@@ -18,6 +18,5 @@ data class CancelSubscriptionResponse(
 )
 data class CreateSubscriptionRequest(
     @SerializedName("product_id") val productId: Int,
-    @SerializedName("branch_id") val branchId: Int
-)
+
 data class CancelSubscriptionRequest(@SerializedName("subscription_id") val subscriptionId: Int)
