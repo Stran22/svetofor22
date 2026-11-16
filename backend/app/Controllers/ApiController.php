@@ -9,6 +9,7 @@ use Svet22\Core\Request;
 use Svet22\Core\Response;
 use Svet22\Core\Config;
 use Svet22\Services\TokenService;
+use Svet22\Services\CategoryVisibilityService;
 use Throwable;
 
 final class ApiController
@@ -222,6 +223,24 @@ final class ApiController
 
         $stock->execute([$params['id']]);
         $product['branches'] = $stock->fetchAll();
+        $visibility = (new CategoryVisibilityService($this->db))->forCategory(
+            $product['category_id'] === null ? null : (int)$product['category_id']
+        );
+        $product['hide_store_stock'] = $visibility['hide_store_stock'];
+        // Only a complete set of stock records for active branches can prove zero availability.
+        $availability = $this->db->prepare(
+            'SELECT COUNT(b.id) AS branch_count,
+                    COUNT(s.product_id) AS known_count,
+                    COALESCE(SUM(CASE WHEN s.quantity > 0 THEN 1 ELSE 0 END), 0) AS available_count
+             FROM branches b
+             LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=?
+             WHERE b.is_active=1'
+        );
+        $availability->execute([$params['id']]);
+        $counts = $availability->fetch(PDO::FETCH_ASSOC);
+        $product['can_track'] = (int)$counts['branch_count'] > 0
+            && (int)$counts['known_count'] === (int)$counts['branch_count']
+            && (int)$counts['available_count'] === 0;
 
         $rating = $this->db->prepare(
             "SELECT COUNT(*) AS reviews_count,
