@@ -152,7 +152,7 @@ final class AdminCategoriesController
                 'hide_store_stock' => array_keys($selected['hide_store_stock'])
             ], $request->clientIp());
             $this->db->commit();
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;
         }
