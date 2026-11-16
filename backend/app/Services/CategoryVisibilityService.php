@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace Svet22\\Services;
+namespace Svet22\Services;
 
 use PDO;
 
