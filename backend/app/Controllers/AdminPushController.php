@@ -34,7 +34,7 @@ final class AdminPushController
         $where = [];
         $params = [];
         if ($branchId > 0) {
-            $where[] = 's.branch_id = ?';
+            $where[] = 'l.branch_id = ?';
             $params[] = $branchId;
         }
         if ($status !== '') {
@@ -49,7 +49,7 @@ final class AdminPushController
         $base = ' FROM push_delivery_log l'
             . ' JOIN subscriptions s ON s.id = l.subscription_id'
             . ' JOIN products p ON p.id = s.product_id'
-            . ' JOIN branches b ON b.id = s.branch_id';
+            . ' JOIN branches b ON b.id = l.branch_id';
         $condition = $where ? ' WHERE ' . implode(' AND ', $where) : '';
         $countStmt = $this->db->prepare('SELECT COUNT(*)' . $base . $condition);
         $countStmt->execute($params);
@@ -160,7 +160,7 @@ final class AdminPushController
             . ' FROM push_delivery_log l'
             . ' JOIN subscriptions s ON s.id=l.subscription_id'
             . ' JOIN products p ON p.id=s.product_id'
-            . ' JOIN branches b ON b.id=s.branch_id WHERE l.id=? LIMIT 1'
+            . ' JOIN branches b ON b.id=l.branch_id WHERE l.id=? LIMIT 1'
         );
         $stmt->execute([(int) $id]);
         $item = $stmt->fetch(PDO::FETCH_ASSOC);
