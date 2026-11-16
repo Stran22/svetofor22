@@ -48,14 +48,14 @@ try {
             $db->beginTransaction();
             $stmt = $db->query(
     "SELECT l.id, l.subscription_id, s.user_id,
-            s.product_id, s.branch_id,
+            s.product_id, l.branch_id,
             s.status AS subscription_status,
                         u.push_enabled, p.name AS product_name, b.name AS branch_name
                  FROM push_delivery_log l
                  JOIN subscriptions s ON s.id = l.subscription_id
                  JOIN users u ON u.id = s.user_id
                  JOIN products p ON p.id = s.product_id
-                 JOIN branches b ON b.id = s.branch_id
+                 JOIN branches b ON b.id = l.branch_id
                  WHERE l.status = 'pending'
                  ORDER BY l.created_at, l.id LIMIT 1 FOR UPDATE"
             );
