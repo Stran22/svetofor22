@@ -70,7 +70,7 @@ final class SubscriptionController
             foreach ($branches as $branchId) {
                 $stock->execute([$productId, (int)$branchId]);
                 $quantity = $stock->fetchColumn();
-                if ($quantity === false || $quantity === null || (float)$quantity > 0) {
+                if ($quantity === false || $quantity === null || (float)$quantity !== 0.0) {
                     $notTrackable = true;
                     break;
                 }
