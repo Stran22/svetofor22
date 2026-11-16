@@ -234,7 +234,7 @@ final class AdminInsightsController
                 . '<span class="unavailable" style="width:' . $unavailablePercent . '%"></span></div>'
                 . '<div class="insight-branch-caption">' . ($total > 0
                     ? 'В наличии ' . $availablePercent . '% из ' . number_format($total, 0, ',', ' ') . ' учтённых позиций'
-                    : 'Нет загруженных остатков') . '</div></article>'
+                    : 'Нет загруженных остатков') . '</div></article>';
         }
         if ($shownBranches === 0) {
             $content .= '<p class="muted">Филиалы пока не добавлены.</p>';
