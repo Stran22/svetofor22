@@ -178,9 +178,24 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Column {
-                            ContestImage(contest.bannerUrl, Modifier.fillMaxWidth().height(130.dp))
-                            Text(contest.title, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(130.dp)) {
+                            ContestImage(contest.bannerUrl, Modifier.fillMaxSize())
+                            Surface(
+                                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                                color = Color.White.copy(alpha = 0.94f),
+                                shape = RoundedCornerShape(18.dp),
+                                shadowElevation = 3.dp
+                            ) {
+                                Text(
+                                    text = contest.title,
+                                    color = Dark,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 14.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
                         }
                     }
                 }
