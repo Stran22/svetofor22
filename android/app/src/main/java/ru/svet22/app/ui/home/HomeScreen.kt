@@ -57,8 +57,6 @@ import ru.svet22.app.data.repository.ContestRepository
 import ru.svet22.app.ui.contest.ContestImage
 import ru.svet22.app.ui.catalog.CatalogViewModel
 import java.net.URL
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val Red = Color(0xFFE53935)
@@ -187,19 +185,21 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(16.dp))
                         ) {
                             ContestImage(contest.bannerUrl, Modifier.fillMaxSize())
-                            Surface(
-                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                                color = Color.White,
-                                shape = RoundedCornerShape(20.dp),
-                                shadowElevation = 8.dp
-                            ) {
-                                Text(
-                                    text = contestEndLabel(contest.endsAt),
-                                    color = Dark,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
-                                )
+                            contestDateLabel(contest.title)?.let { dateLabel ->
+                                Surface(
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(20.dp),
+                                    shadowElevation = 8.dp
+                                ) {
+                                    Text(
+                                        text = dateLabel,
+                                        color = Dark,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                                    )
+                                }
                             }
                             Surface(
                                 modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
@@ -455,7 +455,20 @@ private fun FeaturedTile(product: Product, onClick: () -> Unit, modifier: Modifi
     }
 }
 
-private fun contestEndLabel(endsAt: String): String = runCatching {
-    val date = LocalDateTime.parse(endsAt.trim().replace(' ', 'T'))
-    "ДО " + date.format(DateTimeFormatter.ofPattern("d MMMM", Locale("ru"))).uppercase(Locale("ru"))
-}.getOrElse { "ДО ОКОНЧАНИЯ" }
+private fun contestDateLabel(title: String): String? {
+    // The badge is editorial text from the contest title, not the server end date.
+    val months = "января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря"
+    val match = Regex(
+        """\\bдо\\s+([0-3]?\\d)\\s+($months)\\b""",
+        RegexOption.IGNORE_CASE
+    ).find(title) ?: return null
+    val day = match.groupValues[1].toIntOrNull() ?: return null
+    val month = match.groupValues[2].lowercase(Locale("ru"))
+    val maxDay = when (month) {
+        "февраля" -> 29
+        "апреля", "июня", "сентября", "ноября" -> 30
+        else -> 31
+    }
+    if (day !in 1..maxDay) return null
+    return "ДО $day ${month.uppercase(Locale("ru"))}"
+}
