@@ -63,10 +63,9 @@ final class ApiController
              ORDER BY sort_order, name'
         )->fetchAll();
 
-        $visibility = (new \\Svet22\\Services\\CategoryVisibilityService($this->db))->all();
+        $visibility = (new CategoryVisibilityService($this->db))->all();
         foreach ($rows as &$row) {
-            $flags = $visibility[(int)$row['id']] ?? ['hide_tracking' => false, 'hide_store_stock' => false];
-            $row['hide_tracking'] = $flags['hide_tracking'];
+            $flags = $visibility[(int)$row['id']] ?? ['hide_store_stock' => false];
             $row['hide_store_stock'] = $flags['hide_store_stock'];
         }
         unset($row);
