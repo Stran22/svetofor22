@@ -128,7 +128,6 @@ fun ProductDetailScreen(
     var showLoginDialog by remember {
         mutableStateOf(false)
     }
-    var showTrackingDialog by remember(product.id) { mutableStateOf(false) }
     val appContext = LocalContext.current.applicationContext
     val subscriptionRepository = remember(appContext) {
         SubscriptionRepository(appContext)
@@ -136,14 +135,19 @@ fun ProductDetailScreen(
     val trackingScope = rememberCoroutineScope()
     var trackingBusy by remember(product.id) { mutableStateOf(false) }
     var trackingMessage by remember(product.id) { mutableStateOf<String?>(null) }
-    var trackedBranches by remember(product.id) { mutableStateOf<Set<Int>>(emptySet()) }
-    var trackingError by remember(product.id) { mutableStateOf<String?>(null) }
+    var alreadyTracking by remember(product.id) { mutableStateOf(false) }
+    var detailSettings by remember(product.id) { mutableStateOf<ru.svet22.app.data.model.ProductDetailSettings?>(null) }
     LaunchedEffect(product.id) {
+        detailSettings = null
         try {
-            trackedBranches = subscriptionRepository.list()
-                .filter { it.productId == product.id && it.status == "active" }
-                .map { it.branchId }.toSet()
-        } catch (_: Exception) { /* The user can retry when subscribing. */ }
+            val response = RetrofitClient.api.productDetail(product.id)
+            if (response.success) detailSettings = response.data
+        } catch (_: Exception) { /* Fail closed: no tracking until stock is verified. */ }
+        try {
+            alreadyTracking = subscriptionRepository.list().any {
+                it.productId == product.id && it.status == "active"
+            }
+        } catch (_: Exception) {}
     }
     // ===== КОНЕЦ БЛОКА: Состояние диалога авторизации =====
 
@@ -264,6 +268,7 @@ fun ProductDetailScreen(
         Spacer(Modifier.height(12.dp))
 
         // ===== НАЧАЛО БЛОКА: Остатки во всех филиалах =====
+        if (detailSettings?.hideStoreStock == false) {
         Text(
             text = "Цены и остатки в магазинах",
             style = MaterialTheme.typography.titleMedium,
@@ -315,28 +320,46 @@ fun ProductDetailScreen(
             }
         }
 
+        }
         // ===== КОНЕЦ БЛОКА: Остатки во всех филиалах =====
 
         Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { showTrackingDialog = true },
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF2E7D32),
-                contentColor = Color.White
-            )
-        ) {
-            Icon(Icons.Default.NotificationsActive, contentDescription = null)
-            Spacer(Modifier.size(10.dp))
-            Text("Следить за товаром", fontWeight = FontWeight.Bold)
+        if (detailSettings?.canTrack == true) {
+            Button(
+                onClick = {
+                    if (!alreadyTracking && !trackingBusy) {
+                        trackingBusy = true
+                        trackingScope.launch {
+                            try {
+                                subscriptionRepository.create(product.id)
+                                alreadyTracking = true
+                                trackingMessage = "Уведомим о поступлении товара в любой магазин."
+                            } catch (_: Exception) {
+                                trackingMessage = "Не удалось оформить подписку. Проверьте наличие товара и соединение."
+                            } finally {
+                                trackingBusy = false
+                            }
+                        }
+                    }
+                },
+                enabled = !alreadyTracking && !trackingBusy,
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E7D32),
+                    contentColor = Color.White
+                )
+            ) {
+                Icon(Icons.Default.NotificationsActive, contentDescription = null)
+                Spacer(Modifier.size(10.dp))
+                Text(if (alreadyTracking) "Вы уже следите за товаром" else "Следить за товаром",
+                    fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text("Уведомим о поступлении в любой магазин.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Выберите магазин, где товара нет в наличии. Уведомим о поступлении.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Spacer(Modifier.height(24.dp))
 
         // ===== НАЧАЛО БЛОКА: Переключатель вкладок =====
@@ -382,60 +405,6 @@ fun ProductDetailScreen(
         // ===== КОНЕЦ БЛОКА: Общий блок отзывов =====
     }
 
-    if (showTrackingDialog) {
-        AlertDialog(
-            onDismissRequest = { if (!trackingBusy) showTrackingDialog = false },
-            title = { Text("Следить за товаром") },
-            text = {
-                Column {
-                    Text("Выберите филиал, в котором товара пока нет:")
-                    Spacer(Modifier.height(8.dp))
-                    branches.forEach { branch ->
-                        val stock = branchProducts[branch.id]
-                        val quantity = stock?.quantity?.toString()?.toDoubleOrNull()
-                        val availableToTrack = !stockLoading &&
-                            branch.id !in stockFailed && stock != null &&
-                            quantity != null && quantity <= 0.0
-                        val tracked = branch.id in trackedBranches
-                        TextButton(
-                            enabled = availableToTrack && !tracked && !trackingBusy,
-                            onClick = {
-                                trackingBusy = true
-                                trackingError = null
-                                trackingScope.launch {
-                                    try {
-                                        subscriptionRepository.create(product.id, branch.id)
-                                        trackedBranches = trackedBranches + branch.id
-                                        trackingMessage = "Подписка оформлена: ${branch.name}"
-                                        showTrackingDialog = false
-                                    } catch (e: Exception) {
-                                        trackingError = "Не удалось оформить подписку. Проверьте наличие товара и соединение."
-                                    } finally {
-                                        trackingBusy = false
-                                    }
-                                }
-                            }
-                        ) {
-                            Text(branch.name + when {
-                                tracked -> " — отслеживается"
-                                availableToTrack -> " — подписаться"
-                                else -> " — подписка недоступна"
-                            })
-                        }
-                    }
-                    if (trackingBusy) CircularProgressIndicator()
-                    trackingError?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTrackingDialog = false }, enabled = !trackingBusy) {
-                    Text("Закрыть")
-                }
-            }
-        )
-    }
     trackingMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { trackingMessage = null },
