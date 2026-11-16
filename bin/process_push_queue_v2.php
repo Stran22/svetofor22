@@ -136,14 +136,14 @@ try {
             $db->beginTransaction();
             $stmt = $db->query(
                 "SELECT d.id, d.delivery_id, d.token_id, l.subscription_id,
-                        s.product_id, s.branch_id, s.status AS subscription_status,
+                        s.product_id, l.branch_id, s.status AS subscription_status,
                         u.push_enabled, p.name AS product_name, b.name AS branch_name
                  FROM push_device_deliveries d
                  JOIN push_delivery_log l ON l.id=d.delivery_id
                  JOIN subscriptions s ON s.id=l.subscription_id
                  JOIN users u ON u.id=s.user_id
                  JOIN products p ON p.id=s.product_id
-                 JOIN branches b ON b.id=s.branch_id
+                 JOIN branches b ON b.id=l.branch_id
                  WHERE d.status='pending' AND l.status='processing'
                  ORDER BY d.created_at,d.id LIMIT 1 FOR UPDATE"
             );
