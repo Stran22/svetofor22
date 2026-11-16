@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace Svet22\\Controllers;
+namespace Svet22\Controllers;
 
 use PDO;
-use Svet22\\Core\\Request;
-use Svet22\\Core\\Response;
-use Svet22\\Services\\TokenService;
+use Svet22\Core\Request;
+use Svet22\Core\Response;
+use Svet22\Services\TokenService;
 
 final class SubscriptionController
 {
@@ -119,7 +119,7 @@ final class SubscriptionController
             );
             $stmt->execute([$subscriptionId]);
             Response::success(['subscription' => $stmt->fetch(PDO::FETCH_ASSOC)], [], 201);
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
