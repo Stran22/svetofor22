@@ -33,16 +33,14 @@ final class AdminInsightsController
 
         $newUsers = (int) $this->scalar('SELECT COUNT(*) FROM users WHERE created_at >= ?', [$since]);
         $newSubscriptions = (int) $this->scalar(
-            'SELECT COUNT(*) FROM subscriptions WHERE created_at >= ?' . ($branchId ? ' AND branch_id=?' : ''),
-            $branchId ? [$since, $branchId] : [$since]
+            'SELECT COUNT(*) FROM subscriptions WHERE created_at >= ?', [$since]
         );
         $activeSubscriptions = (int) $this->scalar(
-            "SELECT COUNT(*) FROM subscriptions WHERE status='active'" . ($branchId ? ' AND branch_id=?' : ''),
-            $branchId ? [$branchId] : []
+            "SELECT COUNT(*) FROM subscriptions WHERE status='active'", []
         );
         $sent = (int) $this->scalar(
-            "SELECT COUNT(*) FROM push_delivery_log l JOIN subscriptions s ON s.id=l.subscription_id WHERE l.status='sent' AND l.sent_at>=?"
-            . ($branchId ? ' AND s.branch_id=?' : ''),
+            "SELECT COUNT(*) FROM push_delivery_log l WHERE l.status='sent' AND l.sent_at>=?"
+            . ($branchId ? ' AND l.branch_id=?' : ''),
             $branchId ? [$since, $branchId] : [$since]
         );
         $stock = $this->db->prepare(
@@ -53,46 +51,34 @@ final class AdminInsightsController
         $stock->execute($branchId ? [$branchId] : []);
         $stockStats = $stock->fetch(PDO::FETCH_ASSOC);
 
-        // Рейтинг по уникальным покупателям, а не количеству строк подписок.
-        // При выборе всех филиалов считаем одного покупателя один раз на товар.
-        $topStmt = $this->db->prepare(
-            'SELECT p.id AS product_id,p.name,COUNT(DISTINCT s.user_id) AS interest,'
-            . ' COUNT(DISTINCT s.branch_id) AS branches_count'
-            . ' FROM subscriptions s JOIN products p ON p.id=s.product_id'
-            . " WHERE s.status='active' AND p.is_active=1"
-            . ($branchId ? ' AND s.branch_id=?' : '')
-            . ' GROUP BY p.id,p.name ORDER BY interest DESC,p.name ASC LIMIT 10'
+        // One active subscription represents interest in the product across all branches.
+        $topStmt = $this->db->query(
+            "SELECT p.id AS product_id, p.name, COUNT(DISTINCT s.user_id) AS interest
+             FROM subscriptions s
+             INNER JOIN products p ON p.id = s.product_id
+             WHERE s.status = 'active' AND p.is_active = 1
+             GROUP BY p.id, p.name
+             ORDER BY interest DESC, p.name ASC
+             LIMIT 10"
         );
-        $topStmt->execute($branchId ? [$branchId] : []);
         $top = $topStmt->fetchAll(PDO::FETCH_ASSOC);
         $topDetails = [];
-        if ($top) {
-            $ids = array_map(static fn($r) => (int) $r['product_id'], $top);
-            $placeholders = implode(',', array_fill(0, count($ids), '?'));
-            $detailStmt = $this->db->prepare(
-                'SELECT s.product_id,b.name AS branch_name,COUNT(DISTINCT s.user_id) AS people'
-                . ' FROM subscriptions s JOIN branches b ON b.id=s.branch_id'
-                . " WHERE s.status='active' AND s.product_id IN (" . $placeholders . ')'
-                . ($branchId ? ' AND s.branch_id=?' : '')
-                . ' GROUP BY s.product_id,s.branch_id,b.name ORDER BY people DESC,b.name'
-            );
-            $detailStmt->execute($branchId ? array_merge($ids, [$branchId]) : $ids);
-            foreach ($detailStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                $topDetails[(int) $r['product_id']][] = $r;
-            }
-        }
 
-        // Спрос на отсутствующие товары: только действующие подписки и фактический нулевой остаток.
-        $demandStmt = $this->db->prepare(
-            'SELECT p.name,b.name AS branch_name,COUNT(DISTINCT s.user_id) AS people'
-            . ' FROM subscriptions s JOIN products p ON p.id=s.product_id'
-            . ' JOIN branches b ON b.id=s.branch_id'
-            . ' LEFT JOIN stock st ON st.product_id=s.product_id AND st.branch_id=s.branch_id'
-            . " WHERE s.status='active' AND p.is_active=1 AND COALESCE(st.quantity,0)<=0"
-            . ($branchId ? ' AND s.branch_id=?' : '')
-            . ' GROUP BY s.product_id,s.branch_id,p.name,b.name ORDER BY people DESC,p.name LIMIT 6'
+        // A subscriber waits for the product until it appears in any active branch.
+        $demandStmt = $this->db->query(
+            "SELECT p.name, COUNT(DISTINCT s.user_id) AS people
+             FROM subscriptions s
+             INNER JOIN products p ON p.id = s.product_id
+             WHERE s.status = 'active' AND p.is_active = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM stock st
+                   INNER JOIN branches b ON b.id = st.branch_id AND b.is_active = 1
+                   WHERE st.product_id = s.product_id AND st.quantity > 0
+               )
+             GROUP BY s.product_id, p.name
+             ORDER BY people DESC, p.name ASC
+             LIMIT 6"
         );
-        $demandStmt->execute($branchId ? [$branchId] : []);
         $missingDemand = $demandStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $searchStmt = $this->db->prepare(
@@ -114,10 +100,9 @@ final class AdminInsightsController
 
         $dailyStmt = $this->db->prepare(
             'SELECT DATE(created_at) AS day, COUNT(*) AS amount FROM subscriptions'
-            . ' WHERE created_at >= ?' . ($branchId ? ' AND branch_id=?' : '')
-            . ' GROUP BY DATE(created_at) ORDER BY day'
+            . ' WHERE created_at >= ? GROUP BY DATE(created_at) ORDER BY day'
         );
-        $dailyStmt->execute($branchId ? [$since, $branchId] : [$since]);
+        $dailyStmt->execute([$since]);
         $byDay = [];
         foreach ($dailyStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $byDay[$r['day']] = (int) $r['amount'];
@@ -204,9 +189,9 @@ final class AdminInsightsController
         } else {
             $alertRows = [];
             foreach ($missingDemand as $r) {
-                $alertRows[] = [$e($r['name']), $e($r['branch_name']), (int) $r['people'] . ' чел.'];
+                $alertRows[] = [$e($r['name']), (int) $r['people'] . ' чел.'];
             }
-            $content .= AdminView::table(['Товар', 'Филиал', 'Ожидают'], $alertRows);
+            $content .= AdminView::table(['Товар', 'Ожидают'], $alertRows);
         }
         $content .= '</section><section class="card"><h2>Что ищут покупатели</h2>'
             . '<p class="insight-note">Поисковые запросы приложения за выбранный период. '
@@ -225,7 +210,7 @@ final class AdminInsightsController
             $content .= AdminView::table(['Запрос', 'Поисков', 'Без результатов'], $searchRows);
         }
         $content .= '</section><section class="card"><h2>Сравнение филиалов</h2>'
-            . '<p class="insight-note">Срез по текущим остаткам и активным подпискам. Для просмотра одного магазина используйте фильтр выше.</p>'
+            . '<p class="insight-note">Срез по текущим остаткам в каждом филиале. Подписки на товары учитываются отдельно и не привязаны к магазину.</p>'
             . '<div class="insight-branches">';
         $shownBranches = 0;
         foreach ($branchRows as $b) {
@@ -250,8 +235,7 @@ final class AdminInsightsController
                 . '<div class="insight-branch-caption">' . ($total > 0
                     ? 'В наличии ' . $availablePercent . '% из ' . number_format($total, 0, ',', ' ') . ' учтённых позиций'
                     : 'Нет загруженных остатков') . '</div>'
-                . '<div class="insight-branch-wait"><span class="insight-branch-label">Активные подписки на товары</span><br>'
-                . '<strong>' . number_format($waiting, 0, ',', ' ') . '</strong></div></article>';
+</article>'
         }
         if ($shownBranches === 0) {
             $content .= '<p class="muted">Филиалы пока не добавлены.</p>';
