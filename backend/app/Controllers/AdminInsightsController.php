@@ -62,7 +62,6 @@ final class AdminInsightsController
              LIMIT 10"
         );
         $top = $topStmt->fetchAll(PDO::FETCH_ASSOC);
-        $topDetails = [];
 
         // A subscriber waits for the product until it appears in any active branch.
         $demandStmt = $this->db->query(
@@ -169,18 +168,9 @@ final class AdminInsightsController
                     . '<div class="insight-rank-head"><span class="insight-rank-name"><b class="insight-rank-index">' . $rank . '</b>'
                     . $e($r['name']) . '</span><strong>' . $people . ' чел.</strong></div>'
                     . '<div class="insight-progress"><span style="width:' . $percent . '%"></span></div>';
-                if (!$branchId && isset($topDetails[$productId])) {
-                    $labels = [];
-                    foreach ($topDetails[$productId] as $detail) {
-                        $labels[] = $e($detail['branch_name']) . ': ' . (int) $detail['people'];
-                    }
-                    $content .= '<div class="insight-rank-detail">' . implode(' <span aria-hidden="true">·</span> ', $labels) . '</div>';
-                }
                 $content .= '</div>';
             }
-            $content .= '<p class="insight-note">Рейтинг по уникальным покупателям с активной подпиской на товар.'
-                . ($branchId ? ' Показан выбранный филиал.' : ' Разбивка по филиалам может суммарно превышать общий показатель: один человек может ждать товар в нескольких магазинах.')
-                . '</p>';
+            $content .= '<p class="insight-note">Рейтинг по уникальным покупателям с активной подпиской на товар. Каждая подписка относится ко всем активным филиалам.</p>';
         }
         $content .= '</section></div><section class="card"><h2>Сигналы спроса: товары без остатка</h2>'
             . '<p class="insight-note">Товары, которые сейчас отсутствуют, но на их поступление подписаны покупатели. Это не прогноз продаж.</p>';
@@ -220,7 +210,6 @@ final class AdminInsightsController
             ++$shownBranches;
             $available = (int) $b['available'];
             $unavailable = (int) $b['unavailable'];
-            $waiting = (int) $b['waiting'];
             $total = $available + $unavailable;
             $availablePercent = $total > 0 ? round($available * 100 / $total, 1) : 0;
             $unavailablePercent = $total > 0 ? 100 - $availablePercent : 0;
