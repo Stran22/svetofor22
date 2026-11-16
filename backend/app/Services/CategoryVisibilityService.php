@@ -16,7 +16,7 @@ final class CategoryVisibilityService
     public function all(): array
     {
         $rows = $this->db->query(
-            'SELECT id, parent_id, hide_tracking, hide_store_stock FROM categories'
+            'SELECT id, parent_id, hide_store_stock FROM categories'
         )->fetchAll(PDO::FETCH_ASSOC);
         $byId = [];
         foreach ($rows as $row) $byId[(int)$row['id']] = $row;
@@ -24,15 +24,14 @@ final class CategoryVisibilityService
         $resolve = function (int $id, array $visited = []) use (&$resolve, &$resolved, $byId): array {
             if (isset($resolved[$id])) return $resolved[$id];
             if (!isset($byId[$id]) || isset($visited[$id])) {
-                return ['hide_tracking' => false, 'hide_store_stock' => false];
+                return ['hide_store_stock' => false];
             }
             $visited[$id] = true;
             $row = $byId[$id];
             $parent = $row['parent_id'] !== null
                 ? $resolve((int)$row['parent_id'], $visited)
-                : ['hide_tracking' => false, 'hide_store_stock' => false];
+                : ['hide_store_stock' => false];
             return $resolved[$id] = [
-                'hide_tracking' => (bool)$row['hide_tracking'] || $parent['hide_tracking'],
                 'hide_store_stock' => (bool)$row['hide_store_stock'] || $parent['hide_store_stock']
             ];
         };
@@ -43,7 +42,7 @@ final class CategoryVisibilityService
     public function forCategory(?int $categoryId): array
     {
         return $categoryId === null
-            ? ['hide_tracking' => false, 'hide_store_stock' => false]
-            : ($this->all()[$categoryId] ?? ['hide_tracking' => false, 'hide_store_stock' => false]);
+            ? ['hide_store_stock' => false]
+            : ($this->all()[$categoryId] ?? ['hide_store_stock' => false]);
     }
 }
