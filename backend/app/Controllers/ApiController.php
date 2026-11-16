@@ -230,6 +230,7 @@ final class ApiController
         $availability = $this->db->prepare(
             'SELECT COUNT(b.id) AS branch_count,
                     COUNT(CASE WHEN s.quantity IS NOT NULL THEN 1 END) AS known_count,
+                    COALESCE(SUM(CASE WHEN s.quantity = 0 THEN 1 ELSE 0 END), 0) AS zero_count,
                     COALESCE(SUM(CASE WHEN s.quantity > 0 THEN 1 ELSE 0 END), 0) AS available_count
              FROM branches b
              LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=?
@@ -239,7 +240,7 @@ final class ApiController
         $counts = $availability->fetch(PDO::FETCH_ASSOC);
         $product['can_track'] = (int)$counts['branch_count'] > 0
             && (int)$counts['known_count'] === (int)$counts['branch_count']
-            && (int)$counts['available_count'] === 0;
+            && (int)$counts['zero_count'] === (int)$counts['branch_count'];
 
         $rating = $this->db->prepare(
             "SELECT COUNT(*) AS reviews_count,
