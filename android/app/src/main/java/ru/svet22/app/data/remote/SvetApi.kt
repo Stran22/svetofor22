@@ -18,6 +18,9 @@ import ru.svet22.app.data.model.CreateSubscriptionRequest
 import ru.svet22.app.data.model.CancelSubscriptionRequest
 
 interface SvetApi {
+    @GET("products/{id}")
+    suspend fun productDetail(@Path("id") productId: Int): ApiEnvelope<ru.svet22.app.data.model.ProductDetailSettings>
+
     @GET("home-promotions")
     suspend fun homePromotions(): ApiEnvelope<ru.svet22.app.data.model.HomePromotions>
 
