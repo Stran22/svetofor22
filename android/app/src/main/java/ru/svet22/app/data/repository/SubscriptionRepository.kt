@@ -36,10 +36,10 @@ class SubscriptionRepository(private val context: Context) {
         response.data?.subscriptions ?: emptyList()
     }
 
-    suspend fun create(productId: Int, branchId: Int): TrackedSubscription =
+    suspend fun create(productId: Int): TrackedSubscription =
         authorized { bearer ->
             val response = api.createSubscription(
-                bearer, CreateSubscriptionRequest(productId, branchId)
+                bearer, CreateSubscriptionRequest(productId)
             )
             if (!response.success) error("Не удалось создать подписку")
             response.data?.subscription ?: error("Сервер не вернул подписку")
