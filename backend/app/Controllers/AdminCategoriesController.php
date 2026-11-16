@@ -104,15 +104,14 @@ final class AdminCategoriesController
             . ' <span class="muted">(сейчас: ' . ($sortBy === 'id' ? 'ID' : 'Название') . ', ' . ($direction === 'asc' ? 'по возрастанию' : 'по убыванию') . ')</span></section>';
         if ($admin['role'] === 'admin') {
             $content .= '<section class="card"><h2>Отображение в карточке товара</h2>'
-                . '<p class="muted">Отметьте категории, для которых нужно скрыть функции. Настройки распространяются на все вложенные подкатегории. Цены в каталоге остаются видимыми.</p>'
+                . '<p class="muted">Отметьте категории, для которых нужно скрыть функции. Настройки распространяются на все вложенные подкатегории. Цены в каталоге остаются видимыми. Кнопка отслеживания управляется автоматически по остаткам.</p>'
                 . '<form method="post" action="/admin/categories/visibility">'
                 . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
-                . '<div style="overflow-x:auto"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть «Следить»</th><th>Скрыть цены и остатки</th></tr></thead><tbody>';
+                . '<div style="overflow-x:auto"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть цены и остатки</th></tr></thead><tbody>';
             foreach ($tree as $category) {
                 $id = (int)$category['id'];
                 $label = str_repeat('— ', min((int)$category['_depth'], 12)) . $category['name'];
                 $content .= '<tr><td>' . AdminView::e($label) . '</td>'
-                    . '<td><input type="checkbox" name="hide_tracking[]" value="' . $id . '"' . ((int)$category['hide_tracking'] ? ' checked' : '') . '></td>'
                     . '<td><input type="checkbox" name="hide_store_stock[]" value="' . $id . '"' . ((int)$category['hide_store_stock'] ? ' checked' : '') . '></td></tr>';
             }
             $content .= '</tbody></table></div><button type="submit">Сохранить настройки отображения</button></form></section>';
@@ -129,7 +128,7 @@ final class AdminCategoriesController
         $categories = $this->all();
         $known = array_fill_keys(array_map(static fn(array $row): int => (int)$row['id'], $categories), true);
         $selected = [];
-        foreach (['hide_tracking', 'hide_store_stock'] as $field) {
+        foreach (['hide_store_stock'] as $field) {
             $raw = $data[$field] ?? [];
             if (!is_array($raw)) Response::html('Некорректные настройки категорий.', 422);
             $selected[$field] = [];
@@ -141,17 +140,15 @@ final class AdminCategoriesController
         }
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('UPDATE categories SET hide_tracking=?, hide_store_stock=? WHERE id=?');
+            $stmt = $this->db->prepare('UPDATE categories SET hide_store_stock=? WHERE id=?');
             foreach ($categories as $category) {
                 $id = (int)$category['id'];
                 $stmt->execute([
-                    isset($selected['hide_tracking'][$id]) ? 1 : 0,
                     isset($selected['hide_store_stock'][$id]) ? 1 : 0,
                     $id
                 ]);
             }
             $this->auth->audit((int)$admin['id'], 'category.visibility', 'category', 0, [
-                'hide_tracking' => array_keys($selected['hide_tracking']),
                 'hide_store_stock' => array_keys($selected['hide_store_stock'])
             ], $request->clientIp());
             $this->db->commit();
@@ -275,7 +272,7 @@ final class AdminCategoriesController
 
     private function all(): array
     {
-        return $this->db->query('SELECT id, parent_id, name, slug, sort_order, image_url, is_active, hide_tracking, hide_store_stock FROM categories ORDER BY sort_order, name, id')->fetchAll(PDO::FETCH_ASSOC);
+        return $this->db->query('SELECT id, parent_id, name, slug, sort_order, image_url, is_active, hide_store_stock FROM categories ORDER BY sort_order, name, id')->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function one(int $id): array|false
