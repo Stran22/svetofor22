@@ -118,7 +118,7 @@ final class AdminInsightsController
 
         $branchStmt = $this->db->query(
             "SELECT b.id,b.name,"
-            . " (SELECT COUNT(*) FROM subscriptions s WHERE s.branch_id=b.id AND s.status='active') AS waiting,"
+            . " 0 AS waiting,"
             . ' (SELECT COUNT(*) FROM stock st JOIN products p ON p.id=st.product_id WHERE st.branch_id=b.id AND p.is_active=1 AND st.quantity>0) AS available,'
             . ' (SELECT COUNT(*) FROM stock st JOIN products p ON p.id=st.product_id WHERE st.branch_id=b.id AND p.is_active=1 AND st.quantity<=0) AS unavailable'
             . ' FROM branches b ORDER BY b.name'
@@ -234,8 +234,7 @@ final class AdminInsightsController
                 . '<span class="unavailable" style="width:' . $unavailablePercent . '%"></span></div>'
                 . '<div class="insight-branch-caption">' . ($total > 0
                     ? 'В наличии ' . $availablePercent . '% из ' . number_format($total, 0, ',', ' ') . ' учтённых позиций'
-                    : 'Нет загруженных остатков') . '</div>'
-</article>'
+                    : 'Нет загруженных остатков') . '</div></article>'
         }
         if ($shownBranches === 0) {
             $content .= '<p class="muted">Филиалы пока не добавлены.</p>';
