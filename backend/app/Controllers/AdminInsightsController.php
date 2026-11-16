@@ -137,7 +137,7 @@ final class AdminInsightsController
         foreach ($branches as $b) {
             $content .= '<option value="' . (int) $b['id'] . '"' . ($branchId === (int) $b['id'] ? ' selected' : '') . '>' . $e($b['name']) . '</option>';
         }
-        $content .= '</select></label><button type="submit">Применить</button></form></section>'
+        $content .= '</select></label><button type="submit">Применить</button></form><p class="insight-note">Фильтр филиала применяется к остаткам, поиску и push. Подписки учитываются по товару сразу для всех филиалов.</p></section>'
             . '<div class="insight-kpis">'
             . $this->kpi('Новые пользователи', $newUsers, 'За выбранный период · все филиалы')
             . $this->kpi('Новые подписки', $newSubscriptions, 'За выбранный период')
