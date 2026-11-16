@@ -23,19 +23,13 @@ final class AdminSubscriptionsController
         $admin = $this->auth->requireUser();
         $admin['csrf'] = $this->auth->csrfToken();
         $query = $request->query();
-        $branchId = filter_var($query['branch_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
-        $status = (string) ($query['status'] ?? '');
+        $status = (string)($query['status'] ?? '');
         if (!in_array($status, ['', 'active', 'notified', 'cancelled'], true)) {
             $status = '';
         }
-        $search = trim((string) ($query['q'] ?? ''));
-        $search = mb_substr($search, 0, 100);
+        $search = mb_substr(trim((string)($query['q'] ?? '')), 0, 100);
         $where = [];
         $params = [];
-        if ($branchId > 0) {
-            $where[] = 's.branch_id = ?';
-            $params[] = $branchId;
-        }
         if ($status !== '') {
             $where[] = 's.status = ?';
             $params[] = $status;
@@ -46,82 +40,72 @@ final class AdminSubscriptionsController
             array_push($params, $like, $like, $like);
         }
         $condition = $where ? ' WHERE ' . implode(' AND ', $where) : '';
-        $base = ' FROM subscriptions s JOIN products p ON p.id = s.product_id JOIN branches b ON b.id = s.branch_id';
+        $base = ' FROM subscriptions s INNER JOIN products p ON p.id = s.product_id';
         $count = $this->db->prepare('SELECT COUNT(*)' . $base . $condition);
         $count->execute($params);
-        $total = (int) $count->fetchColumn();
-        $page = max(1, min(100000, (int) ($query['page'] ?? 1)));
+        $total = (int)$count->fetchColumn();
+
+        $page = max(1, min(100000, (int)($query['page'] ?? 1)));
         $perPage = 30;
         $offset = ($page - 1) * $perPage;
         $stmt = $this->db->prepare(
-            'SELECT s.id, s.user_id, p.name AS product_name, b.name AS branch_name,
-                    s.status, s.created_at, s.notified_at'
+            "SELECT s.id, s.user_id, p.name AS product_name, s.status, s.created_at, s.notified_at"
             . $base . $condition . ' ORDER BY s.created_at DESC, s.id DESC LIMIT ' . $perPage . ' OFFSET ' . $offset
         );
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         $stats = $this->db->query(
-            "SELECT COUNT(*) AS total, SUM(status = 'active') AS active_count,
+            "SELECT COUNT(*) AS total, SUM(status='active') AS active_count,
                     SUM(notified_at IS NOT NULL) AS notified_count,
-                    COUNT(DISTINCT product_id) AS product_count FROM subscriptions"
+                    COUNT(DISTINCT product_id) AS product_count
+             FROM subscriptions"
         )->fetch(PDO::FETCH_ASSOC);
-        $branches = $this->db->query('SELECT id, name FROM branches ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
+
         $e = [AdminView::class, 'e'];
-        $content = '<section class="card"><h2>Сводка подписок</h2><p>Всего: <strong>' . (int) $stats['total']
-            . '</strong> · Активных: <strong>' . (int) $stats['active_count']
-            . '</strong> · С отметкой уведомления: <strong>' . (int) $stats['notified_count']
-            . '</strong> · Товаров: <strong>' . (int) $stats['product_count'] . '</strong></p>'
-            . '<p class="muted">Подписка означает интерес к товару в определённом филиале, а не подтверждённый заказ.</p></section>';
+        $content = '<section class="card"><h2>Сводка подписок</h2><p>Всего: <strong>' . (int)$stats['total']
+            . '</strong> · Активных: <strong>' . (int)$stats['active_count']
+            . '</strong> · Уведомлённых: <strong>' . (int)$stats['notified_count']
+            . '</strong> · Товаров: <strong>' . (int)$stats['product_count'] . '</strong></p>'
+            . '<p class="muted">Одна подписка относится ко всему товару. Уведомление отправляется при появлении товара в любом активном филиале.</p></section>';
+
         $content .= '<section class="card"><h2>Фильтры</h2><form method="get" action="/admin/subscribers">'
-            . '<label>Магазин<select name="branch_id"><option value="0">Все магазины</option>';
-        foreach ($branches as $branch) {
-            $selected = (int) $branch['id'] === $branchId ? ' selected' : '';
-            $content .= '<option value="' . (int) $branch['id'] . '"' . $selected . '>' . $e($branch['name']) . '</option>';
-        }
-        $content .= '</select></label><label>Статус<select name="status"><option value="">Все</option>';
+            . '<label>Статус<select name="status"><option value="">Все</option>';
         foreach (['active' => 'Активные', 'notified' => 'Уведомлённые', 'cancelled' => 'Отменённые'] as $value => $label) {
             $content .= '<option value="' . $value . '"' . ($status === $value ? ' selected' : '') . '>' . $label . '</option>';
         }
         $content .= '</select></label><label>Товар, артикул или штрихкод<input type="search" name="q" maxlength="100" value="' . $e($search) . '"></label>'
             . '<button type="submit">Показать</button></form></section>';
-        // Спрос считаем только по активным подпискам, независимо от фильтра статуса списка.
+
         $demandWhere = ["s.status = 'active'"];
         $demandParams = [];
-        if ($branchId > 0) {
-            $demandWhere[] = 's.branch_id = ?';
-            $demandParams[] = $branchId;
-        }
         if ($search !== '') {
             $demandWhere[] = '(p.name LIKE ? OR p.article LIKE ? OR p.barcode LIKE ?)';
             $like = '%' . $search . '%';
             array_push($demandParams, $like, $like, $like);
         }
-        $demandSql = 'SELECT p.name AS product_name, b.name AS branch_name, COUNT(*) AS waiting_count'
+        $demandStmt = $this->db->prepare(
+            'SELECT p.name AS product_name, COUNT(*) AS waiting_count'
             . $base . ' WHERE ' . implode(' AND ', $demandWhere)
-            . ' GROUP BY s.product_id, s.branch_id, p.name, b.name'
-            . ' ORDER BY waiting_count DESC, p.name ASC, b.name ASC LIMIT 50';
-        $demandStmt = $this->db->prepare($demandSql);
+            . ' GROUP BY s.product_id, p.name ORDER BY waiting_count DESC, p.name ASC LIMIT 50'
+        );
         $demandStmt->execute($demandParams);
         $demandRows = [];
-        foreach ($demandStmt->fetchAll(PDO::FETCH_ASSOC) as $demandRow) {
-            $demandRows[] = [
-                $demandRow['product_name'],
-                $demandRow['branch_name'],
-                (int) $demandRow['waiting_count'],
-            ];
+        foreach ($demandStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $demandRows[] = [$row['product_name'], (int)$row['waiting_count']];
         }
         $content .= '<section class="card"><h2>Самые ожидаемые товары</h2>'
-            . '<p class="muted">Количество активных подписок на товар в конкретном магазине. '
-            . 'Учитывается выбранный филиал и поиск по товару; статус в фильтре списка на эту сводку не влияет.</p>'
-            . AdminView::table(['Товар', 'Магазин', 'Ожидают'], $demandRows, 'Активных ожиданий нет.')
+            . '<p class="muted">Количество активных подписок на товар. Все подписчики ожидают поступления в любом филиале.</p>'
+            . AdminView::table(['Товар', 'Ожидают'], $demandRows, 'Активных ожиданий нет.')
             . '</section>';
+
         $tableRows = [];
         foreach ($rows as $row) {
             $tableRows[] = [
-                (int) $row['id'],
-                (int) $row['user_id'],
+                (int)$row['id'],
+                (int)$row['user_id'],
                 $row['product_name'],
-                $row['branch_name'],
+                'Любой филиал',
                 match ($row['status']) {
                     'active' => 'Активна',
                     'notified' => 'Уведомлён',
@@ -134,16 +118,12 @@ final class AdminSubscriptionsController
         }
         $content .= '<section class="card"><h2>Подписки (' . $total . ')</h2>'
             . AdminView::table(['ID', 'Пользователь ID', 'Товар', 'Магазин', 'Статус', 'Подписался', 'Уведомлён'], $tableRows, 'Подписок не найдено.');
-        $pages = (int) ceil($total / $perPage);
+        $pages = (int)ceil($total / $perPage);
         if ($pages > 1) {
             $content .= '<p>Страница ' . $page . ' из ' . $pages . ' · ';
-            $baseUrl = '/admin/subscribers?' . http_build_query(['branch_id' => $branchId, 'status' => $status, 'q' => $search]);
-            if ($page > 1) {
-                $content .= '<a href="' . $e($baseUrl . '&page=' . ($page - 1)) . '">← Назад</a> ';
-            }
-            if ($page < $pages) {
-                $content .= '<a href="' . $e($baseUrl . '&page=' . ($page + 1)) . '">Вперёд →</a>';
-            }
+            $baseUrl = '/admin/subscribers?' . http_build_query(['status' => $status, 'q' => $search]);
+            if ($page > 1) $content .= '<a href="' . $e($baseUrl . '&page=' . ($page - 1)) . '">← Назад</a> ';
+            if ($page < $pages) $content .= '<a href="' . $e($baseUrl . '&page=' . ($page + 1)) . '">Вперёд →</a>';
             $content .= '</p>';
         }
         $content .= '</section>';
