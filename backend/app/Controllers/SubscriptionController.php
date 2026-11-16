@@ -32,70 +32,31 @@ final class SubscriptionController
         $userId = $this->userId($request);
         $body = $request->json();
         $productId = filter_var($body['product_id'] ?? null, FILTER_VALIDATE_INT);
-        $branchId = filter_var($body['branch_id'] ?? null, FILTER_VALIDATE_INT);
-        if (!$productId || $productId < 1 || !$branchId || $branchId < 1) {
-            Response::error('VALIDATION_ERROR', 'Укажите корректные product_id и branch_id.', 422);
+        if (!$productId || $productId < 1) {
+            Response::error('VALIDATION_ERROR', 'Укажите корректный product_id.', 422);
         }
-        try {
-            $this->db->beginTransaction();
-            $stmt = $this->db->prepare('SELECT id FROM branches WHERE id=? AND is_active=1 FOR UPDATE');
-            $stmt->execute([$branchId]);
-            if (!$stmt->fetchColumn()) {
-                $this->db->rollBack();
-                Response::error('NOT_FOUND', 'Магазин не найден.', 404);
-            }
-            $stmt = $this->db->prepare('SELECT id FROM products WHERE id=? AND is_active=1');
+            // Lock stock rows while validating global availability.
+            $stmt = $this->db->prepare(
+                'SELECT b.id, s.quantity FROM branches b
+                 LEFT JOIN stock s ON s.branch_id=b.id AND s.product_id=?
+                 WHERE b.is_active=1 ORDER BY b.id FOR UPDATE'
+            );
             $stmt->execute([$productId]);
-            if (!$stmt->fetchColumn()) {
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!$rows || array_filter($rows, static fn(array $row): bool =>
+                $row['quantity'] === null || (float)$row['quantity'] > 0)) {
                 $this->db->rollBack();
-                Response::error('NOT_FOUND', 'Товар не найден.', 404);
-            }
-            $stmt = $this->db->prepare('SELECT quantity FROM stock WHERE product_id=? AND branch_id=? LIMIT 1');
-            $stmt->execute([$productId, $branchId]);
-            $quantity = $stmt->fetchColumn();
-            if ($quantity !== false && (float)$quantity > 0) {
-                $this->db->rollBack();
-                Response::error('ALREADY_AVAILABLE', 'Товар уже есть в наличии.', 409);
+                Response::error('NOT_TRACKABLE', 'Товар есть в наличии или данные об остатках неполные.', 409);
             }
             $stmt = $this->db->prepare(
                 "INSERT INTO subscriptions (user_id,product_id,branch_id,status,notified_at)
-                 VALUES (?,?,?,'active',NULL)
+                 VALUES (?,?,NULL,'active',NULL)
                  ON DUPLICATE KEY UPDATE status='active',notified_at=NULL,last_push_error=NULL,push_attempts=0"
             );
-            $stmt->execute([$userId, $productId, $branchId]);
-            $stmt = $this->db->prepare('SELECT id,product_id,branch_id,status,created_at FROM subscriptions WHERE user_id=? AND product_id=? AND branch_id=?');
-            $stmt->execute([$userId, $productId, $branchId]);
+            $stmt->execute([$userId, $productId]);
+            $stmt = $this->db->prepare(
+                'SELECT id,product_id,status,created_at FROM subscriptions WHERE user_id=? AND product_id=?'
+            );
+            $stmt->execute([$userId, $productId]);
             $subscription = $stmt->fetch(PDO::FETCH_ASSOC);
-            $this->db->commit();
-            Response::success(['subscription' => $subscription]);
-        } catch (\Throwable $e) {
-            if ($this->db->inTransaction()) $this->db->rollBack();
-            throw $e;
-        }
-    }
-
-    public function cancel(Request $request): never
-    {
-        $userId = $this->userId($request);
-        $body = $request->json();
-        $id = filter_var($body['subscription_id'] ?? null, FILTER_VALIDATE_INT);
-        if (!$id || $id < 1) {
-            Response::error('VALIDATION_ERROR', 'Укажите subscription_id.', 422);
-        }
-        $stmt = $this->db->prepare("UPDATE subscriptions SET status='cancelled' WHERE id=? AND user_id=?");
-        $stmt->execute([$id, $userId]);
-        if ($stmt->rowCount() === 0) {
-            $check = $this->db->prepare('SELECT id FROM subscriptions WHERE id=? AND user_id=?');
-            $check->execute([$id, $userId]);
-            if (!$check->fetchColumn()) Response::error('NOT_FOUND', 'Подписка не найдена.', 404);
-        }
-        Response::success(['subscription_id' => $id, 'status' => 'cancelled']);
-    }
-
-    private function userId(Request $request): int
-    {
-        $userId = (new TokenService($this->db))->userId($request->bearerToken());
-        if ($userId === null) Response::error('UNAUTHENTICATED', 'Требуется Bearer-токен.', 401);
-        return $userId;
-    }
 }
