@@ -54,19 +54,17 @@ final class SubscriptionController
 
             // Every active branch must have a known stock row and quantity <= 0.
             // Locking rows serializes subscription creation with stock imports.
+            $branches = $this->db->query(
+                'SELECT id FROM branches WHERE is_active = 1 ORDER BY id FOR UPDATE'
+            )->fetchAll(PDO::FETCH_COLUMN);
+            $notTrackable = $branches === [];
             $stock = $this->db->prepare(
-                'SELECT b.id, s.quantity
-                 FROM branches b
-                 LEFT JOIN stock s ON s.branch_id = b.id AND s.product_id = ?
-                 WHERE b.is_active = 1
-                 ORDER BY b.id
-                 FOR UPDATE'
+                'SELECT quantity FROM stock WHERE product_id = ? AND branch_id = ? FOR UPDATE'
             );
-            $stock->execute([$productId]);
-            $rows = $stock->fetchAll(PDO::FETCH_ASSOC);
-            $notTrackable = $rows === [];
-            foreach ($rows as $row) {
-                if ($row['quantity'] === null || (float)$row['quantity'] > 0) {
+            foreach ($branches as $branchId) {
+                $stock->execute([$productId, (int)$branchId]);
+                $quantity = $stock->fetchColumn();
+                if ($quantity === false || $quantity === null || (float)$quantity > 0) {
                     $notTrackable = true;
                     break;
                 }
