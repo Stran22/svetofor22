@@ -3,6 +3,7 @@ package ru.svet22.app.ui.home
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,9 @@ import ru.svet22.app.data.repository.ContestRepository
 import ru.svet22.app.ui.contest.ContestImage
 import ru.svet22.app.ui.catalog.CatalogViewModel
 import java.net.URL
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val Red = Color(0xFFE53935)
 private val Yellow = Color(0xFFFFD600)
@@ -178,19 +182,35 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 5.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Box(modifier = Modifier.fillMaxWidth().height(130.dp)) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(145.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        ) {
                             ContestImage(contest.bannerUrl, Modifier.fillMaxSize())
                             Surface(
-                                modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
-                                color = Color.White.copy(alpha = 0.94f),
-                                shape = RoundedCornerShape(18.dp),
-                                shadowElevation = 3.dp
+                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                                color = Color.White,
+                                shape = RoundedCornerShape(20.dp),
+                                shadowElevation = 8.dp
+                            ) {
+                                Text(
+                                    text = contestEndLabel(contest.endsAt),
+                                    color = Dark,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                                )
+                            }
+                            Surface(
+                                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                                color = Color(0xDD222222),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text(
                                     text = contest.title,
-                                    color = Dark,
+                                    color = Color.White,
                                     fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -434,3 +454,8 @@ private fun FeaturedTile(product: Product, onClick: () -> Unit, modifier: Modifi
         }
     }
 }
+
+private fun contestEndLabel(endsAt: String): String = runCatching {
+    val date = LocalDateTime.parse(endsAt.trim().replace(' ', 'T'))
+    "ДО " + date.format(DateTimeFormatter.ofPattern("d MMMM", Locale("ru"))).uppercase(Locale("ru"))
+}.getOrElse { "ДО ОКОНЧАНИЯ" }
