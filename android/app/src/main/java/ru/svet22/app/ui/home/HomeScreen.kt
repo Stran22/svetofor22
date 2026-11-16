@@ -172,8 +172,6 @@ fun HomeScreen(
 
             if (contests.isNotEmpty()) {
                 Spacer(Modifier.height(18.dp))
-                Text("Конкурсы", color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 21.sp, modifier = Modifier.padding(horizontal = 18.dp))
-                Spacer(Modifier.height(10.dp))
                 contests.forEach { contest ->
                     Card(
                         onClick = { onOpenContest(contest.id) },
@@ -203,12 +201,13 @@ fun HomeScreen(
                             }
                             Surface(
                                 modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-                                color = Color(0xDD222222),
-                                shape = RoundedCornerShape(12.dp)
+                                color = Color.White,
+                                shape = RoundedCornerShape(12.dp),
+                                shadowElevation = 8.dp
                             ) {
                                 Text(
                                     text = contest.title,
-                                    color = Color.White,
+                                    color = Dark,
                                     fontWeight = FontWeight.ExtraBold,
                                     fontSize = 16.sp,
                                     maxLines = 2,
