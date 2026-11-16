@@ -34,10 +34,10 @@ final class RestockNotificationService
 
         $subscriptions = $this->db->prepare(
             "SELECT id FROM subscriptions
-             WHERE product_id = ? AND branch_id = ? AND status = 'active'
+             WHERE product_id = ? AND status = 'active'
              ORDER BY id"
         );
-        $subscriptions->execute([$productId, $branchId]);
+        $subscriptions->execute([$productId]);
 
         $enqueue = $this->db->prepare(
             "INSERT INTO push_delivery_log (subscription_id, event_key, status, attempt_count)
@@ -47,7 +47,7 @@ final class RestockNotificationService
 
         $queued = 0;
         while (($subscriptionId = $subscriptions->fetchColumn()) !== false) {
-            $enqueue->execute([(int) $subscriptionId, $eventKey]);
+            $enqueue->execute([(int) $subscriptionId, $branchId, $eventKey]);
             $queued += $enqueue->rowCount() === 1 ? 1 : 0;
         }
 
