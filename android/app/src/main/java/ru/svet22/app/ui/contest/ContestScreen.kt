@@ -39,7 +39,7 @@ fun ContestImage(path: String?, modifier: Modifier = Modifier) {
         }
     }
     if (bitmap != null) {
-        Image(bitmap!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillWidth, modifier = modifier)
+        Image(bitmap!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
     } else {
         Box(modifier = modifier.background(Color(0xFFF2F2F2)))
     }
