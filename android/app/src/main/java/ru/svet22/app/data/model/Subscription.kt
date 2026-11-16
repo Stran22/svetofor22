@@ -17,6 +17,6 @@ data class CancelSubscriptionResponse(
     val status: String
 )
 data class CreateSubscriptionRequest(
-    @SerializedName("product_id") val productId: Int,
-
+    @SerializedName("product_id") val productId: Int
+)
 data class CancelSubscriptionRequest(@SerializedName("subscription_id") val subscriptionId: Int)
