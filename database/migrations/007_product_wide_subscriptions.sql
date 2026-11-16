@@ -5,3 +5,7 @@ ALTER TABLE subscriptions
     DROP INDEX uq_subscription_user_product_branch,
     MODIFY branch_id BIGINT UNSIGNED NULL DEFAULT NULL,
     ADD UNIQUE KEY uq_subscription_user_product (user_id, product_id);
+
+ALTER TABLE push_delivery_log
+    ADD COLUMN branch_id BIGINT UNSIGNED NULL DEFAULT NULL,
+    ADD KEY idx_push_delivery_branch (branch_id);
