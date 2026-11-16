@@ -269,7 +269,7 @@ fun ProductDetailScreen(
         Spacer(Modifier.height(12.dp))
 
         // ===== НАЧАЛО БЛОКА: Остатки во всех филиалах =====
-        if (detailSettings?.hideStoreStock == false) {
+        if (detailSettings?.hideStoreStock != true) {
         Text(
             text = "Цены и остатки в магазинах",
             style = MaterialTheme.typography.titleMedium,
