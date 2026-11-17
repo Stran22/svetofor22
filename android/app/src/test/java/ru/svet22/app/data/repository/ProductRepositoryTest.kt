@@ -114,21 +114,17 @@ class ProductRepositoryTest {
 
     @Test
     fun getProducts_loadsAllPages() = runBlocking {
+        // The repository requests 50 items per page. A full first page
+        // triggers the second request; a shorter page ends pagination.
+        val firstPage = (1..50).joinToString(",") { id ->
+            """{"id":$id,"name":"Товар $id","price":"89.90"}"""
+        }
         jsonResponse(
             """
             {
                 "success": true,
-                "data": [
-                    {"id": 1, "name": "Молоко", "price": "89.90"}
-                ],
-                "meta": {
-                    "pagination": {
-                        "page": 1,
-                        "per_page": 1,
-                        "total": 2,
-                        "total_pages": 2
-                    }
-                }
+                "data": [$firstPage],
+                "meta": {"page": 1}
             }
             """.trimIndent()
         )
@@ -138,31 +134,26 @@ class ProductRepositoryTest {
             {
                 "success": true,
                 "data": [
-                    {"id": 2, "name": "Кефир", "price": "75.12"}
+                    {"id": 51, "name": "Кефир", "price": "75.12"}
                 ],
-                "meta": {
-                    "pagination": {
-                        "page": 2,
-                        "per_page": 1,
-                        "total": 2,
-                        "total_pages": 2
-                    }
-                }
+                "meta": {"page": 2}
             }
             """.trimIndent()
         )
 
         val products = repository.getProducts(branchId = 1)
 
-        assertEquals(2, products.size)
-        assertEquals("Молоко", products[0].name)
-        assertEquals("Кефир", products[1].name)
+        assertEquals(51, products.size)
+        assertEquals("Товар 1", products[0].name)
+        assertEquals("Товар 50", products[49].name)
+        assertEquals("Кефир", products[50].name)
 
         val firstRequest = server.takeRequest()
         val secondRequest = server.takeRequest()
 
         assertTrue(firstRequest.path!!.contains("page=1"))
         assertTrue(secondRequest.path!!.contains("page=2"))
+        assertTrue(firstRequest.path!!.contains("per_page=50"))
     }
 
     @Test(expected = ApiResponseException::class)
