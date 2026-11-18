@@ -59,8 +59,8 @@ fun ProductRow(
             )
 
             Text(
-                text = product.price?.let { "$it ₽" }
-                    ?: "Цена не указана",
+                text = if (product.hideStoreStock) "Цена скрыта"
+                    else product.price?.let { "$it ₽" } ?: "Цена не указана",
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -68,7 +68,8 @@ fun ProductRow(
         Spacer(Modifier.height(3.dp))
 
         Text(
-            text =formatQuantity(product.quantity)?.let {
+            text = if (product.hideStoreStock) "Остаток скрыт"
+            else formatQuantity(product.quantity)?.let {
                 "Остаток: $it"
             } ?: "Наличие уточняется",
             style = MaterialTheme.typography.bodySmall,
