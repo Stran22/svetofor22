@@ -103,3 +103,7 @@
 - Production `GET /api/v1/categories` не отдаёт `show_price_stock`.
 - В GitHub обнаружен `CategoryVisibilityService` с SQL на несовместимый столбец `hide_store_stock`; исправление сервиса необходимо до развёртывания.
 - Production не менялся.
+
+## 2026-11-18 — аудит выдачи списка товаров
+- Production `GET /api/v1/products` отдаёт `s.price`, `s.quantity` без проверки категории. Есть фильтрация по наличию, сортировка по цене, поиск и пагинация.
+- Установлена необходимость серверной маскировки цен и остатков; Android-only скрытие недостаточно. Никаких production изменений.
