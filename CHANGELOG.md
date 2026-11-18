@@ -112,3 +112,8 @@
 - На production `CategoryVisibilityService.php` отсутствует (подтверждено ls).
 - Коммит `c3f1b4b`: GitHub сервис читает `categories.show_price_stock`, рассчитывает `hide_store_stock = !show_price_stock || parent.hide_store_stock`.
 - Не развёрнуто, PHP lint и функциональные тесты ещё не выполнены.
+
+## 2026-11-18 — PHP lint CategoryVisibilityService пройден
+- Временный файл `/tmp/svet22_CategoryVisibilityService_check.php` (GitHub коммит `c3f1b4b`) проверен PHP 8.5.
+- Вывод пользователя: `No syntax errors detected in /tmp/svet22_CategoryVisibilityService_check.php`.
+- На production не развёрнуто; функциональные проверки не выполнены.
