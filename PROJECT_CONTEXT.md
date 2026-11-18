@@ -212,3 +212,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — PHP lint уведомления сохранения подтверждён
 Пользователь скачал `AdminCategoriesController.php` из коммита `75ce461` в `/tmp/svet22-menu-20261118/AdminCategoriesController.php`; `/opt/php85/bin/php -l` вернул `No syntax errors detected`. Production файл ещё не заменён. Следующий шаг: отдельная резервная копия и установка только этого контроллера, проверка lint после установки и браузерный тест уведомления.
+
+### 2026-11-18 — уведомление сохранения установлено на production
+Пользователь создал backup `backend/app/Controllers/AdminCategoriesController.php.bak-before-save-notice`, установил контроллер из staging коммита `75ce461` через `install -m 664`; после установки PHP 8.5 lint вернул `No syntax errors detected`. Код уведомления теперь на сервере; браузерное подтверждение отображения сообщения после POST пока не получено. Следующий шаг — нажать «Сохранить настройки» на `/admin/categories/visibility` без изменения чекбоксов и проверить сообщение, URL `?saved=1` и отсутствие изменений в категориях.
