@@ -183,3 +183,8 @@
 - Read-only grep подтвердил ApiController (стр. 6,29) и AdminCategoriesController (стр. 31).
 - Строка `categories/visibility` не найдена; перед внедрением проверить блок маршрутов и вставить точечно, без замены bootstrap.
 - Production не изменён.
+
+## 2026-11-18 — проверка блока production маршрутов
+- Пользователь показал блок `bootstrap/app.php` с существующими шестью маршрутами категорий и остальными маршрутами админки.
+- Подтверждено отсутствие `POST /admin/categories/visibility`; запланирована точечная вставка после резервной копии и PHP lint, без перезаписи bootstrap.
+- Production пока не изменён.
