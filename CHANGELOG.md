@@ -250,3 +250,8 @@
 - При PHP lint staging `AdminView.php` обнаружен Parse error на строке 25; `AdminCategoriesController.php` прошёл lint, `app.php` не проверялся.
 - Исправлена пропущенная кавычка в PHP-конкатенации ссылки меню «Категории» перед проверкой роли `admin` (`0eb83fdc`).
 - Production не изменён. Нужна повторная проверка lint.
+
+## 2026-11-18 — подтверждение исправления AdminView.php
+- Staging `AdminView.php` скачан по SHA коммита `0eb83fdc`; строки 24–26 содержат исправленную конкатенацию пункта меню.
+- PHP 8.5 lint `AdminView.php`: `No syntax errors detected` (подтверждено пользователем).
+- `app.php` ещё не проверен; production не изменён.
