@@ -82,3 +82,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — подтверждена production таблица stock
 По выполненному пользователем в phpMyAdmin `SHOW COLUMNS FROM stock` (БД `prorock_law`): `id bigint unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT`, `product_id bigint unsigned NOT NULL INDEX`, `branch_id bigint unsigned NOT NULL INDEX`, `price decimal(12,2) NOT NULL` (без default), `quantity decimal(12,3) NOT NULL DEFAULT 0.000`, `imported_on date NULL`, `updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` (индекс). При скрытии цен и остатков **не записывать NULL в stock**; маскировать значения `price`/`quantity` только в JSON API. Не выводить URL с сессионным токеном phpMyAdmin.
+
+### 2026-11-18 — подтверждена production таблица branches
+Пользователь выполнил в phpMyAdmin `SHOW COLUMNS FROM branches` (БД `prorock_law`): `id bigint unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT`, `code varchar(50) NOT NULL UNIQUE`, `name varchar(190) NOT NULL`, `address varchar(500) NULL`, `is_active tinyint(1) NOT NULL DEFAULT 1` (индекс), `created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP`, `updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`. Для вычисления отсутствия товара учитывать только `branches.is_active=1`; отсутствующая запись stock для активного филиала не доказывает нулевой остаток.
