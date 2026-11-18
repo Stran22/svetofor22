@@ -86,3 +86,6 @@
 
 ### Production админка категорий — запись поля (18.11.2026)
 Серверный `AdminCategoriesController::update()` делает `UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=? WHERE id=?`; `show_price_stock` не обновляется. `create()` делает `INSERT INTO categories (name, parent_id, slug, sort_order, image_url) VALUES (...)`, полагаясь на DEFAULT 1 для `show_price_stock`. В HTML формы `edit()` чекбокса нет. Планируем использовать существующий маршрут POST `/admin/categories/{id}/edit` и существующий столбец `show_price_stock`, без добавления второго маршрута, если нет необходимости.
+
+### 2026-11-18 — различие production и GitHub по групповой видимости категорий
+Пользователь проверил production `backend/bootstrap/app.php`: маршруты `/admin/categories` GET/POST, `/{id}/toggle` POST, `/{id}/delete` POST, `/{id}/edit` GET/POST присутствуют (строки 92–97); **POST `/admin/categories/visibility` отсутствует**. В GitHub ветке `feature/excel-column-mapping` `backend/bootstrap/app.php` этот POST маршрут уже зарегистрирован строкой 94 и ведёт на `AdminCategoriesController::saveVisibility()`. При развёртывании групповой формы необходимо согласованно перенести маршрут и контроллер; не добавлять маршрут повторно в GitHub. Production пока не менялся.
