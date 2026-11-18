@@ -330,3 +330,6 @@
 - Пользователь установил `ApiController.php`, PHP 8.5 lint успешен.
 - GET `/api/v1/products?branch_id=1&category_id=55&per_page=20` при скрытой категории 55: ID 6 цена 74.00, ID 5 цена 88.00; у обоих `quantity=null`, `imported_on=null`, `hide_store_stock=true`.
 - Проверено фактическим JSON-ответом production; детальный API и Android ещё не проверены.
+
+### 2026-11-18 — проверка production detail API
+Пользователь выполнил GET `https://baza.altaj-otdyh.ru/api/v1/products/6`. Ответ: `success=true`, `category_id=55`, `hide_store_stock=true`; у филиалов 1, 2 и 3 поля `price`, `quantity`, `imported_on`, `updated_at` равны `null`. Это подтверждает маскирование данных филиалов в подробном API. Основная цена в detail API отдельным полем не возвращается; ранее подтверждена в API списка товаров. Android APK и UI ещё не проверены.
