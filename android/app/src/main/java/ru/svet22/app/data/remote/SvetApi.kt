@@ -21,6 +21,9 @@ interface SvetApi {
     @GET("products/{id}")
     suspend fun productDetail(@Path("id") productId: Int): ApiEnvelope<ru.svet22.app.data.model.ProductDetailSettings>
 
+    @GET("sales-banner")
+    suspend fun salesBanner(): ApiEnvelope<ru.svet22.app.data.model.SalesBannerSettings>
+
     @GET("home-promotions")
     suspend fun homePromotions(): ApiEnvelope<ru.svet22.app.data.model.HomePromotions>
 
