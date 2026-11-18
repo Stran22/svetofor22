@@ -57,3 +57,7 @@
 - В phpMyAdmin выполнен `SELECT show_price_stock, COUNT(*) ... GROUP BY show_price_stock`; результат: `1 | 102` и других строк нет.
 - Подтверждено, что все 102 категории в production показывают цены/остатки, скрытых категорий пока нет.
 - Обновлена документация, production и БД не изменены.
+
+## 2026-11-18 — аудит production контроллера категорий
+- По grep подтверждены методы `index`, `edit`, `create`, `update` в `AdminCategoriesController.php`; совпадений `show_price_stock`, `hide_store_stock`, `checkbox` нет.
+- Требуется просмотр методов и шаблонов перед минимальным патчем. Только документация, production не менялся.
