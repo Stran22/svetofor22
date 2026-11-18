@@ -97,3 +97,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — подтверждены индексы production stock
 `SHOW INDEX FROM stock` подтвердил: `PRIMARY(id)` UNIQUE; `uq_stock_product_branch(product_id,branch_id)` UNIQUE (`Non_unique=0`, последовательность 1/2); `idx_stock_branch_quantity(branch_id,quantity)` неуникальный; `idx_stock_updated(updated_at)` неуникальный. Следовательно, MySQL запрещает повтор пары `(product_id,branch_id)`; добавлять индекс повторно не нужно. Проверка только читающая.
+
+### 2026-11-18 — новая миграция (GitHub, не применена)
+`009_sales_banner_settings.sql`: отдельная таблица `sales_banner_settings` с единственной строкой id=1, `is_enabled`, `mode` (`text`/`product`), `heading`, `cta_text`, `right_title`, `right_subtitle`, `product_id` (FK на `products.id`, ON DELETE SET NULL), `image_override_url`, `updated_at`. **Не применена на production.** Перед запуском сделать резервную копию и сверить `schema_migrations`.
