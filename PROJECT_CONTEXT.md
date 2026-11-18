@@ -116,3 +116,6 @@ Production read-only SQL: 3 активных филиала (ID 1 «На Вол�
 
 ### 2026-11-18 — дубликаты stock отсутствуют
 Проверка `GROUP BY product_id,branch_id HAVING COUNT(*)>1` в production вернула 0 строк. Существующие записи подходят для подсчёта наличия по филиалам, но отсутствие дублей сейчас не подтверждает уникальный индекс. Следующий этап: перейти от read-only аудита к точечной правке GitHub `ApiController.php` для маскировки price/quantity и проверки can_track; production не изменять до lint/тестов.
+
+### 2026-11-18 — UNIQUE stock подтверждён
+Production `SHOW INDEX FROM stock`: UNIQUE `uq_stock_product_branch(product_id,branch_id)` уже есть. Также `PRIMARY(id)`, `idx_stock_branch_quantity(branch_id,quantity)`, `idx_stock_updated(updated_at)`. Дубли защищены на уровне БД, никаких миграций не требуется. Следующий шаг — исправить GitHub API маскировку цены/остатка в списке и карточке, сохранив фильтры/сортировку/пагинацию и защитив от косвенного раскрытия.
