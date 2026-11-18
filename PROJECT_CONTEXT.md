@@ -56,3 +56,6 @@
 
 ### Проверка server grep для настройки категорий (18.11.2026)
 Поиск `hide_store_stock|show_price_stock|ALTER TABLE categories` в серверных `database/migrations` и `backend` вернул пустой вывод. Не трактовать как доказательство отсутствия колонки в MySQL: ошибки путей скрывались. Следующий шаг: read-only `SHOW COLUMNS FROM categories;` в phpMyAdmin, затем согласовать минимальную безопасную миграцию при необходимости. Не применять `007_product_wide_subscriptions.sql` без аудита: в GitHub он удаляет существующие subscriptions.
+
+### Критическая находка в реальной MySQL (18.11.2026)
+В базе `prorock_law` пользователь выполнил `SHOW COLUMNS FROM categories`: столбец **`show_price_stock tinyint(1) NOT NULL DEFAULT 1` уже существует**. Поля `hide_store_stock` в показанной схеме **нет**. Это противоположная семантика относительно GitHub (`hide_store_stock`). НЕЛЬЗЯ добавлять дубликат или заменять контроллер из GitHub без адаптации: сохранить данные, проверить серверную админку, наследование категорий, API и Android. Следующий шаг — найти фактическое использование `show_price_stock` в коде/админке и проверить сохранённые значения, прежде чем менять что-либо.
