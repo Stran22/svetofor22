@@ -89,3 +89,6 @@
 
 ### 2026-11-18 — различие production и GitHub по групповой видимости категорий
 Пользователь проверил production `backend/bootstrap/app.php`: маршруты `/admin/categories` GET/POST, `/{id}/toggle` POST, `/{id}/delete` POST, `/{id}/edit` GET/POST присутствуют (строки 92–97); **POST `/admin/categories/visibility` отсутствует**. В GitHub ветке `feature/excel-column-mapping` `backend/bootstrap/app.php` этот POST маршрут уже зарегистрирован строкой 94 и ведёт на `AdminCategoriesController::saveVisibility()`. При развёртывании групповой формы необходимо согласованно перенести маршрут и контроллер; не добавлять маршрут повторно в GitHub. Production пока не менялся.
+
+### 2026-11-18 — production GET /api/v1/categories
+Из вывода production `ApiController::categories()`: `SELECT id, parent_id, name, slug, image_url, sort_order FROM categories WHERE is_active=1 ORDER BY sort_order,name`; `show_price_stock` в JSON не включён. GitHub `ApiController.php` уже содержит `CategoryVisibilityService` и возвращает `hide_store_stock`, но GitHub `CategoryVisibilityService.php` читает несуществующее в production `categories.hide_store_stock`. Нужно согласовать сервис с существующим `show_price_stock` и наследованием, затем проверить API продуктов и Android. Production пока не менялся.
