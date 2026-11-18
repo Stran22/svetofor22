@@ -59,8 +59,7 @@ fun ProductRow(
             )
 
             Text(
-                text = if (product.hideStoreStock) "Цена скрыта"
-                    else product.price?.let { "$it ₽" } ?: "Цена не указана",
+                text = product.price?.let { "$it ₽" } ?: "Цена не указана",
                 style = MaterialTheme.typography.titleMedium
             )
         }
