@@ -57,3 +57,6 @@
 
 ### Реализация админки видимости в GitHub (2026-11-18)
 Коммит `959e9ee2454441e9c393fe962e615e458eebaf19`: в `backend/app/Controllers/AdminCategoriesController.php` добавлены checkbox `show_price_stock` в создание/редактирование, колонка состояния в таблицу, сохранение 0/1 через INSERT/UPDATE, `all()` выбирает `show_price_stock`. Существующая групповая форма «Скрыть цены и остатки» сохранена с инверсией значения в существующее поле БД; имя POST-массива `hide_store_stock[]` сохранено для формы, но столбец БД больше не используется. **Только GitHub; не развёрнуто и не протестировано**. Следующий этап: синтаксическая проверка PHP, аудит API/Android и безопасное развёртывание.
+
+### 2026-11-18 — CategoryVisibilityService адаптирован к production
+Пользователь подтвердил через `ls -l`, что в production отсутствует `backend/app/Services/CategoryVisibilityService.php`. В GitHub сервис существует. Коммит `c3f1b4b644b53cdedf850cb9f8ce31f262bd4414` меняет SQL сервиса с отсутствующего `hide_store_stock` на существующее `show_price_stock` и рассчитывает прежний API-флаг `hide_store_stock` как отрицание `show_price_stock` с наследованием от родителя. **Только GitHub, не развёрнуто/не протестировано.**
