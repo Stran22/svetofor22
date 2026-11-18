@@ -41,3 +41,6 @@
 
 ### Подтверждение HTTP-точки входа (18.11.2026)
 В ISPmanager для `baza.altaj-otdyh.ru` пользователь подтвердил корень `/backend/public` и PHP 8.5; CLI `/opt/php85/bin/php` = 8.5.12. Активный `backend/public/index.php` содержит `require dirname(__DIR__) . '/bootstrap/app.php';`, то есть загружает **основной** `backend/bootstrap/app.php`, не `.deploy`. Точная версия PHP через HTTP и SAPI ещё не измерены. Следующий read-only шаг — посмотреть маршруты и подключения в `/var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/bootstrap/app.php`. Важные новые подтверждения сразу заносить в `docs/` и оперативный контекст, чтобы не запрашивать повторно.
+
+### Продолжение диагностики (18.11.2026)
+Из серверного `backend/bootstrap/app.php` пользователь предоставил grep: Composer autoload из корневого `vendor/autoload.php`, создание `Router`, `ApiController`, `AdminCategoriesController`, `SubscriptionController`. Это подтверждает, что HTTP-точка входа `backend/public/index.php` загружает основное приложение и эти контроллеры, а не `.deploy` (при условии обычного Composer PSR-4 разрешения). Следующий шаг — read-only просмотр маршрутов и сопоставление с GitHub, без деплоя и миграций.
