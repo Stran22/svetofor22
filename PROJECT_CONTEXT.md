@@ -137,3 +137,6 @@ Production `GET /api/v1/products?per_page=2` возвращает HTTP/2 200 и 
 
 ### 2026-11-18 — baseline карточки товара подтверждён
 Production GET `/api/v1/products/6` HTTP/2 200: кефир ID 6, category_id 55, три branches с price/quantity (74/5, 75.12/12, 78/3), reviews_count=0, rating=null. Нет `hide_store_stock`/`can_track`. Ожидаемый `can_track=false` (все филиалы имеют положительный остаток). Сохранить форму ответа branches/reviews. Production не изменялся.
+
+### 2026-11-18 — baseline API категорий подтверждён
+GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, список с `id,parent_id,name,slug,image_url,sort_order`. Иерархия ID 52→55/54. Нет `hide_store_stock`; новая GitHub версия API ещё не развёрнута. Все три read-only endpoint baseline (`categories`, `products`, `products/6`) проверены. Далее требуется согласовать версию production bootstrap, миграции/сервисы и сделать резервные копии до установки.
