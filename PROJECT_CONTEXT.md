@@ -98,3 +98,6 @@ Production `ApiController::products()` напрямую возвращает `s.
 
 ### 2026-11-18 — production visibility service отсутствует; GitHub исправлен
 `ls -l /var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/app/Services/CategoryVisibilityService.php` на сервере вернул «Нет такого файла или каталога». В GitHub сервис существует; коммит `c3f1b4b` заменил чтение несуществующего `hide_store_stock` на `show_price_stock` с инверсией и наследованием, сохранив API-ключ `hide_store_stock`. Сервис не установлен на production, API список товаров ещё не маскирует данные. Нужны проверки синтаксиса и безопасное согласованное развёртывание.
+
+### 2026-11-18 — PHP lint CategoryVisibilityService успешен
+Пользователь выполнил `/opt/php85/bin/php -l /tmp/svet22_CategoryVisibilityService_check.php` для GitHub файла коммита `c3f1b4b644b53cdedf850cb9f8ce31f262bd4414`; вывод: `No syntax errors detected in /tmp/svet22_CategoryVisibilityService_check.php`. Это только проверка синтаксиса. Production файл по-прежнему отсутствует, сервис не развёрнут. Следующий шаг — реализовать/проверить маскировку price/quantity в API `products()` и `product()` и предотвратить обход через фильтры.
