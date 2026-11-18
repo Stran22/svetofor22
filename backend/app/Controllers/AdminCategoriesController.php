@@ -70,6 +70,7 @@ final class AdminCategoriesController
                 . $this->options($categories, null)
                 . '</select></label><label>Порядок<input type="number" name="sort_order" value="0"></label>'
                 . '<label>URL изображения (необязательно)<input name="image_url" maxlength="1000" type="url"></label>'
+                . '<label><input type="checkbox" name="show_price_stock" value="1" checked> Показывать цены и остатки товаров</label>'
                 . '<button type="submit">Добавить</button></form></section>';
         }
         $rows = [];
@@ -93,6 +94,7 @@ final class AdminCategoriesController
                 $category['parent_id'] === null ? '—' : (int)$category['parent_id'],
                 (int)$category['sort_order'],
                 (int)$category['is_active'] ? 'Активна' : 'Отключена',
+                (int)$category['show_price_stock'] ? 'Показывать' : 'Скрывать',
                 $edit,
             ];
         }
@@ -112,11 +114,11 @@ final class AdminCategoriesController
                 $id = (int)$category['id'];
                 $label = str_repeat('— ', min((int)$category['_depth'], 12)) . $category['name'];
                 $content .= '<tr><td>' . AdminView::e($label) . '</td>'
-                    . '<td><input type="checkbox" name="hide_store_stock[]" value="' . $id . '"' . ((int)$category['hide_store_stock'] ? ' checked' : '') . '></td></tr>';
+                    . '<td><input type="checkbox" name="hide_store_stock[]" value="' . $id . '"' . (!(int)$category['show_price_stock'] ? ' checked' : '') . '></td></tr>';
             }
             $content .= '</tbody></table></div><button type="submit">Сохранить настройки отображения</button></form></section>';
         }
-        $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Действия'], $rows);
+        $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Цены и остатки', 'Действия'], $rows);
         Response::html(AdminView::layout('Категории', $content, $this->adminLayout($admin)));
     }
 
@@ -140,16 +142,16 @@ final class AdminCategoriesController
         }
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('UPDATE categories SET hide_store_stock=? WHERE id=?');
+            $stmt = $this->db->prepare('UPDATE categories SET show_price_stock=? WHERE id=?');
             foreach ($categories as $category) {
                 $id = (int)$category['id'];
                 $stmt->execute([
-                    isset($selected['hide_store_stock'][$id]) ? 1 : 0,
+                    isset($selected['hide_store_stock'][$id]) ? 0 : 1,
                     $id
                 ]);
             }
             $this->auth->audit((int)$admin['id'], 'category.visibility', 'category', 0, [
-                'hide_store_stock' => array_keys($selected['hide_store_stock'])
+                'hidden_category_ids' => array_keys($selected['hide_store_stock'])
             ], $request->clientIp());
             $this->db->commit();
         } catch (\Throwable $e) {
@@ -175,6 +177,7 @@ final class AdminCategoriesController
             . '</select></label>'
             . '<label>Порядок<input type="number" name="sort_order" value="' . (int)$category['sort_order'] . '"></label>'
             . '<label>URL изображения<input type="url" name="image_url" maxlength="1000" value="' . AdminView::e($category['image_url']) . '"></label>'
+            . '<label><input type="checkbox" name="show_price_stock" value="1"' . ((int)$category['show_price_stock'] ? ' checked' : '') . '> Показывать цены и остатки товаров</label>'
             . '<p class="muted">URL-ключ сохраняется при переименовании, чтобы не ломать существующие ссылки.</p>'
             . '<button type="submit">Сохранить</button> <a href="/admin/categories">Отмена</a></form></section>';
         Response::html(AdminView::layout('Редактирование категории', $content, $this->adminLayout($admin)));
@@ -186,9 +189,11 @@ final class AdminCategoriesController
         $data = $request->post();
         $this->csrf($data);
         [$name, $parent, $sort, $image] = $this->fields($data);
+        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
+        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
         $slug = $this->uniqueSlug($name, $parent);
-        $stmt = $this->db->prepare('INSERT INTO categories (name, parent_id, slug, sort_order, image_url) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$name, $parent, $slug, $sort, $image]);
+        $stmt = $this->db->prepare('INSERT INTO categories (name, parent_id, slug, sort_order, image_url, show_price_stock) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$name, $parent, $slug, $sort, $image, $showPriceStock]);
         $this->auth->audit((int)$admin['id'], 'category.create', 'category', (int)$this->db->lastInsertId(), ['name'=>$name,'parent_id'=>$parent], $request->clientIp());
         Response::redirect('/admin/categories');
     }
@@ -204,8 +209,8 @@ final class AdminCategoriesController
         if ($parent === $id || ($parent !== null && $this->isDescendant($parent, $id))) {
             Response::html('Нельзя переместить категорию внутрь самой себя или её подраздела.', 422);
         }
-        $stmt = $this->db->prepare('UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=? WHERE id=?');
-        $stmt->execute([$name, $parent, $sort, $image, $id]);
+        $stmt = $this->db->prepare('UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=?, show_price_stock=? WHERE id=?');
+        $stmt->execute([$name, $parent, $sort, $image, $showPriceStock, $id]);
         $this->auth->audit((int)$admin['id'], 'category.update', 'category', $id, ['name'=>$name,'parent_id'=>$parent], $request->clientIp());
         Response::redirect('/admin/categories');
     }
@@ -272,7 +277,7 @@ final class AdminCategoriesController
 
     private function all(): array
     {
-        return $this->db->query('SELECT id, parent_id, name, slug, sort_order, image_url, is_active, hide_store_stock FROM categories ORDER BY sort_order, name, id')->fetchAll(PDO::FETCH_ASSOC);
+        return $this->db->query('SELECT id, parent_id, name, slug, sort_order, image_url, is_active, show_price_stock FROM categories ORDER BY sort_order, name, id')->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function one(int $id): array|false
