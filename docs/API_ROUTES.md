@@ -123,3 +123,11 @@
 - `GET /api/v1/products`: для `hide_store_stock=true` поле `price` остаётся значением из `stock.price`, `quantity` и `imported_on` маскируются; `hide_store_stock` сохраняется.
 - `GET /api/v1/products/{id}`: в массиве `branches` по-прежнему маскируются цена/количество для скрытых категорий (Android полностью скрывает этот блок); основной экран получает цену из модели списка.
 - Статус: исходники в GitHub; production и API smoke tests ещё не выполнены. При дальнейшем развитии отдельной основной цены в detail API потребуется явное согласование контракта.
+
+### 2026-11-18 — SALES-баннер (код в GitHub, не развёрнут)
+- `GET /api/v1/sales-banner` — публичные настройки баннера: `is_enabled`, `mode`, `heading`, `cta_text`, `right_title`, `right_subtitle`, `product_id`, `product_name`, `image_url`. В режиме товара `image_url` = отдельная картинка, если загружена, иначе фото из карточки. Для удалённого/неактивного товара баннер отключается.
+- `GET /admin/sales-banner` — форма настройки (админ).
+- `POST /admin/sales-banner` — сохранить настройки (админ, CSRF).
+- `POST /admin/sales-banner/image` — загрузить PNG/WebP с прозрачностью до 5 МБ (админ, CSRF).
+- `POST /admin/sales-banner/image/remove` — убрать отдельное фото (админ, CSRF).
+**Маршруты ещё не проверены на production.**
