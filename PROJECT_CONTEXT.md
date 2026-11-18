@@ -86,3 +86,6 @@
 
 ### 2026-11-18 — PHP lint исправленного контроллера успешно пройден
 Пользователь выполнил в терминале ISPmanager `/opt/php85/bin/php -l /tmp/svet22_AdminCategoriesController_check.php` после скачивания файла из коммита `783e0b81ac6ca0f4e7e7f59aa0dcdc2e1470f7e9`. Результат: `No syntax errors detected in /tmp/svet22_AdminCategoriesController_check.php`. Это **только синтаксическая проверка**, не тест БД/маршрутов/форм. Production контроллер не заменён. Следующий шаг: проверить наличие маршрута POST `/admin/categories/visibility` в production `backend/bootstrap/app.php` и при необходимости избежать 404 групповой формы.
+
+### 2026-11-18 — маршрут групповой видимости
+Production bootstrap: POST `/admin/categories/visibility` отсутствует (grep пользователя), тогда как GitHub bootstrap уже содержит его строкой 94. Новая групповая форма в GitHub использует этот POST и `saveVisibility()`. При деплое требуется **согласованное обновление** bootstrap и контроллера либо временно отключить групповую форму; не заменять production bootstrap вслепую, поскольку там могут быть другие изменения. Следующий этап: безопасный точечный перенос маршрута с проверкой PHP lint и аудит API. Не утверждать, что GitHub bootstrap нуждается в новом маршруте.
