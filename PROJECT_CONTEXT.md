@@ -62,3 +62,6 @@
 
 ### Состояние настроек категорий в БД (18.11.2026)
 `SELECT show_price_stock, COUNT(*) ... GROUP BY show_price_stock` в phpMyAdmin вернул **только `1 | 102`**. Все 102 категории имеют показ цен/остатков включённым; скрытых нет. Существующее поле `show_price_stock` использовать как источник истины, не вводить `hide_store_stock` без явной миграционной стратегии. Следующий шаг — read-only аудит реальной серверной админки `AdminCategoriesController` (чтение и сохранение `show_price_stock`) и GitHub-логики, прежде чем писать патч.
+
+### Серверная админка категорий (18.11.2026)
+В `backend/app/Controllers/AdminCategoriesController.php` подтверждены методы `index()` (21), `edit()` (109), `create()` (130), `update()` (143). Поиск `show_price_stock|hide_store_stock|checkbox` в файле пуст. Следующий шаг: read-only `sed -n '1,220p' .../AdminCategoriesController.php` (при необходимости порциями), чтобы увидеть сохранение и подключение шаблонов. Не добавлять второй столбец; production уже имеет `show_price_stock`.
