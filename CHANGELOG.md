@@ -117,3 +117,8 @@
 - Временный файл `/tmp/svet22_CategoryVisibilityService_check.php` (GitHub коммит `c3f1b4b`) проверен PHP 8.5.
 - Вывод пользователя: `No syntax errors detected in /tmp/svet22_CategoryVisibilityService_check.php`.
 - На production не развёрнуто; функциональные проверки не выполнены.
+
+## 2026-11-18 — подтверждена схема stock на production
+- Через phpMyAdmin проверены поля `id`, `product_id`, `branch_id`, `price`, `quantity`, `imported_on`, `updated_at`.
+- `price` и `quantity` NOT NULL; скрытие будет реализовано только в API-ответе, без модификации данных MySQL.
+- SQL-запрос был только читающим, production данные не изменены.
