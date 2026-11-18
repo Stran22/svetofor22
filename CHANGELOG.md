@@ -333,3 +333,9 @@
 
 ### 2026-11-18 — проверка production detail API
 Пользователь выполнил GET `https://baza.altaj-otdyh.ru/api/v1/products/6`. Ответ: `success=true`, `category_id=55`, `hide_store_stock=true`; у филиалов 1, 2 и 3 поля `price`, `quantity`, `imported_on`, `updated_at` равны `null`. Это подтверждает маскирование данных филиалов в подробном API. Основная цена в detail API отдельным полем не возвращается; ранее подтверждена в API списка товаров. Android APK и UI ещё не проверены.
+
+## 2026-11-18 — Android: успешная сборка и проверка на устройстве
+- Ветка `feature/excel-column-mapping`: Git Pull в Android Studio выполнен (`17 files updated in 201 commits`), перед ним `No changes`.
+- Gradle сборка: `BUILD SUCCESSFUL`.
+- Пользователь запустил обновлённое приложение на физическом телефоне и сообщил: «все ок, дизайн прежний».
+- Подтверждено сохранение существующего дизайна; ранее проверены цены и скрытые остатки в production API для категории 55. Поэлементные скриншоты каждого Android-экрана не предоставлялись.
