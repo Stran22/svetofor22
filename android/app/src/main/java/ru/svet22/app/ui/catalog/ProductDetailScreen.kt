@@ -366,8 +366,21 @@ fun ProductDetailScreen(
                                 subscriptionRepository.create(product.id)
                                 alreadyTracking = true
                                 trackingMessage = "Уведомим о поступлении товара в любой магазин."
-                            } catch (_: Exception) {
-                                trackingMessage = "Не удалось оформить подписку. Проверьте наличие товара и соединение."
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: retrofit2.HttpException) {
+                                val serverMessage = runCatching {
+                                    org.json.JSONObject(e.response()?.errorBody()?.string().orEmpty())
+                                        .optJSONObject("error")?.optString("message")
+                                }.getOrNull()?.takeIf { it.isNotBlank() }
+                                trackingMessage = serverMessage ?: when (e.code()) {
+                                    401, 403 -> "Не удалось подтвердить авторизацию. Войдите в аккаунт заново."
+                                    409 -> "Подписка недоступна: проверьте нулевые остатки во всех филиалах."
+                                    else -> "Сервер отклонил подписку (HTTP ${e.code()})."
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("SVET22_SUBS", "Create subscription failed", e)
+                                trackingMessage = "Не удалось связаться с сервером подписок. Проверьте соединение."
                             } finally {
                                 trackingBusy = false
                             }
@@ -457,7 +470,7 @@ fun ProductDetailScreen(
     trackingMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { trackingMessage = null },
-            title = { Text("Готово") },
+            title = { Text(if (alreadyTracking) "Подписка оформлена" else "Подписка не оформлена") },
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { trackingMessage = null }) { Text("Понятно") }
