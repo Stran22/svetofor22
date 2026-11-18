@@ -185,3 +185,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — исправленный AdminView.php подтверждён на сервере
 Пользователь скачал `AdminView.php` по URL конкретного коммита `0eb83fdc4dc19af01d7c82bd75bd908b31c339cf` в `/tmp/svet22-menu-20261118/AdminView.php`. `sed -n '24,26p'` показал закрывающую кавычку после `Категории</a>` и ссылку `/admin/categories/visibility`; `/opt/php85/bin/php -l` вернул `No syntax errors detected`. До этого `AdminCategoriesController.php` прошёл lint; `app.php` ещё не проверен. Production не изменён. Следующий шаг: lint staging `app.php`, затем backup и осторожное развёртывание трёх файлов.
+
+### 2026-11-18 — staging app.php lint и маршруты подтверждены
+Пользователь выполнил `/opt/php85/bin/php -l /tmp/svet22-menu-20261118/app.php`: `No syntax errors detected`. `grep -n categories/visibility` подтвердил GET маршрут line 93 (`visibilityPage`) и POST line 95 (`saveVisibility`). Все 3 staging PHP файла прошли lint: `AdminCategoriesController.php`, `AdminView.php`, `app.php`. Production ещё не обновлён. Следующий шаг: создать резервные копии трёх действующих production файлов перед установкой.
