@@ -145,3 +145,8 @@
 ## 2026-11-18 — подтверждён UNIQUE индекс stock
 - `SHOW INDEX FROM stock` подтвердил `uq_stock_product_branch(product_id,branch_id)` с `Non_unique=0`.
 - Дополнительная миграция или индекс не требуются. Production не изменялся.
+
+## 2026-11-18 — GitHub API: начата маскировка цен и остатков
+- Коммит `767aa0d`: маскировка `price`, `quantity`, `imported_on` в списке и `price`, `quantity`, `imported_on`, `updated_at` в карточке для скрытых категорий.
+- Возвращается `hide_store_stock`, учитывается наследование через сервис.
+- Открытый вопрос: косвенное раскрытие через сортировку/фильтры, lint/тесты и Android; production не изменён.
