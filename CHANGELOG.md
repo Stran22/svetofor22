@@ -297,3 +297,9 @@
 ## 2026-11-18 — staging lint подтверждения сохранения
 - `AdminCategoriesController.php` (коммит `75ce461`): PHP 8.5 lint на сервере прошёл.
 - Production ещё не обновлён; ожидается backup и установка.
+
+## 2026-11-18 — уведомление сохранения установлено
+- На production заменён только `AdminCategoriesController.php` из коммита `75ce461`.
+- Backup: `app/Controllers/AdminCategoriesController.php.bak-before-save-notice`.
+- PHP 8.5 lint после установки: OK.
+- Браузерная проверка уведомления ещё ожидается.
