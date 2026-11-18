@@ -193,3 +193,8 @@
 - Пользователь добавил `POST /admin/categories/visibility` → `saveVisibility()` в `backend/bootstrap/app.php`.
 - PHP lint успешен (`No syntax errors detected`); backup `bootstrap/app.php.bak-20261118` подтверждён.
 - Пока контроллер на production не обновлён, новый маршрут нельзя использовать. Остальные файлы не изменялись.
+
+## 2026-11-18 — production backup перед обновлением контроллеров
+- Созданы `.bak-20261118` для `AdminCategoriesController.php` и `ApiController.php`.
+- `CategoryVisibilityService.php` отсутствует в production, при установке будет новым файлом.
+- Рабочие контроллеры ещё не заменены.
