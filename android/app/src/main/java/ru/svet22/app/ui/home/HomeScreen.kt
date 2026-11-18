@@ -9,10 +9,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -90,7 +89,7 @@ fun HomeScreen(
     }
     val homeScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
-    var featuredOffset by remember { mutableStateOf(0) }
+    val featuredRequester = remember { BringIntoViewRequester() }
     var branchMenuExpanded by remember { mutableStateOf(false) }
     var showAllFeatured by remember { mutableStateOf(false) }
     val featured = remember(vm.products) { vm.products.filter { it.price?.toDoubleOrNull() != null }.take(12) }
@@ -158,7 +157,7 @@ fun HomeScreen(
             Spacer(Modifier.height(14.dp))
             SalesPromoBanner(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                onClick = { scope.launch { homeScroll.animateScrollTo(featuredOffset) } }
+                onClick = { scope.launch { featuredRequester.bringIntoView() } }
             )
 
             if (contests.isNotEmpty()) {
@@ -213,9 +212,7 @@ fun HomeScreen(
             Spacer(Modifier.height(22.dp))
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                    .onGloballyPositioned { coordinates ->
-                        featuredOffset = (coordinates.positionInParent().y + homeScroll.value).roundToInt()
-                    }
+                    .bringIntoViewRequester(featuredRequester)
                     .background(Color(0xFFF2F3F5), RoundedCornerShape(22.dp))
                     .padding(horizontal = 10.dp, vertical = 17.dp)
             ) {
