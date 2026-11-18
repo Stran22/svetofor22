@@ -104,3 +104,6 @@
 
 ### 2026-11-18 — baseline production GET /api/v1/categories
 Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/categories`; HTTP/2 200, `success:true`, `data` — массив активных категорий с полями `id,parent_id,name,slug,image_url,sort_order`, `meta:[]`. Примеры иерархии: ID 52 «Молочные продукты» (`parent_id=null`), ID 55 «Молоко и сливки» (`parent_id=52`), ID 54 «Кисломолочные продукты» (`parent_id=52`). `hide_store_stock` отсутствует в production baseline. Полный вывод пользователь приложил 2026-11-18. Никаких production изменений.
+
+### 2026-11-18 — маршрут группового сохранения (план production)
+В production есть шесть маршрутов `/admin/categories` (GET index, POST create, POST `/{id}/toggle`, POST `/{id}/delete`, GET `/{id}/edit`, POST `/{id}/edit`), но нет `POST /admin/categories/visibility`. Для нового `AdminCategoriesController::saveVisibility()` требуется вставить маршрут после `POST /admin/categories` и перед параметризованными. **Пока не установлен на production.**
