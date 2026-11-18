@@ -92,3 +92,6 @@ Production bootstrap: POST `/admin/categories/visibility` отсутствует
 
 ### 2026-11-18 — API категорий и GitHub visibility service
 Production `ApiController::categories()` не выбирает и не возвращает `show_price_stock` (SQL `SELECT id,parent_id,name,slug,image_url,sort_order ... WHERE is_active=1`). В GitHub `ApiController.php` использует `CategoryVisibilityService`, который пока читает `categories.hide_store_stock` (отсутствует в production). Следующий кодовый шаг — исправить сервис для чтения `show_price_stock` с инверсией в API `hide_store_stock`, проверить `products()/product()` и Android-клиент перед деплоем.
+
+### 2026-11-18 — проверен production список товаров
+Production `ApiController::products()` напрямую возвращает `s.price`, `s.quantity`, `s.imported_on`; не учитывает `show_price_stock`. Сохранять поиск, фильтры, сортировку, пагинацию. В GitHub `ApiController` уже использует `CategoryVisibilityService` только в `categories()`/`product()`, но не в `products()`. Сам сервис использует отсутствующий production `hide_store_stock`; нужен переход на `show_price_stock` с инверсией и наследованием, а также маскировка списка/карточки на сервере. Пока только аудит, production не менялся.
