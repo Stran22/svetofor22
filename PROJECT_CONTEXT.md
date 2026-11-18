@@ -89,3 +89,6 @@
 
 ### 2026-11-18 — маршрут групповой видимости
 Production bootstrap: POST `/admin/categories/visibility` отсутствует (grep пользователя), тогда как GitHub bootstrap уже содержит его строкой 94. Новая групповая форма в GitHub использует этот POST и `saveVisibility()`. При деплое требуется **согласованное обновление** bootstrap и контроллера либо временно отключить групповую форму; не заменять production bootstrap вслепую, поскольку там могут быть другие изменения. Следующий этап: безопасный точечный перенос маршрута с проверкой PHP lint и аудит API. Не утверждать, что GitHub bootstrap нуждается в новом маршруте.
+
+### 2026-11-18 — API категорий и GitHub visibility service
+Production `ApiController::categories()` не выбирает и не возвращает `show_price_stock` (SQL `SELECT id,parent_id,name,slug,image_url,sort_order ... WHERE is_active=1`). В GitHub `ApiController.php` использует `CategoryVisibilityService`, который пока читает `categories.hide_store_stock` (отсутствует в production). Следующий кодовый шаг — исправить сервис для чтения `show_price_stock` с инверсией в API `hide_store_stock`, проверить `products()/product()` и Android-клиент перед деплоем.
