@@ -74,3 +74,6 @@
 
 ### Расположение вспомогательных методов production AdminCategoriesController (18.11.2026)
 По выводу `grep -nE 'function (all|one|fields)\\('`: `all()` — строка 220, `one(int $id)` — 225, `fields(array $data)` — 268. Их тела ещё не прочитаны. Следующий read-only шаг: `sed -n '220,300p'` серверного файла. После сверки с GitHub подготовить минимальный патч, используя существующий `show_price_stock`, без дублирующего `hide_store_stock`.
+
+### Проверены `all()/one()/fields()` production (2026-11-18)
+`all()` SELECT id,parent_id,name,slug,sort_order,image_url,is_active (нет `show_price_stock`); `one()` SELECT * (поле есть); `fields()` валидирует name/parent/sort/HTTPS image и возвращает 4 элемента (не принимает checkbox). Теперь известны форма создания, форма редактирования, SQL INSERT/UPDATE и вспомогательные методы. Готовить минимальный патч на базе реально работающей версии, избегая перезаписи иных функций GitHub-версией; продумать API и Android отдельно. Поле `show_price_stock` уже есть в БД, все 102 = 1.
