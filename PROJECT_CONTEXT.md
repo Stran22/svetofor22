@@ -80,3 +80,6 @@
 
 ### Выполнен первый патч админки (2026-11-18)
 В `Stran22/svetofor22`, ветка `feature/excel-column-mapping`, коммит `959e9ee`: исправлен GitHub `backend/app/Controllers/AdminCategoriesController.php` для production столбца `show_price_stock`: формы создания/редактирования, SQL INSERT/UPDATE, список и групповая настройка. **НЕ развёрнуто на сервере, НЕ проверено php -l/тестами.** GitHub-версия имеет дополнительный `saveVisibility()` и групповую форму, отсутствующие в присланных фрагментах production: при деплое нужна сверка маршрута `/admin/categories/visibility` и совместимости остального приложения. Не применять GitHub миграции вслепую. Следующее: проверить синтаксис, API, затем инструкции по точечному деплою.
+
+### 2026-11-18 — исправление после ревизии патча
+Повторно проверен GitHub `backend/app/Controllers/AdminCategoriesController.php`: первоначальный патч содержал двойное присваивание `$showPriceStock` в `create()` и не содержал присваивания в `update()`. Исправлено коммитом `783e0b81ac6ca0f4e7e7f59aa0dcdc2e1470f7e9`: по одному присваиванию в каждом методе. PHP lint/функциональные тесты ещё не выполнены, на production не развёрнуто.
