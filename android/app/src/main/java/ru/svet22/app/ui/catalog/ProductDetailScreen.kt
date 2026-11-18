@@ -258,6 +258,35 @@ fun ProductDetailScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // Рейтинг отзывов перед названием товара.
+        val averageRating = reviewsResponse?.summary?.rating?.takeIf { it in 0.0..5.0 }
+        if (averageRating != null && (reviewsResponse?.summary?.reviewsCount ?: 0) > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                repeat(5) { index ->
+                    Icon(
+                        imageVector = if (averageRating >= index + 0.5) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = null,
+                        tint = if (averageRating >= index + 0.5) Color(0xFFFFB300) else Color.LightGray,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = String.format(java.util.Locale("ru", "RU"), "%.1f", averageRating),
+                    color = ProductDark,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.size(6.dp))
+                Text(
+                    text = "(${reviewsResponse?.summary?.reviewsCount ?: 0})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
         // ===== НАЧАЛО БЛОКА: Название товара =====
         Text(
             text = product.name,
