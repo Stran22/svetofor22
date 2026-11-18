@@ -42,3 +42,6 @@
 
 ### Текущие настройки всех категорий (18.11.2026)
 В реальной MySQL `prorock_law` все **102 категории** имеют `show_price_stock = 1`, категорий со скрытием (`0`) нет. Это проверено `GROUP BY` в phpMyAdmin. Настройка пока не используется в просмотренном production `ApiController::product()`. При разработке переключателя обеспечить сохранение значения 0 и правильное наследование, без изменения существующего отображения по умолчанию.
+
+### Проверка production AdminCategoriesController (18.11.2026)
+Вывод `grep -nE 'function (index|edit|update|create)|show_price_stock|hide_store_stock|checkbox' backend/app/Controllers/AdminCategoriesController.php`: `index()` строка 21, `edit()` 109, `create()` 130, `update()` 143; **нет совпадений** для `show_price_stock`, `hide_store_stock`, `checkbox` в этом контроллере. Сам по себе grep не проверяет шаблоны и другие файлы; до реализации проверить код методов и форму редактирования. БД содержит `show_price_stock` для всех 102 категорий (все = 1).
