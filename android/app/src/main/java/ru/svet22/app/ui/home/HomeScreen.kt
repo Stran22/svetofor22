@@ -63,6 +63,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.svet22.app.data.model.Product
+import ru.svet22.app.data.model.SalesBannerSettings
+import ru.svet22.app.data.repository.SalesBannerRepository
 import ru.svet22.app.data.model.ContestSummary
 import ru.svet22.app.data.repository.ContestRepository
 import ru.svet22.app.ui.contest.ContestImage
@@ -86,6 +88,9 @@ fun HomeScreen(
 ) {
     val contests by produceState<List<ContestSummary>>(initialValue = emptyList()) {
         value = runCatching { ContestRepository().active() }.getOrDefault(emptyList())
+    }
+    val salesBanner by produceState<SalesBannerSettings?>(initialValue = null) {
+        value = runCatching { SalesBannerRepository().settings() }.getOrNull()
     }
     val homeScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -155,10 +160,23 @@ fun HomeScreen(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            SalesPromoBanner(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
-                onClick = { scope.launch { featuredRequester.bringIntoView() } }
-            )
+            if (salesBanner?.isEnabled != false) {
+                SalesPromoBanner(
+                    settings = salesBanner,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    onClick = {
+                        val banner = salesBanner
+                        if (banner?.mode == "product" && banner.productId != null) {
+                            val product = (vm.products + vm.featuredProducts)
+                                .firstOrNull { it.id == banner.productId }
+                                ?: Product(id = banner.productId, name = banner.productName ?: "Товар", imageUrl = banner.imageUrl)
+                            onOpenProduct(product)
+                        } else {
+                            scope.launch { featuredRequester.bringIntoView() }
+                        }
+                    }
+                )
+            }
 
             if (contests.isNotEmpty()) {
                 Spacer(Modifier.height(18.dp))
@@ -468,8 +486,26 @@ private fun contestDateLabel(title: String): String? {
  * Рисуется нативно, без WebView; касание прокручивает к существующему разделу «Супер выгода».
  */
 @Composable
-private fun SalesPromoBanner(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Canvas(modifier = modifier.aspectRatio(450f / 220f).clickable(onClick = onClick)) {
+private fun SalesPromoBanner(
+    settings: SalesBannerSettings?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val productMode = settings?.mode == "product" && settings.productId != null
+    val imageUrl = settings?.imageUrl
+    val productBitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = imageUrl) {
+        value = if (!productMode || imageUrl.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+            runCatching {
+                URL(URL("https://baza.altaj-otdyh.ru/"), imageUrl.trim())
+                    .openConnection().apply {
+                        connectTimeout = 8000
+                        readTimeout = 8000
+                    }.getInputStream().use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
+        }
+    }
+    Box(modifier = modifier.aspectRatio(450f / 220f).clickable(onClick = onClick)) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
         drawIntoCanvas { composeCanvas ->
             val canvas = composeCanvas.nativeCanvas
             val checkpoint = canvas.save()
@@ -497,20 +533,39 @@ private fun SalesPromoBanner(modifier: Modifier = Modifier, onClick: () -> Unit)
             polygon(floatArrayOf(30f, 5f, 20f, 200f, 440f, 170f, 440f, 55f), black, true, 5f)
             polygon(floatArrayOf(5f, 31f, 5f, 185f, 410f, 205f, 430f, 10f), 0x33000000)
             polygon(floatArrayOf(5f, 31f, 5f, 180f, 410f, 200f, 430f, 10f), 0xFFFDD808.toInt())
-            label("SALES", 43f, 122f, 65f, 0xFFFAFAFA.toInt())
-            label("SALES", 43f, 119f, 65f, black)
-            label("S H O P   N O W", 76f, 161.5f, 20f, android.graphics.Color.WHITE)
-            label("B I G G E S T", 270f, 70f, 23f, black)
-            label("S A L E S", 287f, 95f, 23f, black)
-            label("UP TO", 302f, 120f, 23f, black)
-            label("70%", 313f, 143f, 23f, black)
-            label("OFF", 314f, 168f, 23f, black)
+            label(settings?.heading ?: "SALES", 43f, 122f, 65f, 0xFFFAFAFA.toInt())
+            label(settings?.heading ?: "SALES", 43f, 119f, 65f, black)
+            label((settings?.ctaText ?: "SHOP NOW").uppercase(Locale.ROOT).toCharArray().joinToString(" "), 76f, 161.5f, 20f, android.graphics.Color.WHITE)
+            if (!productMode || productBitmap == null) {
+                if (settings == null) {
+                    label("B I G G E S T", 270f, 70f, 23f, black)
+                    label("S A L E S", 287f, 95f, 23f, black)
+                    label("UP TO", 302f, 120f, 23f, black)
+                    label("70%", 313f, 143f, 23f, black)
+                    label("OFF", 314f, 168f, 23f, black)
+                } else {
+                    label(settings.rightTitle, 270f, 80f, 19f, black)
+                    label(settings.rightSubtitle, 270f, 118f, 18f, black)
+                }
+            }
             paint.color = black
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 4.5f
             canvas.drawLine(30f, 3f, 20f, 200f, paint)
             canvas.restoreToCount(checkpoint)
         }
+    }
+    if (productMode && productBitmap != null) {
+        Image(
+            bitmap = productBitmap!!.asImageBitmap(),
+            contentDescription = settings?.productName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.align(Alignment.CenterEnd)
+                .fillMaxWidth(0.43f)
+                .height(205.dp)
+                .padding(end = 6.dp)
+        )
+    }
     }
 }
 
