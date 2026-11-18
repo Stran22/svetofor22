@@ -204,3 +204,7 @@
 - `/tmp/svet22-deploy-20261118/ApiController.php` — PHP 8.5 lint OK.
 - `/tmp/svet22-deploy-20261118/CategoryVisibilityService.php` — PHP 8.5 lint OK.
 - Production не заменён; следующий шаг — проверка связей и методов.
+
+## 2026-11-18 — подтверждены связи подготовленных PHP-файлов
+- grep временных файлов подтвердил `saveVisibility`, `show_price_stock`, `hide_store_stock`, `CategoryVisibilityService::all/forCategory` и использование сервиса в API.
+- Новые файлы ещё не установлены на production; следующий шаг — сравнение публичных методов старых и новых контроллеров.
