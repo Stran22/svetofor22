@@ -88,3 +88,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — production branches/stock counts
 Пользователь выполнил read-only запрос `SELECT b.id,b.code,b.name,b.is_active,COUNT(s.id) AS stock_records FROM branches b LEFT JOIN stock s ON s.branch_id=b.id GROUP BY b.id,b.code,b.name,b.is_active ORDER BY b.id`. Результат: `1 / 01 / На Волочаевской / 1 / 4`, `2 / 02 / на Иркутской / 1 / 4`, `3 / 03 / На Байкальском / 1 / 4`. Все 3 филиала активны, по 4 записи stock на филиал, всего 12. Совпадение product_id между филиалами пока не подтверждено.
+
+### 2026-11-18 — сверка остатков всех активных товаров
+Пользователь выполнил read-only SQL для активных `products` с `LEFT JOIN stock` по активным `branches`. Получено 4 товара, у каждого `branches_with_stock=3`: ID 5 «Молоко 3,2%» — 3 филиала с положительным остатком, 0 с нулевым; ID 6 «Кефир 1%» — 3/0; ID 7 «Хлеб белый, 400 гр» — 2/1; ID 8 «Сахар 1 кг» — 3/0. На момент запроса нет товара с нулевым остатком во всех 3 филиалах; `can_track` должен быть false для всех четырёх. Запрос не изменял данные.
