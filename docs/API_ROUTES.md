@@ -107,3 +107,6 @@
 
 ### 2026-11-18 — маршрут группового сохранения (план production)
 В production есть шесть маршрутов `/admin/categories` (GET index, POST create, POST `/{id}/toggle`, POST `/{id}/delete`, GET `/{id}/edit`, POST `/{id}/edit`), но нет `POST /admin/categories/visibility`. Для нового `AdminCategoriesController::saveVisibility()` требуется вставить маршрут после `POST /admin/categories` и перед параметризованными. **Пока не установлен на production.**
+
+### 2026-11-18 — production маршрут групповой видимости установлен
+`POST /admin/categories/visibility` → `AdminCategoriesController::saveVisibility()` точечно добавлен пользователем в production `bootstrap/app.php` после POST `/admin/categories`. PHP 8.5 lint прошёл. **Обработчик ещё не развёрнут; маршрут не готов к использованию до обновления AdminCategoriesController.** Резервная копия `bootstrap/app.php.bak-20261118`.
