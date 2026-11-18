@@ -164,3 +164,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — production CategoryVisibilityService установлен
 Пользователь установил `/tmp/svet22-deploy-20261118/CategoryVisibilityService.php` в `backend/app/Services/CategoryVisibilityService.php` через `install -m 664`. Вывод: `No syntax errors detected in app/Services/CategoryVisibilityService.php`, `-rw-rw-r-- 1 prorock prorock 1,6K ноя 18 13:30`. Контроллеры production пока не заменены; их backups `.bak-20261118` готовы. Следующий шаг — установить оба контроллера, проверить lint и три API endpoints, не менять DB.
+
+### 2026-11-18 — production контроллеры установлены
+Пользователь выполнил `install -m 664` для `/tmp/svet22-deploy-20261118/AdminCategoriesController.php` → `backend/app/Controllers/AdminCategoriesController.php` и `ApiController.php` → `backend/app/Controllers/ApiController.php`. Оба `/opt/php85/bin/php -l` успешны (`No syntax errors detected`). `CategoryVisibilityService.php` установлен ранее, bootstrap маршрут `/admin/categories/visibility` установлен ранее. Backup двух контроллеров `.bak-20261118` и bootstrap сохранены. **Следующий шаг — проверить production GET API после деплоя; пока не менять `show_price_stock`.**
