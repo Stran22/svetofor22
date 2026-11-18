@@ -246,8 +246,7 @@ fun ProductDetailScreen(
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             Text(
-                text = if (product.hideStoreStock || detailSettings?.hideStoreStock == true) "Цена скрыта"
-                else product.price
+                text = product.price
                     ?.takeIf { it.isNotBlank() }
                     ?.let { "$it ₽" }
                     ?: "Цена не указана",
