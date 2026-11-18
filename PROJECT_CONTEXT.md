@@ -83,3 +83,6 @@
 
 ### 2026-11-18 — исправление после ревизии патча
 Повторно проверен GitHub `backend/app/Controllers/AdminCategoriesController.php`: первоначальный патч содержал двойное присваивание `$showPriceStock` в `create()` и не содержал присваивания в `update()`. Исправлено коммитом `783e0b81ac6ca0f4e7e7f59aa0dcdc2e1470f7e9`: по одному присваиванию в каждом методе. PHP lint/функциональные тесты ещё не выполнены, на production не развёрнуто.
+
+### 2026-11-18 — PHP lint исправленного контроллера успешно пройден
+Пользователь выполнил в терминале ISPmanager `/opt/php85/bin/php -l /tmp/svet22_AdminCategoriesController_check.php` после скачивания файла из коммита `783e0b81ac6ca0f4e7e7f59aa0dcdc2e1470f7e9`. Результат: `No syntax errors detected in /tmp/svet22_AdminCategoriesController_check.php`. Это **только синтаксическая проверка**, не тест БД/маршрутов/форм. Production контроллер не заменён. Следующий шаг: проверить наличие маршрута POST `/admin/categories/visibility` в production `backend/bootstrap/app.php` и при необходимости избежать 404 групповой формы.
