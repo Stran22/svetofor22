@@ -77,3 +77,6 @@
 
 ### Проверены `all()/one()/fields()` production (2026-11-18)
 `all()` SELECT id,parent_id,name,slug,sort_order,image_url,is_active (нет `show_price_stock`); `one()` SELECT * (поле есть); `fields()` валидирует name/parent/sort/HTTPS image и возвращает 4 элемента (не принимает checkbox). Теперь известны форма создания, форма редактирования, SQL INSERT/UPDATE и вспомогательные методы. Готовить минимальный патч на базе реально работающей версии, избегая перезаписи иных функций GitHub-версией; продумать API и Android отдельно. Поле `show_price_stock` уже есть в БД, все 102 = 1.
+
+### Выполнен первый патч админки (2026-11-18)
+В `Stran22/svetofor22`, ветка `feature/excel-column-mapping`, коммит `959e9ee`: исправлен GitHub `backend/app/Controllers/AdminCategoriesController.php` для production столбца `show_price_stock`: формы создания/редактирования, SQL INSERT/UPDATE, список и групповая настройка. **НЕ развёрнуто на сервере, НЕ проверено php -l/тестами.** GitHub-версия имеет дополнительный `saveVisibility()` и групповую форму, отсутствующие в присланных фрагментах production: при деплое нужна сверка маршрута `/admin/categories/visibility` и совместимости остального приложения. Не применять GitHub миграции вслепую. Следующее: проверить синтаксис, API, затем инструкции по точечному деплою.
