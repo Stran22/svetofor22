@@ -115,3 +115,6 @@
 - `GET /admin/categories/visibility` → `AdminCategoriesController::visibilityPage`, только роль `admin`, отдельная страница с флажками.
 - `POST /admin/categories/visibility` → `saveVisibility`, CSRF, сохраняет `categories.show_price_stock` и перенаправляет на `GET /admin/categories/visibility`.
 - Ссылка в боковом меню `AdminView`; страница `/admin/categories` больше не содержит массовую форму видимости. Создание/редактирование категории не меняет `show_price_stock` (новая категория получает DB default 1).
+
+### 2026-11-18 — новое обязательное поведение hide_store_stock (ТЗ, не реализовано)
+Для `GET /api/v1/products` и `GET /api/v1/products/{id}` флаг `hide_store_stock=true` означает: **основная цена товара остаётся доступной для отображения** на главной, в каталоге и карточке; остатки скрываются, а Android полностью скрывает блок «Цены и остатки в филиалах». `false` — обычное отображение. Сохранить наследование флага от родителя. Текущий API маскирует `price` и требует корректировки; при проектировании отличать основную цену от детализации по филиалам. Не считать реализованным до проверок.
