@@ -140,3 +140,6 @@ Production GET `/api/v1/products/6` HTTP/2 200: кефир ID 6, category_id 55,
 
 ### 2026-11-18 — baseline API категорий подтверждён
 GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, список с `id,parent_id,name,slug,image_url,sort_order`. Иерархия ID 52→55/54. Нет `hide_store_stock`; новая GitHub версия API ещё не развёрнута. Все три read-only endpoint baseline (`categories`, `products`, `products/6`) проверены. Далее требуется согласовать версию production bootstrap, миграции/сервисы и сделать резервные копии до установки.
+
+### 2026-11-18 — production bootstrap route check
+Пользователь выполнил `grep -n -E 'categories/visibility|AdminCategoriesController|ApiController' /var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/bootstrap/app.php`. Вывод: строка 6 `use Svet22\\Controllers\\ApiController;`, строка 29 `$api = new ApiController($db);`, строка 31 `$adminCategories = new \\Svet22\\Controllers\\AdminCategoriesController($db);`. `categories/visibility` не найден. Не делать вывод, что все маршруты категорий отсутствуют: regex их не охватывал. Нужно получить точный блок маршрутов перед точечной вставкой; не заменять bootstrap целиком. Production не изменён.
