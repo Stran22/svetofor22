@@ -42,6 +42,8 @@ try {
     $router->get('/api/v1/featured-products', [new \Svet22\Controllers\FeaturedProductsController($db), 'api']);
     $contests = new \Svet22\Controllers\ContestController($db);
     $router->get('/api/v1/home-promotions', [$contests, 'home']);
+    $salesBanner = new \Svet22\Controllers\SalesBannerController($db);
+    $router->get('/api/v1/sales-banner', [$salesBanner, 'api']);
     $router->get('/api/v1/contests', [$contests, 'index']);
     $router->get('/api/v1/contests/{id}', [$contests, 'show']);
     $router->post('/api/v1/contests/{id}/join', [$contests, 'join']);
@@ -83,6 +85,10 @@ try {
     $router->post('/admin/contests/{id}/image/banner', [new \Svet22\Controllers\AdminContestImageController($db), 'uploadBanner']);
     $router->post('/admin/contests/{id}/image/detail', [new \Svet22\Controllers\AdminContestImageController($db), 'uploadDetail']);
     $router->get('/admin/contests/{id}/participants', [$adminContests, 'participants']);
+    $router->get('/admin/sales-banner', [$salesBanner, 'edit']);
+    $router->post('/admin/sales-banner', [$salesBanner, 'save']);
+    $router->post('/admin/sales-banner/image', [$salesBanner, 'upload']);
+    $router->post('/admin/sales-banner/image/remove', [$salesBanner, 'removeImage']);
     $router->get('/admin/featured', [new \Svet22\Controllers\FeaturedProductsController($db), 'index']);
     $router->post('/admin/featured/{id}', [new \Svet22\Controllers\FeaturedProductsController($db), 'save']);
     $router->get('/admin/products', [$admin, 'products']);
