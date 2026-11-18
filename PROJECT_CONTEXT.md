@@ -104,3 +104,6 @@ Production `ApiController::products()` напрямую возвращает `s.
 
 ### 2026-11-18 — production stock schema проверена
 `SHOW COLUMNS FROM stock` в `prorock_law` подтверждает `price decimal(12,2) NOT NULL`, `quantity decimal(12,3) NOT NULL DEFAULT 0.000`, `product_id`, `branch_id`, `imported_on`, `updated_at`. Для категорий с запретом показа скрывать `price`/`quantity` в API-ответе (`null`), не изменяя stock или импорт XLSX. Сохранять филиалы, поиск, пагинацию. Следующий этап — реализация маскировки в GitHub `ApiController.php`, затем lint и тесты; production пока не менять.
+
+### 2026-11-18 — production branches schema подтверждена
+`SHOW COLUMNS FROM branches` подтвердил `id`, `code` (UNIQUE), `name`, `address`, `is_active tinyint(1) NOT NULL DEFAULT 1`, `created_at`, `updated_at`. Правило `can_track`: есть хотя бы один активный филиал; для каждого активного филиала известен stock.quantity; во всех он равен 0. GitHub `ApiController::product()` уже содержит SQL с `branches b WHERE b.is_active=1` и подсчётами `branch_count`, `known_count`, `zero_count`, но production API не содержит `can_track`. Требуется проверка/доработка и развёртывание; production не изменён.
