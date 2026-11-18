@@ -48,6 +48,7 @@ try {
     $router->get('/api/v1/contests/{id}', [$contests, 'show']);
     $router->post('/api/v1/contests/{id}/join', [$contests, 'join']);
     $router->post('/api/v1/analytics/search', [new \Svet22\Controllers\SearchAnalyticsController($db), 'record']);
+    $router->post('/api/v1/analytics/event', [new \Svet22\Controllers\VisitorAnalyticsController($db), 'record']);
     $router->get('/api/v1/products/{id}', [$api, 'product']);
     $router->get('/api/v1/products/{id}/reviews', [$reviews, 'index']);
     $router->post('/api/v1/products/{id}/reviews', [$reviews, 'create']);
@@ -67,6 +68,7 @@ try {
     $router->post('/admin/login', [$admin, 'login']);
     $router->post('/admin/logout', [$admin, 'logout']);
     $router->get('/admin', [new \Svet22\Controllers\AdminInsightsController($db), 'index']);
+    $router->get('/admin/analytics', [new \Svet22\Controllers\AdminTrafficAnalyticsController($db), 'index']);
     $router->get('/admin/import', [$admin, 'importPage']);
     $router->post('/admin/import/preview', [$admin, 'previewImport']);
     $router->post('/admin/import/confirm', [$admin, 'import']);
