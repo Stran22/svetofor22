@@ -110,3 +110,8 @@
 
 ### 2026-11-18 — production маршрут групповой видимости установлен
 `POST /admin/categories/visibility` → `AdminCategoriesController::saveVisibility()` точечно добавлен пользователем в production `bootstrap/app.php` после POST `/admin/categories`. PHP 8.5 lint прошёл. **Обработчик ещё не развёрнут; маршрут не готов к использованию до обновления AdminCategoriesController.** Резервная копия `bootstrap/app.php.bak-20261118`.
+
+### 2026-11-18 — отдельный раздел видимости
+- `GET /admin/categories/visibility` → `AdminCategoriesController::visibilityPage`, только роль `admin`, отдельная страница с флажками.
+- `POST /admin/categories/visibility` → `saveVisibility`, CSRF, сохраняет `categories.show_price_stock` и перенаправляет на `GET /admin/categories/visibility`.
+- Ссылка в боковом меню `AdminView`; страница `/admin/categories` больше не содержит массовую форму видимости. Создание/редактирование категории не меняет `show_price_stock` (новая категория получает DB default 1).
