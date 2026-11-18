@@ -21,5 +21,7 @@ data class Product(
     val price: String? = null,
     val quantity: String? = null,
     @SerializedName("imported_on")
-    val importedOn: String? = null
+    val importedOn: String? = null,
+    @SerializedName("hide_store_stock")
+    val hideStoreStock: Boolean = false
 )
