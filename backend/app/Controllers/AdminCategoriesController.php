@@ -61,7 +61,7 @@ final class AdminCategoriesController
             $tree[] = $category;
         }
         $csrf = AdminView::e($this->auth->csrfToken());
-        $content = '<section class="card"><p>Разделы и подразделы каталога. Отключение не удаляет товары.</p></section>';
+        $content = '<section class="card"><p>Разделы и подразделы каталога. Отключение не удаляет товары. <a href="/admin/categories/visibility">Настройки видимости цен и остатков</a> находятся в отдельном разделе.</p></section>';
         if ($admin['role'] === 'admin') {
             $content .= '<section class="card"><h2>Добавить категорию или подкатегорию</h2>'
                 . '<form method="post" action="/admin/categories"><input type="hidden" name="csrf_token" value="' . $csrf . '">'
@@ -70,7 +70,6 @@ final class AdminCategoriesController
                 . $this->options($categories, null)
                 . '</select></label><label>Порядок<input type="number" name="sort_order" value="0"></label>'
                 . '<label>URL изображения (необязательно)<input name="image_url" maxlength="1000" type="url"></label>'
-                . '<label><input type="checkbox" name="show_price_stock" value="1" checked> Показывать цены и остатки товаров</label>'
                 . '<button type="submit">Добавить</button></form></section>';
         }
         $rows = [];
@@ -104,22 +103,53 @@ final class AdminCategoriesController
             . '<a href="/admin/categories?sort=name&amp;dir=asc">Название А–Я</a> · '
             . '<a href="/admin/categories?sort=name&amp;dir=desc">Название Я–А</a>'
             . ' <span class="muted">(сейчас: ' . ($sortBy === 'id' ? 'ID' : 'Название') . ', ' . ($direction === 'asc' ? 'по возрастанию' : 'по убыванию') . ')</span></section>';
-        if ($admin['role'] === 'admin') {
-            $content .= '<section class="card"><h2>Отображение в карточке товара</h2>'
-                . '<p class="muted">Отметьте категории, для которых нужно скрыть функции. Настройки распространяются на все вложенные подкатегории. Цены в каталоге остаются видимыми. Кнопка отслеживания управляется автоматически по остаткам.</p>'
-                . '<form method="post" action="/admin/categories/visibility">'
-                . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
-                . '<div style="overflow-x:auto"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть цены и остатки</th></tr></thead><tbody>';
-            foreach ($tree as $category) {
-                $id = (int)$category['id'];
-                $label = str_repeat('— ', min((int)$category['_depth'], 12)) . $category['name'];
-                $content .= '<tr><td>' . AdminView::e($label) . '</td>'
-                    . '<td><input type="checkbox" name="hide_store_stock[]" value="' . $id . '"' . (!(int)$category['show_price_stock'] ? ' checked' : '') . '></td></tr>';
-            }
-            $content .= '</tbody></table></div><button type="submit">Сохранить настройки отображения</button></form></section>';
-        }
         $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Цены и остатки', 'Действия'], $rows);
         Response::html(AdminView::layout('Категории', $content, $this->adminLayout($admin)));
+    }
+
+    public function visibilityPage(Request $request): never
+    {
+        $admin = $this->auth->requireRole('admin');
+        $categories = $this->all();
+        $byParent = [];
+        $known = [];
+        foreach ($categories as $category) $known[(int)$category['id']] = true;
+        foreach ($categories as $category) {
+            $parent = $category['parent_id'] === null ? 0 : (int)$category['parent_id'];
+            if ($parent !== 0 && !isset($known[$parent])) $parent = 0;
+            $byParent[$parent][] = $category;
+        }
+        $tree = [];
+        $visited = [];
+        $walk = function (int $parent, int $depth) use (&$walk, &$tree, &$visited, $byParent): void {
+            foreach ($byParent[$parent] ?? [] as $category) {
+                $id = (int)$category['id'];
+                if (isset($visited[$id])) continue;
+                $visited[$id] = true;
+                $category['_depth'] = $depth;
+                $tree[] = $category;
+                $walk($id, $depth + 1);
+            }
+        };
+        $walk(0, 0);
+        foreach ($categories as $category) {
+            if (!isset($visited[(int)$category['id']])) $walk((int)$category['id'], 0);
+        }
+        $csrf = AdminView::e($this->auth->csrfToken());
+        $content = '<section class="card"><p>Отметьте категории, в которых нужно скрыть цены и остатки. Ограничение родительской категории распространяется на все подкатегории.</p>'
+            . '<p class="muted">Изменения вступают в силу после сохранения. Управление названиями и структурой — в разделе <a href="/admin/categories">Категории</a>.</p></section>'
+            . '<section class="card"><form method="post" action="/admin/categories/visibility">'
+            . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
+            . '<div class="table-wrap"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть цены и остатки</th></tr></thead><tbody>';
+        foreach ($tree as $category) {
+            $id = (int)$category['id'];
+            $label = str_repeat('— ', min((int)$category['_depth'], 12)) . $category['name'];
+            $content .= '<tr><td>' . AdminView::e($label) . '</td>'
+                . '<td><input type="checkbox" name="hide_store_stock[]" value="' . $id . '"'
+                . (!(int)$category['show_price_stock'] ? ' checked' : '') . '></td></tr>';
+        }
+        $content .= '</tbody></table></div><button type="submit">Сохранить настройки</button></form></section>';
+        Response::html(AdminView::layout('Видимость цен и остатков', $content, $this->adminLayout($admin)));
     }
 
     public function saveVisibility(Request $request): never
@@ -158,7 +188,7 @@ final class AdminCategoriesController
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;
         }
-        Response::redirect('/admin/categories');
+        Response::redirect('/admin/categories/visibility');
     }
 
     public function edit(Request $request, array $params): never
@@ -177,7 +207,6 @@ final class AdminCategoriesController
             . '</select></label>'
             . '<label>Порядок<input type="number" name="sort_order" value="' . (int)$category['sort_order'] . '"></label>'
             . '<label>URL изображения<input type="url" name="image_url" maxlength="1000" value="' . AdminView::e($category['image_url']) . '"></label>'
-            . '<label><input type="checkbox" name="show_price_stock" value="1"' . ((int)$category['show_price_stock'] ? ' checked' : '') . '> Показывать цены и остатки товаров</label>'
             . '<p class="muted">URL-ключ сохраняется при переименовании, чтобы не ломать существующие ссылки.</p>'
             . '<button type="submit">Сохранить</button> <a href="/admin/categories">Отмена</a></form></section>';
         Response::html(AdminView::layout('Редактирование категории', $content, $this->adminLayout($admin)));
@@ -189,10 +218,9 @@ final class AdminCategoriesController
         $data = $request->post();
         $this->csrf($data);
         [$name, $parent, $sort, $image] = $this->fields($data);
-        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
         $slug = $this->uniqueSlug($name, $parent);
-        $stmt = $this->db->prepare('INSERT INTO categories (name, parent_id, slug, sort_order, image_url, show_price_stock) VALUES (?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$name, $parent, $slug, $sort, $image, $showPriceStock]);
+        $stmt = $this->db->prepare('INSERT INTO categories (name, parent_id, slug, sort_order, image_url) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute([$name, $parent, $slug, $sort, $image]);
         $this->auth->audit((int)$admin['id'], 'category.create', 'category', (int)$this->db->lastInsertId(), ['name'=>$name,'parent_id'=>$parent], $request->clientIp());
         Response::redirect('/admin/categories');
     }
@@ -205,12 +233,11 @@ final class AdminCategoriesController
         $id = (int)$params['id'];
         if (!$this->one($id)) Response::html('Категория не найдена', 404);
         [$name, $parent, $sort, $image] = $this->fields($data);
-        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
         if ($parent === $id || ($parent !== null && $this->isDescendant($parent, $id))) {
             Response::html('Нельзя переместить категорию внутрь самой себя или её подраздела.', 422);
         }
-        $stmt = $this->db->prepare('UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=?, show_price_stock=? WHERE id=?');
-        $stmt->execute([$name, $parent, $sort, $image, $showPriceStock, $id]);
+        $stmt = $this->db->prepare('UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=? WHERE id=?');
+        $stmt->execute([$name, $parent, $sort, $image, $id]);
         $this->auth->audit((int)$admin['id'], 'category.update', 'category', $id, ['name'=>$name,'parent_id'=>$parent], $request->clientIp());
         Response::redirect('/admin/categories');
     }
