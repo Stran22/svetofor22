@@ -191,3 +191,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — резервные копии production файлов подтверждены
 Пользователь выполнил backup в `~/svet22-backup-menu-20261118` (домашний каталог пользователя prorock). Вывод `ls -lh`: `AdminCategoriesController.php` 21K, `AdminView.php` 7.3K, `app.php` 6.8K, владелец prorock. Все три файла сохранены; production ещё не заменён. Следующий шаг — установка подготовленных PHP файлов из `/tmp/svet22-menu-20261118` с повторным lint, затем проверка страницы в браузере.
+
+### 2026-11-18 — отдельное меню видимости установлено на production
+Пользователь выполнил `install -m 664` трёх staging файлов в `backend/app/Controllers/AdminCategoriesController.php`, `backend/app/Views/AdminView.php`, `backend/bootstrap/app.php`. После установки `/opt/php85/bin/php -l` для всех трёх вернул `No syntax errors detected`. Резервные копии находятся в `~/svet22-backup-menu-20261118`. Изменения БД не производились. HTTP/браузерная проверка GET `/admin/categories/visibility`, отображение меню и сохранение формы пока не подтверждены. Следующий шаг — открыть страницу в браузере под ролью admin и проверить её без изменения настроек.
