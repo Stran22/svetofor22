@@ -255,3 +255,7 @@
 - Staging `AdminView.php` скачан по SHA коммита `0eb83fdc`; строки 24–26 содержат исправленную конкатенацию пункта меню.
 - PHP 8.5 lint `AdminView.php`: `No syntax errors detected` (подтверждено пользователем).
 - `app.php` ещё не проверен; production не изменён.
+
+## 2026-11-18 — staging routes lint confirmed
+- `app.php`: PHP 8.5 lint OK; GET `/admin/categories/visibility` (строка 93), POST `/admin/categories/visibility` (строка 95).
+- Все три staging PHP файла теперь прошли lint; установка на production ещё не выполнена.
