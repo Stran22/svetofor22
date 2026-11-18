@@ -83,3 +83,6 @@
 
 ### Текущий production-ответ GET `/api/v1/products/{id}` (18.11.2026)
 Фактический серверный метод `ApiController::product()` возвращает поля товара `id`, `barcode`, `article`, `name`, `category_id`, `manufacturer`, `unit`, `image_url`, `description`; массив `branches` с `branch_id`, `price`, `quantity`, `imported_on`, `updated_at` из `stock` **без фильтра активных филиалов**; объект `reviews` с `reviews_count`, `rating` по опубликованным отзывам. В предоставленном коде нет `can_track`, `hide_store_stock`. 404: `PRODUCT_NOT_FOUND`. Это описание **production на момент проверки**, не заменяет контракт GitHub. При синхронизации сохранить поля, добавить проверку активных филиалов и новые флаги без поломки Android.
+
+### Production админка категорий — запись поля (18.11.2026)
+Серверный `AdminCategoriesController::update()` делает `UPDATE categories SET name=?, parent_id=?, sort_order=?, image_url=? WHERE id=?`; `show_price_stock` не обновляется. `create()` делает `INSERT INTO categories (name, parent_id, slug, sort_order, image_url) VALUES (...)`, полагаясь на DEFAULT 1 для `show_price_stock`. В HTML формы `edit()` чекбокса нет. Планируем использовать существующий маршрут POST `/admin/categories/{id}/edit` и существующий столбец `show_price_stock`, без добавления второго маршрута, если нет необходимости.
