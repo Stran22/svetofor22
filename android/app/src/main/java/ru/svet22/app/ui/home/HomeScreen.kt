@@ -374,14 +374,14 @@ private fun ProductCard(product: Product, onClick: () -> Unit) {
             Spacer(Modifier.height(9.dp))
             Surface(color = Yellow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "${product.price} ₽",
+                    if (product.hideStoreStock) "Цена скрыта" else product.price?.let { "$it ₽" } ?: "Цена не указана",
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                     color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp
                 )
             }
             Spacer(Modifier.height(7.dp))
             Text(
-                product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
+                if (product.hideStoreStock) "Остаток скрыт" else product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
                 color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -444,7 +444,7 @@ private fun FeaturedTile(product: Product, onClick: () -> Unit, modifier: Modifi
             color = Yellow, shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                (product.price ?: "—") + " ₽",
+                if (product.hideStoreStock) "Цена скрыта" else product.price?.let { "$it ₽" } ?: "Цена не указана",
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 9.dp),
                 fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 1, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
