@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -524,19 +525,19 @@ private fun SalesPromoBanner(
                 paint.strokeWidth = width
                 canvas.drawPath(path, paint)
             }
-            fun label(text: String, x: Float, y: Float, size: Float, color: Int, tracking: Float = 0f) {
+            fun label(text: String, x: Float, y: Float, size: Float, color: Int, tracking: Float = 0f, headingFont: Boolean = false) {
                 paint.style = Paint.Style.FILL
                 paint.color = color
                 paint.textSize = size
-                paint.typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+                paint.typeface = Typeface.create(if (headingFont) "sans-serif-black" else "sans-serif-condensed", Typeface.BOLD)
                 paint.letterSpacingCompat(text, x, y, tracking, canvas)
             }
             val black = android.graphics.Color.BLACK
             polygon(floatArrayOf(30f, 5f, 20f, 200f, 440f, 170f, 440f, 55f), black, true, 5f)
             polygon(floatArrayOf(5f, 31f, 5f, 185f, 410f, 205f, 430f, 10f), 0x33000000)
             polygon(floatArrayOf(5f, 31f, 5f, 180f, 410f, 200f, 430f, 10f), 0xFFFDD808.toInt())
-            label(settings?.heading ?: "SALES", 43f, 122f, 65f, 0xFFFAFAFA.toInt())
-            label(settings?.heading ?: "SALES", 43f, 119f, 65f, black)
+            label(settings?.heading ?: "SALES", 38f, 122f, 58f, 0xFFFAFAFA.toInt(), headingFont = true)
+            label(settings?.heading ?: "SALES", 38f, 119f, 58f, black, headingFont = true)
             label((settings?.ctaText ?: "SHOP NOW").uppercase(Locale.ROOT).toCharArray().joinToString(" "), 76f, 161.5f, 20f, android.graphics.Color.WHITE)
             if (!productMode || productBitmap == null) {
                 if (settings == null) {
@@ -563,9 +564,9 @@ private fun SalesPromoBanner(
             contentDescription = settings?.productName,
             contentScale = ContentScale.Fit,
             modifier = Modifier.align(Alignment.CenterEnd)
-                .fillMaxWidth(0.43f)
-                .height(205.dp)
-                .padding(end = 6.dp)
+                .fillMaxWidth(0.49f)
+                .height(240.dp)
+                .offset(x = 8.dp, y = (-20).dp)
         )
     }
     }
