@@ -36,3 +36,14 @@ git branch --show-current
 git rev-parse HEAD
 ```
 Проверку `schema_migrations` выполнять через read-only запросы из `docs/DATABASE.md`. Deploy, изменение Cron и отправка push только с разрешения владельца.
+
+## Проверено по терминалу ISPmanager 2026-11-18 (без изменений на сервере)
+- Текущая папка терминала при проверке: `/var/www/prorock/data` (не корень сайта). Для команд использовать абсолютные пути или явный `cd`.
+- Путь сайта: `/var/www/prorock/data/www/baza.altaj-otdyh.ru/`.
+- Найден действующий на диске файл `backend/app/Controllers/AdminCategoriesController.php`; также существуют `backend/app/Controllers/ApiController.php`, `backend/app/Controllers/SubscriptionController.php` и другие контроллеры.
+- На диске отдельно есть `.deploy/backend/app/Controllers/AdminController.php` и `.deploy/backend/app/Controllers/ApiController.php`. **Не установлено**, какая копия реально подключена Apache: наличие файла не доказывает его использование.
+- В серверной папке Android найден `android/app/src/main/java/ru/svet22/app/MainActivity.kt`; grep показал код филиалов/остатков, но не показал строк подписки. Это не подтверждает соответствие серверной Android-копии актуальному GitHub или установленному APK.
+- Ранее подтверждено существование внешнего конфига `/var/www/prorock/data/secure/svet22/config.php`; секреты не читать и не публиковать. Для CLI, если требуется, `SVET_CONFIG_FILE` задаётся отдельно.
+- На сервере ранее наблюдались лишь файлы миграций `001_initial_schema.sql`, `002_admin_panel.sql`, `006_search_analytics.sql`, хотя в GitHub их больше. Не переносить и не запускать миграции автоматически.
+- База `prorock_law`: 28 таблиц, включая `categories`, `stock`, `subscriptions`, `excel_column_mappings`, `reviews`, `push_delivery_log`. По ранее полученному списку полей `categories` **не содержала** `hide_store_stock`; перепроверить `SHOW COLUMNS` непосредственно перед решением о миграции.
+- **Вывод:** GitHub и сервер могут находиться на разных версиях. До деплоя нужны read-only сравнение файлов, веб-корня, миграций и резервная копия. Действующий Android UI не заменять упрощённой серверной копией.
