@@ -150,3 +150,7 @@
 - Коммит `767aa0d`: маскировка `price`, `quantity`, `imported_on` в списке и `price`, `quantity`, `imported_on`, `updated_at` в карточке для скрытых категорий.
 - Возвращается `hide_store_stock`, учитывается наследование через сервис.
 - Открытый вопрос: косвенное раскрытие через сортировку/фильтры, lint/тесты и Android; production не изменён.
+
+## 2026-11-18 — PHP lint ApiController пройден
+- Вывод пользователя: `No syntax errors detected in /tmp/svet22_ApiController_check.php` (коммит `767aa0d`).
+- Функциональные тесты и развёртывание не выполнены.
