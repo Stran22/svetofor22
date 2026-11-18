@@ -92,3 +92,6 @@
 
 ### 2026-11-18 — production GET /api/v1/categories
 Из вывода production `ApiController::categories()`: `SELECT id, parent_id, name, slug, image_url, sort_order FROM categories WHERE is_active=1 ORDER BY sort_order,name`; `show_price_stock` в JSON не включён. GitHub `ApiController.php` уже содержит `CategoryVisibilityService` и возвращает `hide_store_stock`, но GitHub `CategoryVisibilityService.php` читает несуществующее в production `categories.hide_store_stock`. Нужно согласовать сервис с существующим `show_price_stock` и наследованием, затем проверить API продуктов и Android. Production пока не менялся.
+
+### 2026-11-18 — production GET /api/v1/products
+Из кода production `ApiController::products()` подтверждено: SELECT возвращает `s.price`, `s.quantity`, `s.imported_on` напрямую через LEFT JOIN stock, без `show_price_stock`; поиск по имени, фильтры branch/category/in_stock, сортировка name/price_asc/price_desc, пагинация. Скрытие только на Android не защищает API. Требуется серверная маскировка цены/остатка с наследованием от родителей и анализ косвенного раскрытия через фильтр/сортировку.
