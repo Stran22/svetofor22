@@ -15,6 +15,7 @@ import ru.svet22.app.data.model.Category
 import ru.svet22.app.data.model.Product
 import ru.svet22.app.data.repository.ProductRepository
 import ru.svet22.app.data.repository.SearchAnalyticsRepository
+import ru.svet22.app.data.repository.VisitorAnalyticsRepository
 
 class CatalogViewModel(
     application: Application
@@ -93,6 +94,9 @@ class CatalogViewModel(
     }
 
     fun selectCategory(category: Category) {
+        viewModelScope.launch {
+            VisitorAnalyticsRepository.record(getApplication(), "category_click", category.id, selectedBranch?.id)
+        }
         selectedCategory = category
         searchAnalyticsJob?.cancel()
         search = ""
