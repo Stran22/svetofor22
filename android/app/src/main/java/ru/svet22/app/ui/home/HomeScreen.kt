@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package ru.svet22.app.ui.home
 
 import android.graphics.BitmapFactory
