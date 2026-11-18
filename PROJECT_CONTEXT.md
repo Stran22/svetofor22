@@ -125,3 +125,6 @@ Production `SHOW INDEX FROM stock`: UNIQUE `uq_stock_product_branch(product_id,b
 
 ### 2026-11-18 — PHP lint GitHub ApiController успешен
 Пользователь скачал GitHub `ApiController.php` коммита `767aa0d6f14618408f274444f95e375125f0efb6` во временный файл и выполнил `/opt/php85/bin/php -l /tmp/svet22_ApiController_check.php`: `No syntax errors detected in /tmp/svet22_ApiController_check.php`. Только синтаксическая проверка; production не развёрнут. Следующий шаг — закрыть косвенное раскрытие через сортировку и `in_stock`.
+
+### 2026-11-18 — GitHub API скрывает сортировку и in_stock
+Коммит `3a14c33` меняет `ApiController::products()`: формирует скрытые category_id из `CategoryVisibilityService`, сортирует по `CASE WHEN hidden THEN NULL ELSE s.price END` вместо реальной цены, при `in_stock=true` исключает скрытые категории. Это устраняет прямое раскрытие через sort/in_stock, но функциональные тесты и PHP lint этого коммита не выполнены. Production не менялся. Следующий шаг: PHP lint новой версии API, затем тесты и согласованный деплой.
