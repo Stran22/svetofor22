@@ -31,3 +31,10 @@
 
 ## Документация
 [БД](docs/DATABASE.md) · [API](docs/API_ROUTES.md) · [Окружение](docs/SERVER_CONFIG.md) · [Функции](docs/FEATURES.md) · [Правила](AGENTS.md) · [Изменения](CHANGELOG.md).
+
+## Дополнение 2026-11-18 — проверка реального сервера
+Пользователь предоставил результаты команд ISPmanager и фрагменты `AdminCategoriesController.php`, `ApiController.php`. В серверной версии `AdminCategoriesController` нет формы `hide_store_stock` и метода `saveVisibility`, а в `ApiController` карточка возвращает `branches` и `reviews`, но в предоставленном участке не возвращает `can_track`/`hide_store_stock`. В GitHub эти возможности **уже реализованы по исходникам**. Поэтому не создавать параллельное поле `show_price_stock`: использовать существующий контракт `hide_store_stock` после безопасной синхронизации версий.
+
+Путь сервера: `/var/www/prorock/data/www/baza.altaj-otdyh.ru/`; терминал стартует в `/var/www/prorock/data`. Есть отдельная папка `.deploy/`. На сервере Android `MainActivity.kt` выглядит как более простой клиент, тогда как GitHub содержит `ui/catalog/ProductDetailScreen.kt`. Состояние установленного APK и web-root пока не подтверждено.
+
+**Следующая задача:** установить активную точку входа Apache и фактическую версию PHP без записи на сервер; сравнить миграции и `SHOW COLUMNS FROM categories`, `SHOW CREATE TABLE subscriptions`, `schema_migrations`; проверить актуальный Android-исходник и CI. До этого не запускать `007_product_wide_subscriptions.sql` (удаляет подписки), не заменять production-файлы, не менять дизайн. Отдельно учесть возможную ошибку пагинации в старом серверном `ApiController::products`: `LIMIT` после `LEFT JOIN stock` ограничивает строки, не уникальные товары.
