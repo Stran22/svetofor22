@@ -98,3 +98,8 @@
 - Production `backend/bootstrap/app.php` не содержит POST `/admin/categories/visibility`, подтверждено grep пользователя.
 - GitHub `backend/bootstrap/app.php` уже содержит этот маршрут на `saveVisibility()`; дополнительный GitHub-патч не требуется.
 - Для работоспособности групповой формы при развёртывании понадобится согласованное изменение production bootstrap и контроллера. Production не менялся.
+
+## 2026-11-18 — аудит API категорий
+- Production `GET /api/v1/categories` не отдаёт `show_price_stock`.
+- В GitHub обнаружен `CategoryVisibilityService` с SQL на несовместимый столбец `hide_store_stock`; исправление сервиса необходимо до развёртывания.
+- Production не менялся.
