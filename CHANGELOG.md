@@ -188,3 +188,8 @@
 - Пользователь показал блок `bootstrap/app.php` с существующими шестью маршрутами категорий и остальными маршрутами админки.
 - Подтверждено отсутствие `POST /admin/categories/visibility`; запланирована точечная вставка после резервной копии и PHP lint, без перезаписи bootstrap.
 - Production пока не изменён.
+
+## 2026-11-18 — production: точечно добавлен маршрут видимости категорий
+- Пользователь добавил `POST /admin/categories/visibility` → `saveVisibility()` в `backend/bootstrap/app.php`.
+- PHP lint успешен (`No syntax errors detected`); backup `bootstrap/app.php.bak-20261118` подтверждён.
+- Пока контроллер на production не обновлён, новый маршрут нельзя использовать. Остальные файлы не изменялись.
