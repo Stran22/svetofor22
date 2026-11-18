@@ -107,3 +107,8 @@
 ## 2026-11-18 — аудит выдачи списка товаров
 - Production `GET /api/v1/products` отдаёт `s.price`, `s.quantity` без проверки категории. Есть фильтрация по наличию, сортировка по цене, поиск и пагинация.
 - Установлена необходимость серверной маскировки цен и остатков; Android-only скрытие недостаточно. Никаких production изменений.
+
+## 2026-11-18 — исправлен GitHub CategoryVisibilityService
+- На production `CategoryVisibilityService.php` отсутствует (подтверждено ls).
+- Коммит `c3f1b4b`: GitHub сервис читает `categories.show_price_stock`, рассчитывает `hide_store_stock = !show_price_stock || parent.hide_store_stock`.
+- Не развёрнуто, PHP lint и функциональные тесты ещё не выполнены.
