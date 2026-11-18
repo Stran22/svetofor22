@@ -63,7 +63,6 @@ final class ApiController
              ORDER BY sort_order, name'
         )->fetchAll();
 
-        $visibility = (new CategoryVisibilityService($this->db))->all();
         foreach ($rows as &$row) {
             $flags = $visibility[(int)$row['id']] ?? ['hide_store_stock' => false];
             $row['hide_store_stock'] = $flags['hide_store_stock'];
@@ -126,9 +125,23 @@ final class ApiController
             );
         }
 
+        // Masked categories must not reveal prices through ordering or stock filters.
+        $visibility = (new CategoryVisibilityService($this->db))->all();
+        $hiddenCategoryIds = [];
+        foreach ($visibility as $id => $flags) {
+            if ($flags['hide_store_stock']) {
+                $hiddenCategoryIds[] = (int)$id;
+            }
+        }
+        $hiddenSql = $hiddenCategoryIds
+            ? 'p.category_id IN (' . implode(',', $hiddenCategoryIds) . ')'
+            : '0=1';
+        $visibleSql = 'NOT (' . $hiddenSql . ')';
+        $safePrice = 'CASE WHEN ' . $hiddenSql . ' THEN NULL ELSE s.price END';
+
         $order = match ($sort) {
-            'price_asc' => 's.price ASC, p.name ASC',
-            'price_desc' => 's.price DESC, p.name ASC',
+            'price_asc' => $safePrice . ' ASC, p.name ASC',
+            'price_desc' => $safePrice . ' DESC, p.name ASC',
             default => 'p.name ASC',
         };
 
@@ -151,6 +164,8 @@ final class ApiController
         }
 
         if ($inStock === true) {
+            // A hidden category must not disclose availability via filtered results.
+            $where[] = $visibleSql;
             $where[] = 's.quantity > 0';
         }
 
