@@ -256,3 +256,9 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 В GitHub ветке `feature/excel-column-mapping` создана серверная основа: миграция `009_sales_banner_settings.sql`, контроллер `SalesBannerController.php`, маршруты `/api/v1/sales-banner` и `/admin/sales-banner` (+ POST сохранения/загрузки/удаления изображения), пункт админ-меню. Функции: текст/товар по ID, автоматическое фото либо отдельное прозрачное PNG/WebP, включение/выключение. **Ещё НЕ применено на production, не проверено PHP lint, Android ещё не подключён к API.** Следующий шаг — проверить PHP синтаксис и миграцию, безопасно развернуть сервер, затем реализовать Android-загрузку настроек и выступающее фото за жёлтый контур с кликом в карточку. Не создавать новых веток, не ломать конкурсы/подписки/VK/дизайн.
 
 Текущий этап: Android SALES интегрирован в ветке `feature/excel-column-mapping` на уровне исходного кода. API production возвращает `mode=product`, `product_id=6`, `image_url=/uploads/sales/1-080d8232cd26ca66.webp`. Следующее действие: Gradle build и тест APK на телефоне; не менять ветку.
+
+## Диагностика подписки 2026-11-18
+- Пользователь подтвердил `stock.quantity=0.000` для товара ID 6 во всех трёх активных филиалах; `subscriptions` для товара ID 6 пустая.
+- В production 15 users имеют действующие API-токены; 8 имеют FCM-токены. Причина неуспешной подписки пока не подтверждена ответом HTTP.
+- Удалена проверка `is_guest` в `SubscriptionController.php` (a41b3df); в `ProductDetailScreen.kt` удалено требование VK-входа для подписки (9e885dc). Обновление production PHP и Android APK следует проверить отдельно.
+- Следующий шаг: Git Pull, сборка/установка APK и проверка точного текста ошибки HTTP. Не менять остатки и FCM без подтверждения причины.
