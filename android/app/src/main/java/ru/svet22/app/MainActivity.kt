@@ -12,6 +12,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import ru.svet22.app.ui.splash.TrafficLightSplash
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.core.content.ContextCompat
@@ -181,10 +186,12 @@ class MainActivity : ComponentActivity() {
 
         // ===== НАЧАЛО БЛОКА: Основная тема приложения =====
         setContent {
+            var showStartupAnimation by remember { mutableStateOf(savedInstanceState == null) }
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    Box(Modifier.fillMaxSize()) {
                     // ===== НАЧАЛО БЛОКА: Запуск навигации =====
                     AppNavigation(
                         notificationTarget = notificationTarget.value,
@@ -195,6 +202,10 @@ class MainActivity : ComponentActivity() {
                         isSocialAuthenticated = isSocialAuthenticated.value
                     )
                     // ===== КОНЕЦ БЛОКА: Запуск навигации =====
+                        if (showStartupAnimation) {
+                            TrafficLightSplash(onFinished = { showStartupAnimation = false })
+                        }
+                    }
                 }
             }
         }
