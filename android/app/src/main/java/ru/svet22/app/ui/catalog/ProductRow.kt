@@ -66,14 +66,14 @@ fun ProductRow(
 
         Spacer(Modifier.height(3.dp))
 
-        Text(
-            text = if (product.hideStoreStock) "Остаток скрыт"
-            else formatQuantity(product.quantity)?.let {
-                "Остаток: $it"
-            } ?: "Наличие уточняется",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (!product.hideStoreStock) {
+            Text(
+                text = formatQuantity(product.quantity)?.let { "Остаток: $it" }
+                    ?: "Наличие уточняется",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Divider(
             modifier = Modifier.padding(top = 8.dp)
