@@ -101,3 +101,6 @@
 
 ### 2026-11-18 — baseline production GET /api/v1/products/6
 Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/products/6`: HTTP/2 200, `success:true`, `data.id=6`, `name="Кефир 1%"`, `category_id=55`, `branches` содержит филиал 1 price 74.00 quantity 5.000, филиал 2 price 75.12 quantity 12.000, филиал 3 price 78.00 quantity 3.000; `imported_on`/`updated_at` присутствуют, `reviews={reviews_count:0,rating:null}`, `meta:[]`. `hide_store_stock` и `can_track` в baseline отсутствуют. Сохранить `branches` и `reviews` при обновлении.
+
+### 2026-11-18 — baseline production GET /api/v1/categories
+Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/categories`; HTTP/2 200, `success:true`, `data` — массив активных категорий с полями `id,parent_id,name,slug,image_url,sort_order`, `meta:[]`. Примеры иерархии: ID 52 «Молочные продукты» (`parent_id=null`), ID 55 «Молоко и сливки» (`parent_id=52`), ID 54 «Кисломолочные продукты» (`parent_id=52`). `hide_store_stock` отсутствует в production baseline. Полный вывод пользователь приложил 2026-11-18. Никаких production изменений.
