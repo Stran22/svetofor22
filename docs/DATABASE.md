@@ -85,3 +85,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — подтверждена production таблица branches
 Пользователь выполнил в phpMyAdmin `SHOW COLUMNS FROM branches` (БД `prorock_law`): `id bigint unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT`, `code varchar(50) NOT NULL UNIQUE`, `name varchar(190) NOT NULL`, `address varchar(500) NULL`, `is_active tinyint(1) NOT NULL DEFAULT 1` (индекс), `created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP`, `updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`. Для вычисления отсутствия товара учитывать только `branches.is_active=1`; отсутствующая запись stock для активного филиала не доказывает нулевой остаток.
+
+### 2026-11-18 — production branches/stock counts
+Пользователь выполнил read-only запрос `SELECT b.id,b.code,b.name,b.is_active,COUNT(s.id) AS stock_records FROM branches b LEFT JOIN stock s ON s.branch_id=b.id GROUP BY b.id,b.code,b.name,b.is_active ORDER BY b.id`. Результат: `1 / 01 / На Волочаевской / 1 / 4`, `2 / 02 / на Иркутской / 1 / 4`, `3 / 03 / На Байкальском / 1 / 4`. Все 3 филиала активны, по 4 записи stock на филиал, всего 12. Совпадение product_id между филиалами пока не подтверждено.
