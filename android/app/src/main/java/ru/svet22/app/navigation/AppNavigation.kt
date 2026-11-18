@@ -23,6 +23,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import ru.svet22.app.data.repository.VisitorAnalyticsRepository
 import ru.svet22.app.data.repository.ProductRepository
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
@@ -85,6 +87,19 @@ fun AppNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     var selectedProduct by remember { mutableStateOf<Product?>(null) }
+
+    LaunchedEffect(appContext) {
+        // Give guest registration a moment to establish its bearer token.
+        delay(2500)
+        VisitorAnalyticsRepository.record(appContext, "visit")
+    }
+    LaunchedEffect(currentRoute, selectedProduct?.id) {
+        if (currentRoute == AppRoutes.PRODUCT_DETAIL) {
+            selectedProduct?.let { product ->
+                VisitorAnalyticsRepository.record(appContext, "product_view", product.id, catalogViewModel.selectedBranch?.id)
+            }
+        }
+    }
 
     LaunchedEffect(notificationTarget) {
         val target = notificationTarget ?: return@LaunchedEffect
