@@ -188,3 +188,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — staging app.php lint и маршруты подтверждены
 Пользователь выполнил `/opt/php85/bin/php -l /tmp/svet22-menu-20261118/app.php`: `No syntax errors detected`. `grep -n categories/visibility` подтвердил GET маршрут line 93 (`visibilityPage`) и POST line 95 (`saveVisibility`). Все 3 staging PHP файла прошли lint: `AdminCategoriesController.php`, `AdminView.php`, `app.php`. Production ещё не обновлён. Следующий шаг: создать резервные копии трёх действующих production файлов перед установкой.
+
+### 2026-11-18 — резервные копии production файлов подтверждены
+Пользователь выполнил backup в `~/svet22-backup-menu-20261118` (домашний каталог пользователя prorock). Вывод `ls -lh`: `AdminCategoriesController.php` 21K, `AdminView.php` 7.3K, `app.php` 6.8K, владелец prorock. Все три файла сохранены; production ещё не заменён. Следующий шаг — установка подготовленных PHP файлов из `/tmp/svet22-menu-20261118` с повторным lint, затем проверка страницы в браузере.
