@@ -325,3 +325,8 @@
 - `AdminCategoriesController`: текст настроек поясняет новую логику.
 - Детальный API `branches` пока продолжает маскировать цены/остатки, не предназначенные для отображения в скрытом блоке.
 - Статус: коммиты внесены, **не проверены сборкой, PHP lint и тестами; production и APK не обновлены**.
+
+## 2026-11-18 — production: подтверждён API скрытых остатков
+- Пользователь установил `ApiController.php`, PHP 8.5 lint успешен.
+- GET `/api/v1/products?branch_id=1&category_id=55&per_page=20` при скрытой категории 55: ID 6 цена 74.00, ID 5 цена 88.00; у обоих `quantity=null`, `imported_on=null`, `hide_store_stock=true`.
+- Проверено фактическим JSON-ответом production; детальный API и Android ещё не проверены.
