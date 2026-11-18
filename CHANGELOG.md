@@ -33,3 +33,7 @@
 - Из вывода `grep` пользователя зафиксированы фактически зарегистрированные API и административные маршруты каталога, отзывов, подписок, акций, конкурсов и рекомендуемых товаров.
 - В выборке нет `/admin/categories/visibility`, присутствующего в GitHub; требуется дальнейшая сверка.
 - Обновлены `docs/SERVER_CONFIG.md`, `docs/API_ROUTES.md`, `PROJECT_CONTEXT.md`. Исходный код, БД и production не изменены.
+
+## 2026-11-18 — проверка полей production ApiController
+- По предоставленному пользователем grep серверного `backend/app/Controllers/ApiController.php`: методы `categories()` (строка 56) и `product()` (строка 188) присутствуют, идентификаторы `can_track` и `hide_store_stock` отсутствуют.
+- Обновлены `docs/SERVER_CONFIG.md`, `docs/FEATURES.md`, `PROJECT_CONTEXT.md`. Никаких изменений PHP/БД/Android/production.
