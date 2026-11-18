@@ -223,3 +223,9 @@
 - `AdminCategoriesController.php` и `ApiController.php` установлены из staging, права 664.
 - PHP 8.5 lint обоих файлов успешен.
 - Весь комплект из сервиса, контроллеров и маршрута установлен; функциональная проверка API после деплоя ещё не проведена.
+
+## 2026-11-18 — production API smoke test: карточка товара
+- `GET /api/v1/products/6`: HTTP/2 200, success=true.
+- 3 филиала с прежними ценами 74.00/75.12/78.00 и остатками 5/12/3.
+- `hide_store_stock=false`, `can_track=false`, `reviews` сохранены.
+- Проверка категорий и списка товаров ещё впереди.
