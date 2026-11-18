@@ -164,3 +164,8 @@
 - Проверена версия `ApiController.php` из коммита `3a14c33`.
 - Вывод пользователя: `No syntax errors detected in /tmp/svet22_ApiController_check.php`.
 - Production не изменён; SQL и API функционально ещё не тестировались.
+
+## 2026-11-18 — зафиксирован baseline production API
+- `GET /api/v1/products?per_page=2`: HTTP/2 200, два ряда товара ID 6 в филиалах 1 и 2, `total=4,total_pages=2`.
+- Выявлена несогласованность: total по DISTINCT товарам, пагинация по строкам JOIN stock.
+- Ответ пока содержит реальные цены и остатки, флага скрытия нет. Production не изменялся.
