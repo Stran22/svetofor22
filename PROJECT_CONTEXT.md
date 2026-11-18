@@ -53,3 +53,6 @@
 
 ### Прочитан реальный метод карточки товара (18.11.2026)
 В production `backend/app/Controllers/ApiController.php` метод `product()` (начинается на строке 188) читает активный товар, все строки `stock` по product_id (без `branches.is_active`), агрегат опубликованных отзывов, затем `Response::success`. Нет полей `can_track`, `hide_store_stock`. Нельзя заменять файл целиком без сверки других методов: сохранить отзывы, API, импорт, авторизацию и подписки. Следующий этап — проверить реальные столбцы `categories` и активные филиалы, затем разработать минимальный безопасный патч.
+
+### Проверка server grep для настройки категорий (18.11.2026)
+Поиск `hide_store_stock|show_price_stock|ALTER TABLE categories` в серверных `database/migrations` и `backend` вернул пустой вывод. Не трактовать как доказательство отсутствия колонки в MySQL: ошибки путей скрывались. Следующий шаг: read-only `SHOW COLUMNS FROM categories;` в phpMyAdmin, затем согласовать минимальную безопасную миграцию при необходимости. Не применять `007_product_wide_subscriptions.sql` без аудита: в GitHub он удаляет существующие subscriptions.
