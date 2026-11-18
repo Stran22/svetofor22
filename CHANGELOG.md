@@ -169,3 +169,8 @@
 - `GET /api/v1/products?per_page=2`: HTTP/2 200, два ряда товара ID 6 в филиалах 1 и 2, `total=4,total_pages=2`.
 - Выявлена несогласованность: total по DISTINCT товарам, пагинация по строкам JOIN stock.
 - Ответ пока содержит реальные цены и остатки, флага скрытия нет. Production не изменялся.
+
+## 2026-11-18 — baseline карточки товара
+- Production GET `/api/v1/products/6` вернул HTTP/2 200, три филиала с ценами и остатками и блок reviews.
+- Поля `hide_store_stock`/`can_track` отсутствуют; ожидаемый `can_track=false`.
+- Только read-only проверка; production не изменялся.
