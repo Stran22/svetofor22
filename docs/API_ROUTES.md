@@ -77,3 +77,6 @@
 
 ## НЕ путать с историческим контрактом
 В `docs/api-contract.md` упомянуты `GET /api/v1/search`, `DELETE /api/v1/subscriptions/{id}`, `GET /api/v1/products/{id}/price-history`, `POST /api/v1/auth/{provider}/start`. На проверенном `backend/bootstrap/app.php` они **не зарегистрированы**.
+
+### Проверка реального production bootstrap (18.11.2026)
+По выводу `grep -nE 'categories|products|subscriptions|featured|promotions|contests' backend/bootstrap/app.php` подтверждены действующие регистрации `/api/v1/categories`, `/api/v1/products`, `/api/v1/products/{id}`, `/api/v1/featured-products`, `/api/v1/home-promotions`, `/api/v1/contests`, `/api/v1/contests/{id}`, POST `/api/v1/contests/{id}/join`, GET/POST `/api/v1/products/{id}/reviews`, GET/POST `/api/v1/subscriptions`, POST `/api/v1/subscriptions/cancel`, админ-маршруты товаров, категорий, конкурсов и рекомендуемых товаров. В этом выводе **отсутствует** `/admin/categories/visibility`, предусмотренный кодом GitHub. Наличие маршрута подписок само по себе не подтверждает продуктовую логику `can_track` или доставку FCM. Полный реестр маршрутов без фильтра ещё не просмотрен.
