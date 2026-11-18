@@ -5,8 +5,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -49,33 +52,38 @@ fun TrafficLightSplash(onFinished: () -> Unit) {
         onFinished()
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .alpha(overlay.value)
             .background(Color(0xFF17191C)),
         contentAlignment = Alignment.Center
     ) {
+        val housingHeight = maxHeight * 0.70f
+        val housingWidth = minOf(maxWidth * 0.65f, housingHeight * 0.42f)
+        val lightSize = minOf(housingWidth * 0.78f, housingHeight * 0.26f)
+
         Column(
             modifier = Modifier
-                .size(width = 132.dp, height = 326.dp)
-                .clip(RoundedCornerShape(30.dp))
+                .width(housingWidth)
+                .height(housingHeight)
+                .clip(RoundedCornerShape(housingWidth * 0.20f))
                 .background(Color(0xFF090B0D))
-                .padding(vertical = 16.dp),
+                .padding(vertical = housingHeight * 0.04f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            SignalLight(Red, red.value)
-            SignalLight(Yellow, yellow.value)
-            SignalLight(Green, green.value, glow = true)
+            SignalLight(Red, red.value, lightSize)
+            SignalLight(Yellow, yellow.value, lightSize)
+            SignalLight(Green, green.value, lightSize, glow = true)
         }
     }
 }
 
 @Composable
-private fun SignalLight(color: Color, intensity: Float, glow: Boolean = false) {
+private fun SignalLight(color: Color, intensity: Float, diameter: androidx.compose.ui.unit.Dp, glow: Boolean = false) {
     Box(
-        modifier = Modifier.size(88.dp),
+        modifier = Modifier.size(diameter),
         contentAlignment = Alignment.Center
     ) {
         if (glow) {
@@ -96,10 +104,10 @@ private fun SignalLight(color: Color, intensity: Float, glow: Boolean = false) {
         }
         Box(
             modifier = Modifier
-                .size(68.dp)
+                .size(diameter * 0.78f)
                 .clip(CircleShape)
                 .background(Color(0xFF202326))
-                .padding(3.dp)
+                .padding(diameter * 0.035f)
                 .clip(CircleShape)
                 .background(
                     androidx.compose.ui.graphics.lerp(Unlit, color, intensity)
