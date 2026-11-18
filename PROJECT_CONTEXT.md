@@ -131,3 +131,6 @@ Production `SHOW INDEX FROM stock`: UNIQUE `uq_stock_product_branch(product_id,b
 
 ### 2026-11-18 — PHP lint ApiController с защитой сортировки успешен
 Пользователь скачал `backend/app/Controllers/ApiController.php` из коммита `3a14c33589e8419b92560aefb91bc7d21f77425d` во временный файл `/tmp/svet22_ApiController_check.php` и выполнил `/opt/php85/bin/php -l`: результат `No syntax errors detected in /tmp/svet22_ApiController_check.php`. Это только синтаксическая проверка, функциональные тесты/деплой ещё не проведены. Следующий этап — проверить совместимость исходников и подготовить безопасную проверку API без замены production файлов.
+
+### 2026-11-18 — baseline API подтверждён HTTP 200
+Production `GET /api/v1/products?per_page=2` возвращает HTTP/2 200 и два stock-рядa товара ID 6 «Кефир 1%» (филиалы 1/2, цена 74.00/75.12, количество 5/12), `total=4,total_pages=2`. API считает total уникальных товаров, но LIMIT/OFFSET применяется к строкам product×stock. Это отдельный обнаруженный дефект пагинации; не менять одновременно с маскировкой без отдельного плана/тестов. `show_price_stock`/`hide_store_stock` в baseline отсутствуют. Следующий шаг: проверить JSON карточки товара, сравнить API и GitHub перед безопасным деплоем.
