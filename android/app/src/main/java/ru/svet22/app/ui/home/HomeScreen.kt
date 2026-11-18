@@ -389,10 +389,12 @@ private fun ProductCard(product: Product, onClick: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(7.dp))
-            Text(
-                if (product.hideStoreStock) "Остаток скрыт" else product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
-                color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+            if (!product.hideStoreStock) {
+                Text(
+                    product.quantity?.let { "Остаток: $it" } ?: "Наличие уточняется",
+                    color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
