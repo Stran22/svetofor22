@@ -190,7 +190,6 @@ final class AdminCategoriesController
         $this->csrf($data);
         [$name, $parent, $sort, $image] = $this->fields($data);
         $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
-        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
         $slug = $this->uniqueSlug($name, $parent);
         $stmt = $this->db->prepare('INSERT INTO categories (name, parent_id, slug, sort_order, image_url, show_price_stock) VALUES (?, ?, ?, ?, ?, ?)');
         $stmt->execute([$name, $parent, $slug, $sort, $image, $showPriceStock]);
@@ -206,6 +205,7 @@ final class AdminCategoriesController
         $id = (int)$params['id'];
         if (!$this->one($id)) Response::html('Категория не найдена', 404);
         [$name, $parent, $sort, $image] = $this->fields($data);
+        $showPriceStock = isset($data['show_price_stock']) ? 1 : 0;
         if ($parent === $id || ($parent !== null && $this->isDescendant($parent, $id))) {
             Response::html('Нельзя переместить категорию внутрь самой себя или её подраздела.', 422);
         }
