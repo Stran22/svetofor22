@@ -40,8 +40,10 @@ jobs:
       - name: Install MySQL client
         run: sudo apt-get update && sudo apt-get install -y default-mysql-client
       - name: Create isolated test database schema
+        # Disposable CI database only. Migration 007 deletes subscriptions; NEVER run it
+        # against production without explicit approval, backup, and stopped workers.
         run: |
-          for migration in 001_initial_schema.sql 003_firebase_push.sql 004_push_device_deliveries.sql 005_excel_column_mappings.sql 006_import_mapping_fingerprint.sql 006_upload_log_mapping_hash.sql; do
+          for migration in 001_initial_schema.sql 003_firebase_push.sql 004_push_device_deliveries.sql 005_excel_column_mappings.sql 006_import_mapping_fingerprint.sql 006_upload_log_mapping_hash.sql 007_product_wide_subscriptions.sql; do
             mysql -h 127.0.0.1 -u root -ptestpass svet_import_test < "database/migrations/$migration"
           done
       - name: Full-cycle MySQL Excel import integration test
