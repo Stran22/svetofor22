@@ -209,3 +209,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — уведомление после сохранения видимости (готово в GitHub, не развёрнуто)
 Коммит `75ce461`: в `backend/app/Controllers/AdminCategoriesController.php` `saveVisibility()` после успешного commit перенаправляет на `/admin/categories/visibility?saved=1`; `visibilityPage()` при `saved=1` отображает сообщение `Настройки успешно сохранены.` с `role=status`. Не менялись DB, API и сама логика скрытия. Нужны staging download, PHP 8.5 lint, backup и установка на production; затем браузерная проверка.
+
+### 2026-11-18 — PHP lint уведомления сохранения подтверждён
+Пользователь скачал `AdminCategoriesController.php` из коммита `75ce461` в `/tmp/svet22-menu-20261118/AdminCategoriesController.php`; `/opt/php85/bin/php -l` вернул `No syntax errors detected`. Production файл ещё не заменён. Следующий шаг: отдельная резервная копия и установка только этого контроллера, проверка lint после установки и браузерный тест уведомления.
