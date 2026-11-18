@@ -107,3 +107,6 @@ Production `ApiController::products()` напрямую возвращает `s.
 
 ### 2026-11-18 — production branches schema подтверждена
 `SHOW COLUMNS FROM branches` подтвердил `id`, `code` (UNIQUE), `name`, `address`, `is_active tinyint(1) NOT NULL DEFAULT 1`, `created_at`, `updated_at`. Правило `can_track`: есть хотя бы один активный филиал; для каждого активного филиала известен stock.quantity; во всех он равен 0. GitHub `ApiController::product()` уже содержит SQL с `branches b WHERE b.is_active=1` и подсчётами `branch_count`, `known_count`, `zero_count`, но production API не содержит `can_track`. Требуется проверка/доработка и развёртывание; production не изменён.
+
+### 2026-11-18 — проверено наполнение филиалов
+Production read-only SQL: 3 активных филиала (ID 1 «На Волочаевской», ID 2 «на Иркутской», ID 3 «На Байкальском»), в каждом по 4 записи stock. Неизвестно, совпадают ли product_id и заполнены ли записи по каждому товару во всех филиалах. Следующий шаг — read-only SQL сверки product_id и нулевых остатков; не включать `can_track` на основе одного лишь числа записей.
