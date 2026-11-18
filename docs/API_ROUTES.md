@@ -131,3 +131,7 @@
 - `POST /admin/sales-banner/image` — загрузить PNG/WebP с прозрачностью до 5 МБ (админ, CSRF).
 - `POST /admin/sales-banner/image/remove` — убрать отдельное фото (админ, CSRF).
 **Маршруты ещё не проверены на production.**
+
+
+## Аналитика (2026-11-19)
+`POST /api/v1/analytics/event` — Bearer-токен приложения, включая гостевой; JSON `{"event_type":"visit|product_view|category_click","product_id":123,"category_id":10,"branch_id":1}`. ID товара нужен только для `product_view`, ID категории — только для `category_click`; `branch_id` необязателен. Ответ `data.recorded`. `POST /api/v1/analytics/search` сохраняется без изменений. Админ-страница `GET /admin/analytics?period=today|week|month` защищена существующей авторизацией админки.
