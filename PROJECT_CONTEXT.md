@@ -167,3 +167,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — production контроллеры установлены
 Пользователь выполнил `install -m 664` для `/tmp/svet22-deploy-20261118/AdminCategoriesController.php` → `backend/app/Controllers/AdminCategoriesController.php` и `ApiController.php` → `backend/app/Controllers/ApiController.php`. Оба `/opt/php85/bin/php -l` успешны (`No syntax errors detected`). `CategoryVisibilityService.php` установлен ранее, bootstrap маршрут `/admin/categories/visibility` установлен ранее. Backup двух контроллеров `.bak-20261118` и bootstrap сохранены. **Следующий шаг — проверить production GET API после деплоя; пока не менять `show_price_stock`.**
+
+### 2026-11-18 — production GET /api/v1/products/6 после установки успешен
+Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/products/6`; HTTP/2 200, `success:true`, продукт ID6 `Кефир 1%`, category_id=55, 3 branches: (1,74.00,5.000), (2,75.12,12.000), (3,78.00,3.000). Новые поля `hide_store_stock:false`, `can_track:false`; `reviews:{reviews_count:0,rating:null}`. Production ApiController и CategoryVisibilityService выполняются без ошибки на этой карточке. Следующий шаг — GET `/api/v1/categories` и затем `/api/v1/products?per_page=2`, затем безопасно проверить скрытие категории с возвратом настройки.
