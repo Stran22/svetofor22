@@ -141,34 +141,6 @@ fun HomeScreen(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Card(
-                onClick = onOpenCatalog,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Red)
-            ) {
-                Column(modifier = Modifier.padding(22.dp)) {
-                    Surface(color = Yellow, shape = RoundedCornerShape(8.dp)) {
-                        Text("ЦЕНЫ И НАЛИЧИЕ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = Dark, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    Text("Всё нужное\nрядом с вами", color = Color.White, fontSize = 30.sp, lineHeight = 35.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(10.dp))
-                    Text("Выбирайте товары и проверяйте остатки в своём магазине", color = Color.White.copy(alpha = 0.95f), fontSize = 14.sp)
-                    Spacer(Modifier.height(20.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(color = Yellow, shape = RoundedCornerShape(13.dp)) {
-                            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Смотреть каталог", color = Dark, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(8.dp))
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Dark, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Text("🛍️", fontSize = 47.sp)
-                    }
-                }
-            }
 
             if (contests.isNotEmpty()) {
                 Spacer(Modifier.height(18.dp))
