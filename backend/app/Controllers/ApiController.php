@@ -125,7 +125,7 @@ final class ApiController
             );
         }
 
-        // Masked categories must not reveal prices through ordering or stock filters.
+        // Category restrictions hide stock availability, not product prices.
         $visibility = (new CategoryVisibilityService($this->db))->all();
         $hiddenCategoryIds = [];
         foreach ($visibility as $id => $flags) {
@@ -137,7 +137,7 @@ final class ApiController
             ? 'p.category_id IN (' . implode(',', $hiddenCategoryIds) . ')'
             : '0=1';
         $visibleSql = 'NOT (' . $hiddenSql . ')';
-        $safePrice = 'CASE WHEN ' . $hiddenSql . ' THEN NULL ELSE s.price END';
+        $safePrice = 's.price';
 
         $order = match ($sort) {
             'price_asc' => $safePrice . ' ASC, p.name ASC',
@@ -197,13 +197,12 @@ final class ApiController
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
 
-        // Never expose prices or stock quantities for restricted categories.
+        // Keep the product price visible; hide stock quantities for restricted categories.
         $visibility = (new CategoryVisibilityService($this->db))->all();
         foreach ($rows as &$row) {
             $hidden = $visibility[(int)($row['category_id'] ?? 0)]['hide_store_stock'] ?? false;
             $row['hide_store_stock'] = $hidden;
             if ($hidden) {
-                $row['price'] = null;
                 $row['quantity'] = null;
                 $row['imported_on'] = null;
             }
