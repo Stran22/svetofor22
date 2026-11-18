@@ -230,3 +230,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — production API smoke test: скрытая категория подтверждена
 Пользователь установил новую версию `backend/app/Controllers/ApiController.php` на production, PHP 8.5 lint: `No syntax errors detected`. Проверен GET `/api/v1/products?branch_id=1&category_id=55&per_page=20` до и после включения скрытия для категории 55 «Молоко и сливки». После скрытия: товар ID 6 «Кефир 1%» `price="74.00"`, `quantity=null`, `imported_on=null`, `hide_store_stock=true`; товар ID 5 «Молоко 3,2%» `price="88.00"`, `quantity=null`, `imported_on=null`, `hide_store_stock=true`. До скрытия цены 74/88 и остатки 5/10 были доступны. **Подтверждён production API списка, но не Android APK и не detail API.** Категория 55 оставлена скрытой для дальнейших тестов.
+
+### 2026-11-18 — проверка production detail API
+Пользователь выполнил GET `https://baza.altaj-otdyh.ru/api/v1/products/6`. Ответ: `success=true`, `category_id=55`, `hide_store_stock=true`; у филиалов 1, 2 и 3 поля `price`, `quantity`, `imported_on`, `updated_at` равны `null`. Это подтверждает маскирование данных филиалов в подробном API. Основная цена в detail API отдельным полем не возвращается; ранее подтверждена в API списка товаров. Android APK и UI ещё не проверены.
