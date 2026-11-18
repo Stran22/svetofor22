@@ -93,3 +93,8 @@
 - Проверен скачанный во временную папку `/tmp/svet22_AdminCategoriesController_check.php` файл из коммита `783e0b8`.
 - Вывод пользователя: `No syntax errors detected in /tmp/svet22_AdminCategoriesController_check.php`.
 - Синтаксис OK; функциональные проверки и развёртывание не выполнены. Следующий этап — проверка маршрута групповой настройки категорий.
+
+## 2026-11-18 — выявлено различие маршрутов production и GitHub
+- Production `backend/bootstrap/app.php` не содержит POST `/admin/categories/visibility`, подтверждено grep пользователя.
+- GitHub `backend/bootstrap/app.php` уже содержит этот маршрут на `saveVisibility()`; дополнительный GitHub-патч не требуется.
+- Для работоспособности групповой формы при развёртывании понадобится согласованное изменение production bootstrap и контроллера. Production не менялся.
