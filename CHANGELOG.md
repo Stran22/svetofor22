@@ -37,3 +37,8 @@
 ## 2026-11-18 — проверка полей production ApiController
 - По предоставленному пользователем grep серверного `backend/app/Controllers/ApiController.php`: методы `categories()` (строка 56) и `product()` (строка 188) присутствуют, идентификаторы `can_track` и `hide_store_stock` отсутствуют.
 - Обновлены `docs/SERVER_CONFIG.md`, `docs/FEATURES.md`, `PROJECT_CONTEXT.md`. Никаких изменений PHP/БД/Android/production.
+
+## 2026-11-18 — аудит фактического метода product()
+- По серверному коду подтверждено: ответ карточки товара содержит `branches` и `reviews`, но не содержит `can_track`/`hide_store_stock`; выборка остатков не фильтрует `branches.is_active`.
+- Документирован риск отображения остатков неактивных филиалов и необходимость сохранения существующего JSON-контракта.
+- Обновлены только документационные файлы; сервер, PHP-код, MySQL, Android не менялись.
