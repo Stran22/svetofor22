@@ -136,7 +136,6 @@ fun ProductDetailScreen(
     var trackingBusy by remember(product.id) { mutableStateOf(false) }
     var trackingMessage by remember(product.id) { mutableStateOf<String?>(null) }
     var alreadyTracking by remember(product.id) { mutableStateOf(false) }
-    var showTrackingLoginDialog by remember(product.id) { mutableStateOf(false) }
     var detailSettings by remember(product.id) { mutableStateOf<ru.svet22.app.data.model.ProductDetailSettings?>(null) }
     LaunchedEffect(product.id) {
         detailSettings = null
@@ -357,9 +356,7 @@ fun ProductDetailScreen(
         if (detailSettings?.canTrack == true) {
             Button(
                 onClick = {
-                    if (!isAuthenticated) {
-                        showTrackingLoginDialog = true
-                    } else if (!alreadyTracking && !trackingBusy) {
+                    if (!alreadyTracking && !trackingBusy) {
                         trackingBusy = true
                         trackingScope.launch {
                             try {
@@ -448,23 +445,6 @@ fun ProductDetailScreen(
             }
         )
         // ===== КОНЕЦ БЛОКА: Общий блок отзывов =====
-    }
-
-    if (showTrackingLoginDialog) {
-        AlertDialog(
-            onDismissRequest = { showTrackingLoginDialog = false },
-            title = { Text("Войдите, чтобы следить за товаром") },
-            text = { Text("После входа вы сможете оформить одну подписку и получить уведомление, когда товар появится в любом магазине.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showTrackingLoginDialog = false
-                    onLoginClick()
-                }) { Text("Войти") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTrackingLoginDialog = false }) { Text("Позже") }
-            }
-        )
     }
 
     trackingMessage?.let { message ->
