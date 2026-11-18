@@ -58,7 +58,6 @@ fun TrackedScreen() {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp)) {
                         Text(item.productName ?: "Товар №${item.productId}", style = MaterialTheme.typography.titleMedium)
-                        Text(item.branchName ?: "Магазин №${item.branchId}")
                         TextButton(
                             enabled = busyId != item.id,
                             onClick = {
