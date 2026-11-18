@@ -16,7 +16,7 @@ final class CategoryVisibilityService
     public function all(): array
     {
         $rows = $this->db->query(
-            'SELECT id, parent_id, hide_store_stock FROM categories'
+            'SELECT id, parent_id, show_price_stock FROM categories'
         )->fetchAll(PDO::FETCH_ASSOC);
         $byId = [];
         foreach ($rows as $row) $byId[(int)$row['id']] = $row;
@@ -32,7 +32,7 @@ final class CategoryVisibilityService
                 ? $resolve((int)$row['parent_id'], $visited)
                 : ['hide_store_stock' => false];
             return $resolved[$id] = [
-                'hide_store_stock' => (bool)$row['hide_store_stock'] || $parent['hide_store_stock']
+                'hide_store_stock' => !(bool)$row['show_price_stock'] || $parent['hide_store_stock']
             ];
         };
         foreach (array_keys($byId) as $id) $resolve($id);
