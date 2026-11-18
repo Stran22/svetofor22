@@ -246,7 +246,8 @@ fun ProductDetailScreen(
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             Text(
-                text = product.price
+                text = if (product.hideStoreStock || detailSettings?.hideStoreStock == true) "Цена скрыта"
+                else product.price
                     ?.takeIf { it.isNotBlank() }
                     ?.let { "$it ₽" }
                     ?: "Цена не указана",
@@ -269,7 +270,7 @@ fun ProductDetailScreen(
         Spacer(Modifier.height(12.dp))
 
         // ===== НАЧАЛО БЛОКА: Остатки во всех филиалах =====
-        if (detailSettings?.hideStoreStock != true) {
+        if (!product.hideStoreStock && detailSettings?.hideStoreStock != true) {
         Text(
             text = "Цены и остатки в магазинах",
             style = MaterialTheme.typography.titleMedium,
