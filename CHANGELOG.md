@@ -234,3 +234,8 @@
 - `GET /api/v1/categories`: `success=true`, 102 категории.
 - ID 52, 54, 55: `hide_store_stock=false`.
 - Список товаров и запись настроек через админку ещё не проверены.
+
+## 2026-11-18 — production API smoke test: список товаров
+- `GET /api/v1/products?per_page=2`: `success=true`, 2 записи.
+- Кефир 1%, филиалы 1 и 2: цена 74.00/75.12, остаток 5/12, `hide_store_stock=false`.
+- GET categories/products/product проверены; админское сохранение и наследование скрытия пока не проверены.
