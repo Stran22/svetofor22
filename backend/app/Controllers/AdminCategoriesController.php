@@ -103,7 +103,7 @@ final class AdminCategoriesController
             . '<a href="/admin/categories?sort=name&amp;dir=asc">Название А–Я</a> · '
             . '<a href="/admin/categories?sort=name&amp;dir=desc">Название Я–А</a>'
             . ' <span class="muted">(сейчас: ' . ($sortBy === 'id' ? 'ID' : 'Название') . ', ' . ($direction === 'asc' ? 'по возрастанию' : 'по убыванию') . ')</span></section>';
-        $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Цены и остатки', 'Действия'], $rows);
+        $content .= AdminView::table(['ID', 'Название', 'Родитель ID', 'Порядок', 'Статус', 'Остатки / блок филиалов', 'Действия'], $rows);
         Response::html(AdminView::layout('Категории', $content, $this->adminLayout($admin)));
     }
 
@@ -139,11 +139,11 @@ final class AdminCategoriesController
         $savedNotice = (($request->query()['saved'] ?? '') === '1')
             ? '<section class="card" role="status" style="border-left:4px solid #218657"><strong>Настройки успешно сохранены.</strong></section>'
             : '';
-        $content = $savedNotice . '<section class="card"><p>Отметьте категории, в которых нужно скрыть цены и остатки. Ограничение родительской категории распространяется на все подкатегории.</p>'
+        $content = $savedNotice . '<section class="card"><p>Отметьте категории, в которых нужно скрыть остатки товаров и блок «Цены и остатки в филиалах» в карточке товара. Основная цена товара остаётся видимой. Ограничение родительской категории распространяется на все подкатегории.</p>'
             . '<p class="muted">Изменения вступают в силу после сохранения. Управление названиями и структурой — в разделе <a href="/admin/categories">Категории</a>.</p></section>'
             . '<section class="card"><form method="post" action="/admin/categories/visibility">'
             . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
-            . '<div class="table-wrap"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть цены и остатки</th></tr></thead><tbody>';
+            . '<div class="table-wrap"><table><thead><tr><th>Категория / подкатегория</th><th>Скрыть остатки и блок филиалов</th></tr></thead><tbody>';
         foreach ($tree as $category) {
             $id = (int)$category['id'];
             $label = str_repeat('— ', min((int)$category['_depth'], 12)) . $category['name'];
