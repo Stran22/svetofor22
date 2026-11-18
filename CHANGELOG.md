@@ -24,3 +24,7 @@
 - Прочитан фактический `backend/public/index.php`: подключает `backend/bootstrap/app.php` через `dirname(__DIR__)`.
 - Зафиксировано, что корневой `public/` содержит только `.htaccess` с путём внешнего конфига и не является web-root.
 - Изменены только документы GitHub. Сервер, БД, Android и Cron не менялись; HTTP PHP patch/SAPI и маршруты bootstrap ещё предстоит проверить.
+
+## 2026-11-18 — подтверждена загрузка серверных контроллеров
+- По grep `backend/bootstrap/app.php` установлены Composer autoload (`vendor/autoload.php`), `Router`, создание `ApiController`, `AdminCategoriesController` и `SubscriptionController`.
+- Добавлены сведения в `docs/SERVER_CONFIG.md` и `PROJECT_CONTEXT.md`. Никакие исходники, серверные настройки и БД не изменялись.
