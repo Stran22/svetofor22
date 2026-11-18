@@ -213,3 +213,8 @@
 - Все публичные методы production `AdminCategoriesController` и `ApiController` присутствуют в staging версиях.
 - Дополнительно появился `AdminCategoriesController::saveVisibility`.
 - Новые файлы ещё не установлены. Следующий шаг — установка нового сервиса с проверкой.
+
+## 2026-11-18 — production: установлен CategoryVisibilityService
+- Новый файл `backend/app/Services/CategoryVisibilityService.php` установлен с правами 664.
+- PHP 8.5 lint успешен, размер 1,6K.
+- Контроллеры ещё не заменены, API пока прежний.
