@@ -65,3 +65,6 @@
 
 ### Серверная админка категорий (18.11.2026)
 В `backend/app/Controllers/AdminCategoriesController.php` подтверждены методы `index()` (21), `edit()` (109), `create()` (130), `update()` (143). Поиск `show_price_stock|hide_store_stock|checkbox` в файле пуст. Следующий шаг: read-only `sed -n '1,220p' .../AdminCategoriesController.php` (при необходимости порциями), чтобы увидеть сохранение и подключение шаблонов. Не добавлять второй столбец; production уже имеет `show_price_stock`.
+
+### Получен код серверной админки категорий (18.11.2026)
+Пользователь прислал фрагмент `AdminCategoriesController.php` с `edit/create/update/toggle/delete`. Подтверждено: edit форма не имеет checkbox `show_price_stock`; `create()` INSERT без этого поля (БД DEFAULT 1), `update()` UPDATE без поля. Есть CSRF, admin role, audit, проверка циклов и ограничения удаления — сохранить. Следующий шаг — проверить начало файла (`index()`/`all()`/`one()`/`fields()`) и/или GitHub код, чтобы сделать минимальный патч с существующим `show_price_stock`, а не дублировать `hide_store_stock`.
