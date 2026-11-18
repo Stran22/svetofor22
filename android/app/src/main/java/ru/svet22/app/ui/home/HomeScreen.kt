@@ -1,6 +1,18 @@
 package ru.svet22.app.ui.home
 
 import android.graphics.BitmapFactory
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Typeface
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -76,13 +88,16 @@ fun HomeScreen(
     val contests by produceState<List<ContestSummary>>(initialValue = emptyList()) {
         value = runCatching { ContestRepository().active() }.getOrDefault(emptyList())
     }
+    val homeScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    var featuredOffset by remember { mutableStateOf(0) }
     var branchMenuExpanded by remember { mutableStateOf(false) }
     var showAllFeatured by remember { mutableStateOf(false) }
     val featured = remember(vm.products) { vm.products.filter { it.price?.toDoubleOrNull() != null }.take(12) }
     val categories = remember(vm.categories) { vm.categories.filter { it.parentId == null }.take(12) }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Background).verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize().background(Background).verticalScroll(homeScroll)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().background(Color.White).padding(start = 18.dp, end = 12.dp, top = 18.dp, bottom = 14.dp),
@@ -141,6 +156,10 @@ fun HomeScreen(
                 }
             }
             Spacer(Modifier.height(14.dp))
+            SalesPromoBanner(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                onClick = { scope.launch { homeScroll.animateScrollTo(featuredOffset) } }
+            )
 
             if (contests.isNotEmpty()) {
                 Spacer(Modifier.height(18.dp))
@@ -194,6 +213,9 @@ fun HomeScreen(
             Spacer(Modifier.height(22.dp))
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    .onGloballyPositioned { coordinates ->
+                        featuredOffset = (coordinates.positionInParent().y + homeScroll.value).roundToInt()
+                    }
                     .background(Color(0xFFF2F3F5), RoundedCornerShape(22.dp))
                     .padding(horizontal = 10.dp, vertical = 17.dp)
             ) {
@@ -442,4 +464,70 @@ private fun contestDateLabel(title: String): String? {
     }
     if (day !in 1..maxDay) return null
     return "ДО $day ${month.uppercase(Locale("ru"))}"
+}
+
+/**
+ * Баннер по геометрии первого SVG-варианта CodePen (viewBox 0 0 450 220).
+ * Рисуется нативно, без WebView; касание прокручивает к существующему разделу «Супер выгода».
+ */
+@Composable
+private fun SalesPromoBanner(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Canvas(modifier = modifier.aspectRatio(450f / 220f).clickable(onClick = onClick)) {
+        drawIntoCanvas { composeCanvas ->
+            val canvas = composeCanvas.nativeCanvas
+            val checkpoint = canvas.save()
+            canvas.scale(size.width / 450f, size.height / 220f)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            fun polygon(points: FloatArray, color: Int, stroke: Boolean = false, width: Float = 1f) {
+                val path = Path().apply {
+                    moveTo(points[0], points[1])
+                    for (i in 2 until points.size step 2) lineTo(points[i], points[i + 1])
+                    close()
+                }
+                paint.color = color
+                paint.style = if (stroke) Paint.Style.STROKE else Paint.Style.FILL
+                paint.strokeWidth = width
+                canvas.drawPath(path, paint)
+            }
+            fun label(text: String, x: Float, y: Float, size: Float, color: Int, tracking: Float = 0f) {
+                paint.style = Paint.Style.FILL
+                paint.color = color
+                paint.textSize = size
+                paint.typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+                paint.letterSpacingCompat(text, x, y, tracking, canvas)
+            }
+            val black = android.graphics.Color.BLACK
+            polygon(floatArrayOf(30f, 5f, 20f, 200f, 440f, 170f, 440f, 55f), black, true, 5f)
+            polygon(floatArrayOf(5f, 31f, 5f, 185f, 410f, 205f, 430f, 10f), 0x33000000)
+            polygon(floatArrayOf(5f, 31f, 5f, 180f, 410f, 200f, 430f, 10f), 0xFFFDD808.toInt())
+            label("SALES", 43f, 122f, 65f, 0xFFFAFAFA.toInt())
+            label("SALES", 43f, 119f, 65f, black)
+            label("S H O P   N O W", 76f, 161.5f, 20f, android.graphics.Color.WHITE)
+            label("B I G G E S T", 270f, 70f, 23f, black)
+            label("S A L E S", 287f, 95f, 23f, black)
+            label("UP TO", 302f, 120f, 23f, black)
+            label("70%", 313f, 143f, 23f, black)
+            label("OFF", 314f, 168f, 23f, black)
+            paint.color = black
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 4.5f
+            canvas.drawLine(30f, 3f, 20f, 200f, paint)
+            canvas.restoreToCount(checkpoint)
+        }
+    }
+}
+
+/** Text spacing matching the letter-separated labels in the source SVG. */
+private fun Paint.letterSpacingCompat(
+    text: String, x: Float, y: Float, extra: Float, canvas: android.graphics.Canvas
+) {
+    if (extra == 0f) {
+        canvas.drawText(text, x, y, this)
+    } else {
+        var current = x
+        text.forEach { char ->
+            canvas.drawText(char.toString(), current, y, this)
+            current += measureText(char.toString()) + extra
+        }
+    }
 }
