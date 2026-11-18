@@ -122,3 +122,6 @@ Production `SHOW INDEX FROM stock`: UNIQUE `uq_stock_product_branch(product_id,b
 
 ### 2026-11-18 — начата серверная маскировка в GitHub API
 Коммит `767aa0d` обновил `backend/app/Controllers/ApiController.php`: список и карточка товара маскируют цену/остаток для скрытых категорий, возвращают `hide_store_stock`; карточка маскирует даты остатков. Не считать функцию законченной: `sort=price_*`, `in_stock` и связанные count/order всё ещё могут раскрывать скрытые данные косвенно. Нужно закрыть эти пути, проверить lint и тесты, согласовать production bootstrap/controller/service перед развёртыванием. Production не изменён.
+
+### 2026-11-18 — PHP lint GitHub ApiController успешен
+Пользователь скачал GitHub `ApiController.php` коммита `767aa0d6f14618408f274444f95e375125f0efb6` во временный файл и выполнил `/opt/php85/bin/php -l /tmp/svet22_ApiController_check.php`: `No syntax errors detected in /tmp/svet22_ApiController_check.php`. Только синтаксическая проверка; production не развёрнут. Следующий шаг — закрыть косвенное раскрытие через сортировку и `in_stock`.
