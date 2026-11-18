@@ -155,3 +155,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — три PHP-файла скачаны во временную папку, lint успешен
 Пользователь скачал из `feature/excel-column-mapping` в `/tmp/svet22-deploy-20261118/` файлы `AdminCategoriesController.php`, `ApiController.php`, `CategoryVisibilityService.php`. Все три `/opt/php85/bin/php -l` выдали `No syntax errors detected`. Production файлы ещё не заменены. Есть backups двух контроллеров и bootstrap; новый сервис отсутствует на production. Следующий шаг — проверка методов/ссылок на сервис и совместимости перед установкой.
+
+### 2026-11-18 — проверены связи трёх временных PHP-файлов
+Пользователь выполнил grep в `/tmp/svet22-deploy-20261118/*.php`. Подтверждены: `AdminCategoriesController::saveVisibility` (стр.125), формы `show_price_stock`, SQL INSERT/UPDATE/SELECT по `categories.show_price_stock`; `ApiController` импортирует `CategoryVisibilityService`, использует `all()` в categories/products и `forCategory()` в product, выдаёт `hide_store_stock`; `CategoryVisibilityService` читает `id,parent_id,show_price_stock` и наследует `hide_store_stock`. Все три PHP lint OK ранее. Production файлы пока не заменены. Перед установкой проверить сохранность публичных методов старых контроллеров, затем безопасная установка.
