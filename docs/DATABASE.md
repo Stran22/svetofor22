@@ -76,3 +76,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### Проверка значений `categories.show_price_stock` (phpMyAdmin, 2026-11-18)
 Пользователь выполнил read-only запрос `SELECT show_price_stock, COUNT(*) AS categories_count FROM categories GROUP BY show_price_stock ORDER BY show_price_stock;` в production MySQL `prorock_law`. Единственная строка результата: **`show_price_stock = 1`, `categories_count = 102`**. Следовательно, на момент проверки все 102 категории показывают цены/остатки; строк со значением 0 нет. Это снимок данных, не гарантия неизменности. При адаптации GitHub не создавать второй флаг `hide_store_stock`; сохранить `show_price_stock` и обратную семантику.
+
+### Подтверждение использования поля в production контроллере (2026-11-18)
+`AdminCategoriesController::all()` делает `SELECT id, parent_id, name, slug, sort_order, image_url, is_active FROM categories ORDER BY sort_order, name, id` — **не выбирает** `show_price_stock`. `one()` делает `SELECT * FROM categories WHERE id=?` — **получает** существующий столбец. `fields()` валидирует `name`, `parent_id`, `sort_order`, HTTPS `image_url` и возвращает массив из 4 значений, **не читает** чекбокс. В production таблице поле уже существует, все 102 значения = 1; миграция для добавления поля не нужна.
