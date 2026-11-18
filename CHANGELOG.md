@@ -178,3 +178,8 @@
 ## 2026-11-18 — baseline API категорий подтверждён
 - Production GET `/api/v1/categories`: HTTP/2 200, иерархия parent_id сохранена (52→55/54), в текущем ответе нет `hide_store_stock`.
 - Проверены read-only baseline трёх API endpoints: categories, products, products/6. Production не изменён.
+
+## 2026-11-18 — production bootstrap: нет маршрута групповой видимости
+- Read-only grep подтвердил ApiController (стр. 6,29) и AdminCategoriesController (стр. 31).
+- Строка `categories/visibility` не найдена; перед внедрением проверить блок маршрутов и вставить точечно, без замены bootstrap.
+- Production не изменён.
