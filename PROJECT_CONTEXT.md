@@ -95,3 +95,6 @@ Production `ApiController::categories()` не выбирает и не возв�
 
 ### 2026-11-18 — проверен production список товаров
 Production `ApiController::products()` напрямую возвращает `s.price`, `s.quantity`, `s.imported_on`; не учитывает `show_price_stock`. Сохранять поиск, фильтры, сортировку, пагинацию. В GitHub `ApiController` уже использует `CategoryVisibilityService` только в `categories()`/`product()`, но не в `products()`. Сам сервис использует отсутствующий production `hide_store_stock`; нужен переход на `show_price_stock` с инверсией и наследованием, а также маскировка списка/карточки на сервере. Пока только аудит, production не менялся.
+
+### 2026-11-18 — production visibility service отсутствует; GitHub исправлен
+`ls -l /var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/app/Services/CategoryVisibilityService.php` на сервере вернул «Нет такого файла или каталога». В GitHub сервис существует; коммит `c3f1b4b` заменил чтение несуществующего `hide_store_stock` на `show_price_stock` с инверсией и наследованием, сохранив API-ключ `hide_store_stock`. Сервис не установлен на production, API список товаров ещё не маскирует данные. Нужны проверки синтаксиса и безопасное согласованное развёртывание.
