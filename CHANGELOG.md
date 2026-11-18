@@ -369,3 +369,8 @@
 - `backend/bootstrap/app.php`: 5 новых маршрутов.
 - `backend/app/Views/AdminView.php`: пункт меню «Баннер SALES» только администратору.
 - Всё пока только в GitHub, production не менялся; PHP lint/SQL миграция/Android тесты ещё не выполнены.
+
+## 2026-11-18 — Android SALES
+- Добавлены модель SalesBannerSettings, SalesBannerRepository и метод Retrofit API.
+- Главный экран получает настройки баннера, показывает текст либо изображение товара и открывает карточку товара по нажатию.
+- Проверка: код сохранён в GitHub; Gradle-сборка и проверка на устройстве ещё не выполнены.
