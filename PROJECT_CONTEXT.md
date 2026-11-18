@@ -182,3 +182,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — обнаружена и исправлена ошибка синтаксиса AdminView.php
 Пользователь скачал три новых файла в `/tmp/svet22-menu-20261118`: `AdminCategoriesController.php` PHP lint OK; `AdminView.php` PHP Parse error unexpected identifier `role` line 25, цикл остановился, `app.php` ещё не проверен. Причина — отсутствовала закрывающая одинарная кавычка после ссылки `Категории` при вставке пункта меню. Исправлено в GitHub `backend/app/Views/AdminView.php`, commit `0eb83fdc4dc19af01d7c82bd75bd908b31c339cf`. Production не изменён. Следующий шаг — повторно скачать AdminView.php и выполнить lint всех трёх файлов; не деплоить до успешной проверки.
+
+### 2026-11-18 — исправленный AdminView.php подтверждён на сервере
+Пользователь скачал `AdminView.php` по URL конкретного коммита `0eb83fdc4dc19af01d7c82bd75bd908b31c339cf` в `/tmp/svet22-menu-20261118/AdminView.php`. `sed -n '24,26p'` показал закрывающую кавычку после `Категории</a>` и ссылку `/admin/categories/visibility`; `/opt/php85/bin/php -l` вернул `No syntax errors detected`. До этого `AdminCategoriesController.php` прошёл lint; `app.php` ещё не проверен. Production не изменён. Следующий шаг: lint staging `app.php`, затем backup и осторожное развёртывание трёх файлов.
