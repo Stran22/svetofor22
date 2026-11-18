@@ -122,3 +122,8 @@
 - Через phpMyAdmin проверены поля `id`, `product_id`, `branch_id`, `price`, `quantity`, `imported_on`, `updated_at`.
 - `price` и `quantity` NOT NULL; скрытие будет реализовано только в API-ответе, без модификации данных MySQL.
 - SQL-запрос был только читающим, production данные не изменены.
+
+## 2026-11-18 — подтверждена production схема branches
+- Через phpMyAdmin проверены `id`, `code`, `name`, `address`, `is_active`, `created_at`, `updated_at`.
+- `is_active` существует и по умолчанию равен 1. Для `can_track` должны учитываться только активные филиалы и известные нулевые остатки по каждому.
+- Только аудит, изменений production нет.
