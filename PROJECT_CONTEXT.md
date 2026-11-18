@@ -262,3 +262,7 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 - В production 15 users имеют действующие API-токены; 8 имеют FCM-токены. Причина неуспешной подписки пока не подтверждена ответом HTTP.
 - Удалена проверка `is_guest` в `SubscriptionController.php` (a41b3df); в `ProductDetailScreen.kt` удалено требование VK-входа для подписки (9e885dc). Обновление production PHP и Android APK следует проверить отдельно.
 - Следующий шаг: Git Pull, сборка/установка APK и проверка точного текста ошибки HTTP. Не менять остатки и FCM без подтверждения причины.
+
+## Экран «Отслеживаемое» — 2026-11-18
+- Пользователь подтвердил успешное создание подписки после изменения production `subscriptions.branch_id` на NULLABLE.
+- Удалена строка магазина из `TrackedScreen.kt` (коммит `7ad0376`), так как подписки общие для всех филиалов. Следующее действие: Git Pull и сборка APK в Android Studio.
