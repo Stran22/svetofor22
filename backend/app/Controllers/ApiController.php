@@ -182,6 +182,19 @@ final class ApiController
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
 
+        // Never expose prices or stock quantities for restricted categories.
+        $visibility = (new CategoryVisibilityService($this->db))->all();
+        foreach ($rows as &$row) {
+            $hidden = $visibility[(int)($row['category_id'] ?? 0)]['hide_store_stock'] ?? false;
+            $row['hide_store_stock'] = $hidden;
+            if ($hidden) {
+                $row['price'] = null;
+                $row['quantity'] = null;
+                $row['imported_on'] = null;
+            }
+        }
+        unset($row);
+
         Response::success($rows, [
             'pagination' => [
                 'page' => $page,
@@ -226,6 +239,15 @@ final class ApiController
             $product['category_id'] === null ? null : (int)$product['category_id']
         );
         $product['hide_store_stock'] = $visibility['hide_store_stock'];
+        if ($visibility['hide_store_stock']) {
+            foreach ($product['branches'] as &$branch) {
+                $branch['price'] = null;
+                $branch['quantity'] = null;
+                $branch['imported_on'] = null;
+                $branch['updated_at'] = null;
+            }
+            unset($branch);
+        }
         // Only a complete set of stock records for active branches can prove zero availability.
         $availability = $this->db->prepare(
             'SELECT COUNT(b.id) AS branch_count,
