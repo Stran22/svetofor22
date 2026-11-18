@@ -95,3 +95,6 @@
 
 ### 2026-11-18 — production GET /api/v1/products
 Из кода production `ApiController::products()` подтверждено: SELECT возвращает `s.price`, `s.quantity`, `s.imported_on` напрямую через LEFT JOIN stock, без `show_price_stock`; поиск по имени, фильтры branch/category/in_stock, сортировка name/price_asc/price_desc, пагинация. Скрытие только на Android не защищает API. Требуется серверная маскировка цены/остатка с наследованием от родителей и анализ косвенного раскрытия через фильтр/сортировку.
+
+### 2026-11-18 — baseline production GET /api/v1/products?per_page=2
+Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/products?per_page=2`. Ответ HTTP/2 200, `success:true`, `data` — две строки **одного товара** ID 6 «Кефир 1%» (category_id=55): филиал 1 `price:"74.00"`, `quantity:"5.000"`; филиал 2 `price:"75.12"`, `quantity:"12.000"`; `imported_on:"2026-11-15"`. `meta.pagination={page:1,per_page:2,total:4,total_pages:2}`. Пагинация LIMIT/OFFSET применяется к строкам join stock, тогда как total — COUNT(DISTINCT p.id): **несогласованная семантика**, возможны повторения товара на страницах. Baseline до деплоя; production не менялся.
