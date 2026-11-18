@@ -356,13 +356,14 @@ private fun ProductGridTile(product: Product, onClick: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFE53935)
             )
-            Text(
-                text = if (product.hideStoreStock) "Остаток скрыт"
-                else formatQuantity(product.quantity)?.let { "Остаток: $it" }
-                    ?: "Наличие уточняется",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF757575)
-            )
+            if (!product.hideStoreStock) {
+                Text(
+                    text = formatQuantity(product.quantity)?.let { "Остаток: $it" }
+                        ?: "Наличие уточняется",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF757575)
+                )
+            }
         }
     }
 }
