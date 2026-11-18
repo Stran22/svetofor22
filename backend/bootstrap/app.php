@@ -90,6 +90,7 @@ try {
     $router->post('/admin/products/{id}', [$admin, 'updateProduct']);
     $router->post('/admin/products/{id}/photo', [new \Svet22\Controllers\AdminProductImageController($db), 'upload']);
     $router->get('/admin/categories', [$adminCategories, 'index']);
+    $router->get('/admin/categories/visibility', [$adminCategories, 'visibilityPage']);
     $router->post('/admin/categories', [$adminCategories, 'create']);
     $router->post('/admin/categories/visibility', [$adminCategories, 'saveVisibility']);
     $router->post('/admin/categories/{id}/toggle', [$adminCategories, 'toggle']);
