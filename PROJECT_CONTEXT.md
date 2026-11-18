@@ -161,3 +161,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — сравнение публичных методов production и staging
 Пользователь сравнил `grep -E 'public function '` в рабочих и `/tmp/svet22-deploy-20261118` контроллерах. `AdminCategoriesController` сохраняет __construct,index,edit,create,update,toggle,delete и добавляет `saveVisibility`; `ApiController` сохраняет __construct,health,healthDb,branches,categories,products,product,productReviews,createProductReview,registerDevice,me,logout (12 включая конструктор). Синтаксис всех трёх файлов уже проверен. Следующий шаг — установить новый сервис в `backend/app/Services/` (он отсутствовал) с lint; затем отдельно синхронно установить контроллеры и проверить API. Production bootstrap маршрут уже установлен.
+
+### 2026-11-18 — production CategoryVisibilityService установлен
+Пользователь установил `/tmp/svet22-deploy-20261118/CategoryVisibilityService.php` в `backend/app/Services/CategoryVisibilityService.php` через `install -m 664`. Вывод: `No syntax errors detected in app/Services/CategoryVisibilityService.php`, `-rw-rw-r-- 1 prorock prorock 1,6K ноя 18 13:30`. Контроллеры production пока не заменены; их backups `.bak-20261118` готовы. Следующий шаг — установить оба контроллера, проверить lint и три API endpoints, не менять DB.
