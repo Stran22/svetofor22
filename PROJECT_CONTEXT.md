@@ -101,3 +101,6 @@ Production `ApiController::products()` напрямую возвращает `s.
 
 ### 2026-11-18 — PHP lint CategoryVisibilityService успешен
 Пользователь выполнил `/opt/php85/bin/php -l /tmp/svet22_CategoryVisibilityService_check.php` для GitHub файла коммита `c3f1b4b644b53cdedf850cb9f8ce31f262bd4414`; вывод: `No syntax errors detected in /tmp/svet22_CategoryVisibilityService_check.php`. Это только проверка синтаксиса. Production файл по-прежнему отсутствует, сервис не развёрнут. Следующий шаг — реализовать/проверить маскировку price/quantity в API `products()` и `product()` и предотвратить обход через фильтры.
+
+### 2026-11-18 — production stock schema проверена
+`SHOW COLUMNS FROM stock` в `prorock_law` подтверждает `price decimal(12,2) NOT NULL`, `quantity decimal(12,3) NOT NULL DEFAULT 0.000`, `product_id`, `branch_id`, `imported_on`, `updated_at`. Для категорий с запретом показа скрывать `price`/`quantity` в API-ответе (`null`), не изменяя stock или импорт XLSX. Сохранять филиалы, поиск, пагинацию. Следующий этап — реализация маскировки в GitHub `ApiController.php`, затем lint и тесты; production пока не менять.
