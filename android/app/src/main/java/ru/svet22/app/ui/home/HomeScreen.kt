@@ -374,7 +374,7 @@ private fun ProductCard(product: Product, onClick: () -> Unit) {
             Spacer(Modifier.height(9.dp))
             Surface(color = Yellow, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    if (product.hideStoreStock) "Цена скрыта" else product.price?.let { "$it ₽" } ?: "Цена не указана",
+                    product.price?.let { "$it ₽" } ?: "Цена не указана",
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                     color = Dark, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp
                 )
@@ -444,7 +444,7 @@ private fun FeaturedTile(product: Product, onClick: () -> Unit, modifier: Modifi
             color = Yellow, shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                if (product.hideStoreStock) "Цена скрыта" else product.price?.let { "$it ₽" } ?: "Цена не указана",
+                product.price?.let { "$it ₽" } ?: "Цена не указана",
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 9.dp),
                 fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
                 maxLines = 1, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
