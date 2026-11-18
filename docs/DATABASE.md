@@ -100,3 +100,7 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — новая миграция (GitHub, не применена)
 `009_sales_banner_settings.sql`: отдельная таблица `sales_banner_settings` с единственной строкой id=1, `is_enabled`, `mode` (`text`/`product`), `heading`, `cta_text`, `right_title`, `right_subtitle`, `product_id` (FK на `products.id`, ON DELETE SET NULL), `image_override_url`, `updated_at`. **Не применена на production.** Перед запуском сделать резервную копию и сверить `schema_migrations`.
+
+
+## Аналитика посетителей (2026-11-19)
+Миграция `010_visitor_analytics.sql` создаёт `app_analytics_events`: `id`, `user_id` (включая гостя с токеном), `event_type` (`visit`, `product_view`, `category_click`), `product_id`, `category_id`, `branch_id`, `created_at`. Посещение записывается не чаще одного раза в день на пользователя; просмотры и клики считаются отдельно. Поисковые запросы остаются в `search_events`, подписки — в `subscriptions`. Миграция не применена на production автоматически.
