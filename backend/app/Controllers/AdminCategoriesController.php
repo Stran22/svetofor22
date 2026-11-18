@@ -136,7 +136,10 @@ final class AdminCategoriesController
             if (!isset($visited[(int)$category['id']])) $walk((int)$category['id'], 0);
         }
         $csrf = AdminView::e($this->auth->csrfToken());
-        $content = '<section class="card"><p>Отметьте категории, в которых нужно скрыть цены и остатки. Ограничение родительской категории распространяется на все подкатегории.</p>'
+        $savedNotice = (($request->query()['saved'] ?? '') === '1')
+            ? '<section class="card" role="status" style="border-left:4px solid #218657"><strong>Настройки успешно сохранены.</strong></section>'
+            : '';
+        $content = $savedNotice . '<section class="card"><p>Отметьте категории, в которых нужно скрыть цены и остатки. Ограничение родительской категории распространяется на все подкатегории.</p>'
             . '<p class="muted">Изменения вступают в силу после сохранения. Управление названиями и структурой — в разделе <a href="/admin/categories">Категории</a>.</p></section>'
             . '<section class="card"><form method="post" action="/admin/categories/visibility">'
             . '<input type="hidden" name="csrf_token" value="' . $csrf . '">'
@@ -188,7 +191,7 @@ final class AdminCategoriesController
             if ($this->db->inTransaction()) $this->db->rollBack();
             throw $e;
         }
-        Response::redirect('/admin/categories/visibility');
+        Response::redirect('/admin/categories/visibility?saved=1');
     }
 
     public function edit(Request $request, array $params): never
