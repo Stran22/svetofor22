@@ -94,3 +94,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### 2026-11-18 — проверка дублей stock
 Пользователь выполнил `SELECT product_id, branch_id, COUNT(*) AS records_count FROM stock GROUP BY product_id, branch_id HAVING COUNT(*) > 1;`. Результат: пусто (0 строк). На момент проверки нет повторных записей для пары `(product_id, branch_id)`. Это не доказывает наличие UNIQUE-ограничения в схеме; проверить индекс отдельно при необходимости.
+
+### 2026-11-18 — подтверждены индексы production stock
+`SHOW INDEX FROM stock` подтвердил: `PRIMARY(id)` UNIQUE; `uq_stock_product_branch(product_id,branch_id)` UNIQUE (`Non_unique=0`, последовательность 1/2); `idx_stock_branch_quantity(branch_id,quantity)` неуникальный; `idx_stock_updated(updated_at)` неуникальный. Следовательно, MySQL запрещает повтор пары `(product_id,branch_id)`; добавлять индекс повторно не нужно. Проверка только читающая.
