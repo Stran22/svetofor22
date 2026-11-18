@@ -39,12 +39,9 @@ final class SubscriptionController
         if ($productId === false || $productId === null) {
             Response::error('VALIDATION_ERROR', 'Укажите корректный product_id.', 422);
         }
-        $account = $this->db->prepare('SELECT is_guest FROM users WHERE id = ? LIMIT 1');
-        $account->execute([$userId]);
-        $user = $account->fetch(PDO::FETCH_ASSOC);
-        if (!$user || (int)$user['is_guest'] !== 0) {
-            Response::error('AUTH_REQUIRED', 'Для отслеживания товара войдите в аккаунт.', 403);
-        }
+        // Guest devices receive their own Bearer token during FCM registration.
+        // Tracking is available without social login; the token still identifies
+        // the device and scopes subscriptions to its user record.
 
         try {
             $this->db->beginTransaction();
