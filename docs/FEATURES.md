@@ -60,3 +60,6 @@
 
 ### 2026-11-18 — CategoryVisibilityService адаптирован к production
 Пользователь подтвердил через `ls -l`, что в production отсутствует `backend/app/Services/CategoryVisibilityService.php`. В GitHub сервис существует. Коммит `c3f1b4b644b53cdedf850cb9f8ce31f262bd4414` меняет SQL сервиса с отсутствующего `hide_store_stock` на существующее `show_price_stock` и рассчитывает прежний API-флаг `hide_store_stock` как отрицание `show_price_stock` с наследованием от родителя. **Только GitHub, не развёрнуто/не протестировано.**
+
+### 2026-11-18 — маскировка price/quantity в GitHub API (не завершено)
+Коммит `767aa0d6f14618408f274444f95e375125f0efb6` добавляет в `ApiController::products()` и `product()` маскировку `price`, `quantity`, временных полей и `hide_store_stock` для скрытых категорий через `CategoryVisibilityService` (с наследованием). **Не проверено lint, не развёрнуто.** Требуется защита от косвенного раскрытия через `sort=price_asc/price_desc`, `in_stock=true`, пагинацию/порядок и тесты. Android ещё не обновлён.
