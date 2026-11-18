@@ -6,7 +6,7 @@ namespace Svet22\Services;
 use PDO;
 
 /**
- * Queues one notification per subscriber and product-availability cycle.
+ * Queues one notification per subscriber for each new zero-to-positive transition.
  * Must be called inside the stock-import transaction.
  */
 final class RestockNotificationService
@@ -24,9 +24,10 @@ final class RestockNotificationService
             return 0;
         }
 
-        // A stable key plus uq_delivery_event prevents duplicate notifications
-        // when multiple branches restock before the queue worker runs.
-        $eventKey = 'restock:' . $productId;
+        // Each transition is a new availability cycle. A fixed product-only key
+        // suppressed later restocks permanently, even after stock returned to zero.
+        // The same event key is shared by subscribers of this transition.
+        $eventKey = 'restock:' . $productId . ':' . bin2hex(random_bytes(12));
         $subscriptions = $this->db->prepare(
             "SELECT id FROM subscriptions
              WHERE product_id = ? AND status = 'active'
