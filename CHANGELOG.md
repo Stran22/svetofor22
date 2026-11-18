@@ -259,3 +259,7 @@
 ## 2026-11-18 — staging routes lint confirmed
 - `app.php`: PHP 8.5 lint OK; GET `/admin/categories/visibility` (строка 93), POST `/admin/categories/visibility` (строка 95).
 - Все три staging PHP файла теперь прошли lint; установка на production ещё не выполнена.
+
+## 2026-11-18 — резервные копии перед установкой меню
+- Подтверждены три backup-файла в `~/svet22-backup-menu-20261118`: `AdminCategoriesController.php` (21K), `AdminView.php` (7.3K), `app.php` (6.8K).
+- Production ещё не обновлён; следующий этап — установка подготовленных файлов.
