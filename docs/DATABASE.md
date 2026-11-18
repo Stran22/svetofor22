@@ -79,3 +79,6 @@ SHOW CREATE TABLE push_delivery_log;
 
 ### Подтверждение использования поля в production контроллере (2026-11-18)
 `AdminCategoriesController::all()` делает `SELECT id, parent_id, name, slug, sort_order, image_url, is_active FROM categories ORDER BY sort_order, name, id` — **не выбирает** `show_price_stock`. `one()` делает `SELECT * FROM categories WHERE id=?` — **получает** существующий столбец. `fields()` валидирует `name`, `parent_id`, `sort_order`, HTTPS `image_url` и возвращает массив из 4 значений, **не читает** чекбокс. В production таблице поле уже существует, все 102 значения = 1; миграция для добавления поля не нужна.
+
+### 2026-11-18 — подтверждена production таблица stock
+По выполненному пользователем в phpMyAdmin `SHOW COLUMNS FROM stock` (БД `prorock_law`): `id bigint unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT`, `product_id bigint unsigned NOT NULL INDEX`, `branch_id bigint unsigned NOT NULL INDEX`, `price decimal(12,2) NOT NULL` (без default), `quantity decimal(12,3) NOT NULL DEFAULT 0.000`, `imported_on date NULL`, `updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` (индекс). При скрытии цен и остатков **не записывать NULL в stock**; маскировать значения `price`/`quantity` только в JSON API. Не выводить URL с сессионным токеном phpMyAdmin.
