@@ -69,3 +69,7 @@ SHOW CREATE TABLE upload_log;
 SHOW CREATE TABLE push_delivery_log;
 ```
 Без явного согласия не выполнять ALTER, DELETE или запуск мигратора на production.
+
+### Подтверждённая production-схема `categories` (phpMyAdmin, 2026-11-18)
+Пользователь выполнил `SHOW COLUMNS FROM categories;` в MySQL базе `prorock_law`. Столбцы: `id bigint unsigned NOT NULL PRIMARY KEY AUTO_INCREMENT`; `parent_id bigint unsigned NULL INDEX`; `name varchar(190) NOT NULL`; `slug varchar(220) NOT NULL`; `image_url varchar(1000) NULL`; `sort_order int NOT NULL DEFAULT 0`; `is_active tinyint(1) NOT NULL DEFAULT 1 INDEX`; **`show_price_stock tinyint(1) NOT NULL DEFAULT 1`**; `created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP`; `updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`.
+**Критическое расхождение:** production уже имеет `show_price_stock` (1 = показывать цену/остатки; 0 = скрывать), тогда как текущая реализация GitHub использует `hide_store_stock` (инвертированная семантика). **Не добавлять дублирующий столбец и не применять миграцию вслепую**. Перед патчем сверить все места чтения/записи и наследование настройки в категориях; сохранить существующие значения.
