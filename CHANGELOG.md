@@ -208,3 +208,8 @@
 ## 2026-11-18 — подтверждены связи подготовленных PHP-файлов
 - grep временных файлов подтвердил `saveVisibility`, `show_price_stock`, `hide_store_stock`, `CategoryVisibilityService::all/forCategory` и использование сервиса в API.
 - Новые файлы ещё не установлены на production; следующий шаг — сравнение публичных методов старых и новых контроллеров.
+
+## 2026-11-18 — сравнение методов контроллеров перед деплоем
+- Все публичные методы production `AdminCategoriesController` и `ApiController` присутствуют в staging версиях.
+- Дополнительно появился `AdminCategoriesController::saveVisibility`.
+- Новые файлы ещё не установлены. Следующий шаг — установка нового сервиса с проверкой.
