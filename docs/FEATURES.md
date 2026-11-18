@@ -63,3 +63,6 @@
 
 ### 2026-11-18 — маскировка price/quantity в GitHub API (не завершено)
 Коммит `767aa0d6f14618408f274444f95e375125f0efb6` добавляет в `ApiController::products()` и `product()` маскировку `price`, `quantity`, временных полей и `hide_store_stock` для скрытых категорий через `CategoryVisibilityService` (с наследованием). **Не проверено lint, не развёрнуто.** Требуется защита от косвенного раскрытия через `sort=price_asc/price_desc`, `in_stock=true`, пагинацию/порядок и тесты. Android ещё не обновлён.
+
+### 2026-11-18 — защита сортировки/фильтра наличия (GitHub)
+Коммит `3a14c33589e8419b92560aefb91bc7d21f77425d`: `ApiController::products()` получает скрытые категории через `CategoryVisibilityService` с наследованием. Для `sort=price_asc/price_desc` использует SQL `CASE WHEN p.category_id IN (hidden_ids) THEN NULL ELSE s.price END`, чтобы не сортировать скрытые товары по реальной цене. Для `in_stock=true` исключает скрытые категории, чтобы не раскрывать наличие через фильтрацию. Прямые поля `price/quantity` маскируются ранее. **Не развёрнуто, новый коммит ещё не проверен lint и тестами**; нужно отдельно проверить поведение поиска/филиалов/пагинации и Android.
