@@ -293,3 +293,7 @@
 ## 2026-11-18 — подтверждение сохранения настроек (GitHub)
 - `AdminCategoriesController.php`: добавлено сообщение «Настройки успешно сохранены» после POST `/admin/categories/visibility` через redirect `?saved=1`.
 - Изменение только в GitHub (`75ce461`), серверная установка и проверка ожидаются.
+
+## 2026-11-18 — staging lint подтверждения сохранения
+- `AdminCategoriesController.php` (коммит `75ce461`): PHP 8.5 lint на сервере прошёл.
+- Production ещё не обновлён; ожидается backup и установка.
