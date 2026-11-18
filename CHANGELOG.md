@@ -198,3 +198,9 @@
 - Созданы `.bak-20261118` для `AdminCategoriesController.php` и `ApiController.php`.
 - `CategoryVisibilityService.php` отсутствует в production, при установке будет новым файлом.
 - Рабочие контроллеры ещё не заменены.
+
+## 2026-11-18 — pre-deploy PHP lint трёх файлов пройден
+- `/tmp/svet22-deploy-20261118/AdminCategoriesController.php` — PHP 8.5 lint OK.
+- `/tmp/svet22-deploy-20261118/ApiController.php` — PHP 8.5 lint OK.
+- `/tmp/svet22-deploy-20261118/CategoryVisibilityService.php` — PHP 8.5 lint OK.
+- Production не заменён; следующий шаг — проверка связей и методов.
