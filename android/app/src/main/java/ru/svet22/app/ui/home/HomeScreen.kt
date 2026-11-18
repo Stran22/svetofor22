@@ -157,10 +157,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("СВЕТОФОР", color = Red, fontWeight = FontWeight.ExtraBold, fontSize = 29.sp)
-                Spacer(Modifier.weight(1f))
-                Surface(color = Yellow, shape = RoundedCornerShape(12.dp)) {
-                    Text("БИЙСК", modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                }
+
             }
             Spacer(Modifier.height(14.dp))
             if (salesBanner?.isEnabled != false) {
@@ -536,8 +533,8 @@ private fun SalesPromoBanner(
             polygon(floatArrayOf(30f, 5f, 20f, 200f, 440f, 170f, 440f, 55f), black, true, 5f)
             polygon(floatArrayOf(5f, 31f, 5f, 185f, 410f, 205f, 430f, 10f), 0x33000000)
             polygon(floatArrayOf(5f, 31f, 5f, 180f, 410f, 200f, 430f, 10f), 0xFFFDD808.toInt())
-            label(settings?.heading ?: "SALES", 38f, 122f, 58f, 0xFFFAFAFA.toInt(), headingFont = true)
-            label(settings?.heading ?: "SALES", 38f, 119f, 58f, black, headingFont = true)
+            label(settings?.heading ?: "SALES", 38f, 122f, 39f, 0xFFFAFAFA.toInt(), headingFont = true)
+            label(settings?.heading ?: "SALES", 38f, 119f, 39f, black, headingFont = true)
             label((settings?.ctaText ?: "SHOP NOW").uppercase(Locale.ROOT).toCharArray().joinToString(" "), 76f, 161.5f, 20f, android.graphics.Color.WHITE)
             if (!productMode || productBitmap == null) {
                 if (settings == null) {
