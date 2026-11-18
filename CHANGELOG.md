@@ -47,3 +47,8 @@
 - Пользователь сообщил пустой результат grep по `hide_store_stock`, `show_price_stock`, `ALTER TABLE categories` в серверных миграциях/backend.
 - Зафиксировано ограничение проверки: наличие столбца в реальной БД этим не устанавливается; следующий шаг — read-only проверка `categories` через phpMyAdmin.
 - Только документация; production и БД не изменены.
+
+## 2026-11-18 — обнаружен существующий флаг в production MySQL
+- По `SHOW COLUMNS FROM categories` в `prorock_law` подтверждено `show_price_stock TINYINT(1) NOT NULL DEFAULT 1`; в предоставленной схеме нет `hide_store_stock`.
+- Выявлен конфликт именования и инвертированной логики между production БД и GitHub. Принято не создавать дублирующий столбец до полного аудита.
+- Обновлена только документация, MySQL и код не менялись.
