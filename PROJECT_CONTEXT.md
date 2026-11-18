@@ -152,3 +152,6 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 
 ### 2026-11-18 — резервные копии контроллеров production
 Пользователь выполнил `cp -p` для трёх файлов: созданы `backend/app/Controllers/AdminCategoriesController.php.bak-20261118` и `backend/app/Controllers/ApiController.php.bak-20261118`; `backend/app/Services/CategoryVisibilityService.php` на production **отсутствует**, это новый GitHub сервис, его нужно создать при деплое. Production контроллеры пока не заменены. Production bootstrap уже имеет добавленный POST `/admin/categories/visibility` и резервную копию. Следующий шаг — скачать три файла во временный каталог, проверить lint и совместимость, затем атомарно заменить контроллеры и добавить сервис.
+
+### 2026-11-18 — три PHP-файла скачаны во временную папку, lint успешен
+Пользователь скачал из `feature/excel-column-mapping` в `/tmp/svet22-deploy-20261118/` файлы `AdminCategoriesController.php`, `ApiController.php`, `CategoryVisibilityService.php`. Все три `/opt/php85/bin/php -l` выдали `No syntax errors detected`. Production файлы ещё не заменены. Есть backups двух контроллеров и bootstrap; новый сервис отсутствует на production. Следующий шаг — проверка методов/ссылок на сервис и совместимости перед установкой.
