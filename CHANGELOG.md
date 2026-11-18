@@ -28,3 +28,8 @@
 ## 2026-11-18 — подтверждена загрузка серверных контроллеров
 - По grep `backend/bootstrap/app.php` установлены Composer autoload (`vendor/autoload.php`), `Router`, создание `ApiController`, `AdminCategoriesController` и `SubscriptionController`.
 - Добавлены сведения в `docs/SERVER_CONFIG.md` и `PROJECT_CONTEXT.md`. Никакие исходники, серверные настройки и БД не изменялись.
+
+## 2026-11-18 — инвентаризация маршрутов работающего backend
+- Из вывода `grep` пользователя зафиксированы фактически зарегистрированные API и административные маршруты каталога, отзывов, подписок, акций, конкурсов и рекомендуемых товаров.
+- В выборке нет `/admin/categories/visibility`, присутствующего в GitHub; требуется дальнейшая сверка.
+- Обновлены `docs/SERVER_CONFIG.md`, `docs/API_ROUTES.md`, `PROJECT_CONTEXT.md`. Исходный код, БД и production не изменены.
