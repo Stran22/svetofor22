@@ -119,3 +119,6 @@ Production read-only SQL: 3 активных филиала (ID 1 «На Вол�
 
 ### 2026-11-18 — UNIQUE stock подтверждён
 Production `SHOW INDEX FROM stock`: UNIQUE `uq_stock_product_branch(product_id,branch_id)` уже есть. Также `PRIMARY(id)`, `idx_stock_branch_quantity(branch_id,quantity)`, `idx_stock_updated(updated_at)`. Дубли защищены на уровне БД, никаких миграций не требуется. Следующий шаг — исправить GitHub API маскировку цены/остатка в списке и карточке, сохранив фильтры/сортировку/пагинацию и защитив от косвенного раскрытия.
+
+### 2026-11-18 — начата серверная маскировка в GitHub API
+Коммит `767aa0d` обновил `backend/app/Controllers/ApiController.php`: список и карточка товара маскируют цену/остаток для скрытых категорий, возвращают `hide_store_stock`; карточка маскирует даты остатков. Не считать функцию законченной: `sort=price_*`, `in_stock` и связанные count/order всё ещё могут раскрывать скрытые данные косвенно. Нужно закрыть эти пути, проверить lint и тесты, согласовать production bootstrap/controller/service перед развёртыванием. Production не изменён.
