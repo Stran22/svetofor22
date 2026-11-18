@@ -297,3 +297,8 @@ GET `/api/v1/categories` production: HTTP/2 200, JSON `success:true`, списо
 - Реализована первая версия сбора событий гостей и авторизованных пользователей и страница `/admin/analytics` в ветке `feature/excel-column-mapping`.
 - Требуется: развернуть серверный код, применить миграцию `010_visitor_analytics.sql`, затем Android Studio Git Pull → Gradle Sync → Build APK → проверить посещения/поиск/просмотры/категории и отсутствие ошибок.
 - Заставку «Светофор Premium» не изменять.
+
+## Excel CI: ошибка поля branch_id (2026-11-19)
+- В одноразовом MySQL CI сценарии Excel добавлена `007_product_wide_subscriptions.sql` после 006: без неё `RestockNotificationService` обращался к несуществующему `push_delivery_log.branch_id`.
+- **Не запускать 007 в production автоматически**: она удаляет все подписки. Рабочий сервер не изменён.
+- Проверить новый Excel import safety checks в GitHub Actions. Заставка Premium без изменений.
