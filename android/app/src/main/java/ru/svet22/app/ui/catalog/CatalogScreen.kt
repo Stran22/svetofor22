@@ -350,8 +350,7 @@ private fun ProductGridTile(product: Product, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = if (product.hideStoreStock) "Цена скрыта"
-                else product.price?.takeIf { it.isNotBlank() }?.let { "$it ₽" }
+                text = product.price?.takeIf { it.isNotBlank() }?.let { "$it ₽" }
                     ?: "Цена не указана",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
