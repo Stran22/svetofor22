@@ -98,3 +98,6 @@
 
 ### 2026-11-18 — baseline production GET /api/v1/products?per_page=2
 Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/products?per_page=2`. Ответ HTTP/2 200, `success:true`, `data` — две строки **одного товара** ID 6 «Кефир 1%» (category_id=55): филиал 1 `price:"74.00"`, `quantity:"5.000"`; филиал 2 `price:"75.12"`, `quantity:"12.000"`; `imported_on:"2026-11-15"`. `meta.pagination={page:1,per_page:2,total:4,total_pages:2}`. Пагинация LIMIT/OFFSET применяется к строкам join stock, тогда как total — COUNT(DISTINCT p.id): **несогласованная семантика**, возможны повторения товара на страницах. Baseline до деплоя; production не менялся.
+
+### 2026-11-18 — baseline production GET /api/v1/products/6
+Пользователь выполнил `curl -sS -i https://baza.altaj-otdyh.ru/api/v1/products/6`: HTTP/2 200, `success:true`, `data.id=6`, `name="Кефир 1%"`, `category_id=55`, `branches` содержит филиал 1 price 74.00 quantity 5.000, филиал 2 price 75.12 quantity 12.000, филиал 3 price 78.00 quantity 3.000; `imported_on`/`updated_at` присутствуют, `reviews={reviews_count:0,rating:null}`, `meta:[]`. `hide_store_stock` и `can_track` в baseline отсутствуют. Сохранить `branches` и `reviews` при обновлении.
