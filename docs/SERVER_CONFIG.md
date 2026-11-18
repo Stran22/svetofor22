@@ -47,3 +47,10 @@ git rev-parse HEAD
 - На сервере ранее наблюдались лишь файлы миграций `001_initial_schema.sql`, `002_admin_panel.sql`, `006_search_analytics.sql`, хотя в GitHub их больше. Не переносить и не запускать миграции автоматически.
 - База `prorock_law`: 28 таблиц, включая `categories`, `stock`, `subscriptions`, `excel_column_mappings`, `reviews`, `push_delivery_log`. По ранее полученному списку полей `categories` **не содержала** `hide_store_stock`; перепроверить `SHOW COLUMNS` непосредственно перед решением о миграции.
 - **Вывод:** GitHub и сервер могут находиться на разных версиях. До деплоя нужны read-only сравнение файлов, веб-корня, миграций и резервная копия. Действующий Android UI не заменять упрощённой серверной копией.
+
+## Подтверждено пользователем в ISPmanager — 2026-11-18
+- **Корень домена `baza.altaj-otdyh.ru` в настройках ISPmanager:** `/backend/public` (относительно каталога сайта), полный путь `/var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/public`.
+- **Версия PHP, назначенная домену:** PHP 8.5 (ISPmanager). Отдельно CLI `/opt/php85/bin/php -v` показал **PHP 8.5.12**. Точный patch-level PHP для HTTP и SAPI пока не измерены, не приравнивать их автоматически к CLI.
+- Файл активной точки входа `backend/public/index.php` подтверждён выводом `cat`: `<?php`, `declare(strict_types=1);`, `use Svet22\\Core\\Config;`, `require dirname(__DIR__) . '/bootstrap/app.php';`. Следовательно, он подключает `/var/www/prorock/data/www/baza.altaj-otdyh.ru/backend/bootstrap/app.php`.
+- `public/` в корне проекта содержит лишь `.htaccess` с `SetEnv SVET_CONFIG_FILE /var/www/prorock/data/secure/svet22/config.php`; это **не** web-root домена. `public.backup-20261101/` — резервная папка.
+- Для диагностики работающих маршрутов читать `backend/bootstrap/app.php` и используемые им контроллеры, а не `.deploy/`.
