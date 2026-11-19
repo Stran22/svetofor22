@@ -253,7 +253,7 @@ final class AdminInsightsController
             . '<h3 id="insight-help-title"></h3><p id="insight-help-description"></p>'
             . '<form method="dialog"><button type="submit">Закрыть</button></form></dialog>'
             . '<style>.insight-help{border:0;background:none;color:#1769a3;text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:0 0 0 5px}.insight-help:hover{color:#0d426b}.insight-help-dialog{max-width:min(460px,calc(100vw - 32px));width:100%;border:1px solid #dce6f1;border-radius:14px;padding:24px;box-shadow:0 18px 55px #123d7233;color:#24364a}.insight-help-dialog::backdrop{background:#142b4a88}.insight-help-dialog h3{margin:0 0 12px;color:#123d72}.insight-help-dialog p{line-height:1.55;margin:0 0 20px}</style>'
-            . '<script>document.addEventListener("click",function(event){var button=event.target.closest(".insight-help");if(!button)return;var dialog=document.getElementById("insight-help-dialog");if(!dialog||!dialog.showModal)return;document.getElementById("insight-help-title").textContent=button.dataset.insightTitle;document.getElementById("insight-help-description").textContent=button.dataset.insightDescription;dialog.showModal();});</script>';
+            . '<script src="/assets/js/admin-insights-help.js" defer></script>';
         Response::html(AdminView::layout('Панель руководителя', $content, $admin));
     }
 
