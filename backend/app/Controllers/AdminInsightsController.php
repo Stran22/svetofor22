@@ -45,6 +45,16 @@ final class AdminInsightsController
             . ($branchId ? ' AND s.branch_id=?' : ''),
             $branchId ? [$since, $branchId] : [$since]
         );
+        // A device-level sent record means Firebase accepted that token's message.
+        // Historical push events without device records remain counted separately.
+        $firebaseAccepted = (int) $this->scalar(
+            "SELECT COUNT(*) FROM push_device_deliveries d"
+            . " INNER JOIN push_delivery_log l ON l.id=d.delivery_id"
+            . " INNER JOIN subscriptions s ON s.id=l.subscription_id"
+            . " WHERE d.status='sent' AND d.sent_at>=?"
+            . ($branchId ? ' AND s.branch_id=?' : ''),
+            $branchId ? [$since, $branchId] : [$since]
+        );
         $stock = $this->db->prepare(
             'SELECT COUNT(*) AS total, COALESCE(SUM(st.quantity<=0),0) AS empty_count'
             . ' FROM stock st JOIN products p ON p.id=st.product_id WHERE p.is_active=1'
@@ -144,7 +154,8 @@ final class AdminInsightsController
             . $this->kpi('Новые пользователи', $newUsers, 'За выбранный период · все филиалы')
             . $this->kpi('Новые подписки', $newSubscriptions, 'За выбранный период')
             . $this->kpi('Ожидают поступления', $activeSubscriptions, 'Активные подписки сейчас')
-            . $this->kpi('Принято Firebase', $sent, 'Уведомления за период')
+            . $this->kpi('Push-события', $sent, 'Успешные события за период')
+            . $this->kpi('Принято Firebase', $firebaseAccepted, 'Отправки на устройства за период')
             . $this->kpi('Нет в наличии', (int) $stockStats['empty_count'], 'Позиций с нулевым остатком')
             . '</div>'
             . '<div class="insight-two"><section class="card"><h2>Новые подписки по дням</h2>'
@@ -232,7 +243,7 @@ final class AdminInsightsController
         }
         $content .= '</div><p class="insight-note">Доли рассчитаны по позициям с загруженными остатками, а не по всему ассортименту. '
             . 'Подписки — сигнал интереса, а не подтверждённые продажи. '
-            . '«Принято Firebase» не означает, что уведомление прочитано. '
+            . '«Принято Firebase» — ответы сервиса по устройствам, а не подтверждение доставки или прочтения. Исторические push-события без записи об устройстве не считаются ошибками. '
             . 'Просмотры, поисковые запросы и покупки пока не отслеживаются.</p></section>'
             . '<section class="card"><h2>Рабочие инструменты</h2><p>'
             . '<a class="button" href="/admin/import">Импорт Excel</a> '
