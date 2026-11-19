@@ -443,3 +443,9 @@
 - Android Studio, `D:\GitHub\svetofor22-updated\android`: `git pull --ff-only` обновил ветку `feature/excel-column-mapping` на 19 коммитов до `973925c` без конфликтов; рабочее дерево чистое. Подтверждено наличие `VisitorAnalyticsRepository.kt`.
 - Исправлен только для текущей PowerShell-сессии `JAVA_HOME`: старый `Android Studio2\jbr` заменён на `C:\Program Files\Android\Android Studio\jbr`. `:app:assembleDebug` — **BUILD SUCCESSFUL in 1m 12s**, 38 tasks (9 executed, 29 up-to-date).
 - Осталось проверить новый APK на телефоне и фактическую запись `product_view`; работоспособность дизайна Premium Splash и остальных функций после этой сборки ещё не подтверждена.
+
+## 2026-11-19 — аналитика: проверка данных и пункт меню production
+- После установки debug APK через USB пользователь подтвердил запуск Android. В production `app_analytics_events` зарегистрированы 4 события: `visit` (1) и `product_view` (3), `user_id=5`, товары ID 6 и 8, филиалы ID 1 и 3. Отправка событий с Android в MySQL подтверждена; `category_click` пока не подтверждён.
+- Пользователь подтвердил, что на `/admin/analytics?period=month` появились разделы «Что смотрят чаще всего» и «Клики по рубрикам», а названия просмотренных товаров отображаются.
+- В действующем `backend/app/Views/AdminView.php` отсутствовала ссылка на `/admin/analytics`. Пользователь добавил «Аналитика» между «Обзор» и «Импорт Excel» с резервной копией `AdminView.php.backup-analytics-menu`. PHP 8.5 lint: `No syntax errors detected in backend/app/Views/AdminView.php`.
+- Проверка клика по новому пункту меню в браузере пока ожидается; не считать её выполненной.
