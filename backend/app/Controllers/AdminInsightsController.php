@@ -39,8 +39,10 @@ final class AdminInsightsController
             "SELECT COUNT(*) FROM subscriptions WHERE status='active'", []
         );
         $sent = (int) $this->scalar(
-            "SELECT COUNT(*) FROM push_delivery_log l WHERE l.status='sent' AND l.sent_at>=?"
-            . ($branchId ? ' AND l.branch_id=?' : ''),
+            "SELECT COUNT(*) FROM push_delivery_log l"
+            . " INNER JOIN subscriptions s ON s.id=l.subscription_id"
+            . " WHERE l.status='sent' AND l.sent_at>=?"
+            . ($branchId ? ' AND s.branch_id=?' : ''),
             $branchId ? [$since, $branchId] : [$since]
         );
         $stock = $this->db->prepare(
@@ -137,7 +139,7 @@ final class AdminInsightsController
         foreach ($branches as $b) {
             $content .= '<option value="' . (int) $b['id'] . '"' . ($branchId === (int) $b['id'] ? ' selected' : '') . '>' . $e($b['name']) . '</option>';
         }
-        $content .= '</select></label><button type="submit">Применить</button></form><p class="insight-note">Фильтр филиала применяется к остаткам, поиску и push. Подписки учитываются по товару сразу для всех филиалов.</p></section>'
+        $content .= '</select></label><button type="submit">Применить</button></form><p class="insight-note">Фильтр филиала применяется к остаткам, поиску и историческим push с указанным филиалом. Общие подписки и push без филиала учитываются в режиме «Все филиалы».</p></section>'
             . '<div class="insight-kpis">'
             . $this->kpi('Новые пользователи', $newUsers, 'За выбранный период · все филиалы')
             . $this->kpi('Новые подписки', $newSubscriptions, 'За выбранный период')
