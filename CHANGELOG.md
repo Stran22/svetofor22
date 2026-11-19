@@ -435,3 +435,11 @@
 - В тестовую схему CI добавлена миграция `007_product_wide_subscriptions.sql`, которая вводит `push_delivery_log.branch_id` и согласует формат подписок с текущим кодом.
 - Важно: миграция содержит `DELETE FROM subscriptions`; её применение ограничено одноразовой тестовой БД GitHub Actions. На рабочую БД ничего не применялось.
 - Повторный результат CI требует проверки.
+
+
+## 2026-11-19 — аналитика production и Android BUILD SUCCESSFUL
+- Production: создана и зарегистрирована миграция `010_visitor_analytics.sql` в `prorock_law`, установлены два PHP-контроллера аналитики, добавлены два маршрута в `backend/bootstrap/app.php` с резервной копией. PHP lint контроллеров и маршрутизатора пройден. В админке «Кликов по товарам» переименовано в «Просмотры товаров»; lint пройден.
+- HTTP POST `/api/v1/analytics/event` без токена вернул ожидаемый `401 UNAUTHENTICATED`. Таблица событий пока пустая; тест записи с APK не выполнен.
+- Android Studio, `D:\GitHub\svetofor22-updated\android`: `git pull --ff-only` обновил ветку `feature/excel-column-mapping` на 19 коммитов до `973925c` без конфликтов; рабочее дерево чистое. Подтверждено наличие `VisitorAnalyticsRepository.kt`.
+- Исправлен только для текущей PowerShell-сессии `JAVA_HOME`: старый `Android Studio2\jbr` заменён на `C:\Program Files\Android\Android Studio\jbr`. `:app:assembleDebug` — **BUILD SUCCESSFUL in 1m 12s**, 38 tasks (9 executed, 29 up-to-date).
+- Осталось проверить новый APK на телефоне и фактическую запись `product_view`; работоспособность дизайна Premium Splash и остальных функций после этой сборки ещё не подтверждена.
