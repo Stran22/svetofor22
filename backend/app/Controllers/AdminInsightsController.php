@@ -249,6 +249,11 @@ final class AdminInsightsController
             . '<a class="button" href="/admin/import">Импорт Excel</a> '
             . '<a class="button" href="/admin/subscribers">Подписчики</a> '
             . '<a class="button" href="/admin/push">Push-уведомления</a></p></section>';
+        $content .= '<dialog id="insight-help-dialog" class="insight-help-dialog" aria-labelledby="insight-help-title">'
+            . '<h3 id="insight-help-title"></h3><p id="insight-help-description"></p>'
+            . '<form method="dialog"><button type="submit">Закрыть</button></form></dialog>'
+            . '<style>.insight-help{border:0;background:none;color:#1769a3;text-decoration:underline;cursor:pointer;font:inherit;font-size:12px;padding:0 0 0 5px}.insight-help:hover{color:#0d426b}.insight-help-dialog{max-width:min(460px,calc(100vw - 32px));width:100%;border:1px solid #dce6f1;border-radius:14px;padding:24px;box-shadow:0 18px 55px #123d7233;color:#24364a}.insight-help-dialog::backdrop{background:#142b4a88}.insight-help-dialog h3{margin:0 0 12px;color:#123d72}.insight-help-dialog p{line-height:1.55;margin:0 0 20px}</style>'
+            . '<script>document.addEventListener("click",function(event){var button=event.target.closest(".insight-help");if(!button)return;var dialog=document.getElementById("insight-help-dialog");if(!dialog||!dialog.showModal)return;document.getElementById("insight-help-title").textContent=button.dataset.insightTitle;document.getElementById("insight-help-description").textContent=button.dataset.insightDescription;dialog.showModal();});</script>';
         Response::html(AdminView::layout('Панель руководителя', $content, $admin));
     }
 
@@ -261,7 +266,22 @@ final class AdminInsightsController
 
     private function kpi(string $label, int $value, string $hint): string
     {
-        return '<div class="insight-kpi"><span>' . AdminView::e($label) . '</span><strong>'
+        $explanations = [
+            'Новые пользователи' => 'Количество зарегистрированных пользователей за выбранный период. Показатель общий для всех филиалов.',
+            'Новые подписки' => 'Количество созданных подписок на появление товаров за выбранный период. Повторные подписки учитываются как отдельные записи, если они были созданы заново. Подписка относится к товару, а не к конкретному филиалу.',
+            'Ожидают поступления' => 'Количество подписок со статусом active на текущий момент. Это число подписок, а не обязательно уникальных покупателей. Подписка действует для товара во всех филиалах.',
+            'Push-события' => 'Количество событий со статусом sent в журнале push_delivery_log за выбранный период. Одной подписке могут соответствовать несколько событий. Это не число устройств.',
+            'Принято Firebase' => 'Количество записей со статусом sent в журнале push_device_deliveries за выбранный период. Firebase принял запрос на отправку устройству, но это не подтверждает доставку, показ или прочтение уведомления. Старые события без записи об устройстве сюда не входят.',
+            'Нет в наличии' => 'Количество строк остатков активных товаров с количеством меньше или равным нулю. При выборе филиала учитывается только его склад; при выборе всех филиалов суммируются строки по филиалам. Это не количество уникальных отсутствующих товаров.',
+            'Всего поисков' => 'Количество зарегистрированных поисковых запросов в приложении за выбранный период и, если указан, по выбранному филиалу.',
+            'Без результатов' => 'Количество зарегистрированных поисков с нулевым количеством найденных товаров за выбранный период и, если указан, по выбранному филиалу.',
+        ];
+        $help = isset($explanations[$label])
+            ? ' <button type="button" class="insight-help" data-insight-title="' . AdminView::e($label)
+                . '" data-insight-description="' . AdminView::e($explanations[$label])
+                . '" aria-label="Что означает: ' . AdminView::e($label) . '">Что означает?</button>'
+            : '';
+        return '<div class="insight-kpi"><span>' . AdminView::e($label) . $help . '</span><strong>'
             . number_format($value, 0, ',', ' ') . '</strong><span>' . AdminView::e($hint) . '</span></div>';
     }
 }
